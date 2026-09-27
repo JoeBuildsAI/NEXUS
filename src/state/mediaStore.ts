@@ -19,6 +19,9 @@ function emptySlots(): PlayerSlot[] {
 }
 
 interface MediaState {
+  /** Session-only: the restored workspace has been revealed by the user. */
+  revealed: boolean;
+  reveal: () => void;
   layout: LayoutId;
   /** Slot shown large in focus / primary layouts. */
   focusIndex: number;
@@ -59,6 +62,8 @@ export const useMediaStore = create<MediaState>()(
       savedLayouts: [],
       syncPlayback: false,
       seekRequest: null,
+      revealed: false,
+      reveal: () => set({ revealed: true }),
       columns: 3,
       rows: 2,
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Folder, FolderPlus, Play, Plus, Search, Star, X } from "lucide-react";
 import { Button, ContextMenu, type ContextMenuItem } from "@/components/ui";
 import { useAsync } from "@/hooks/useAsync";
@@ -48,7 +48,20 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
     return all;
   }, [items, view, collection, folder, query]);
 
-  useThumbnails(filtered.slice(0, 60));
+  // Windowed rendering: 10k-file libraries never mount 10k tiles.
+  const PAGE = 60;
+  const [page, setPage] = useState(1);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => setPage(1), [view, collection, folder, query]);
+  const visible = useMemo(() => filtered.slice(0, page * PAGE), [filtered, page]);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting && visible.length < filtered.length) setPage((p) => p + 1); }, { rootMargin: "800px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible.length, filtered.length]);
+  useThumbnails(visible);
 
   const sendToSlot = (item: MediaItem, index?: number) => {
     if (item.available === false) return notify.warn("Unavailable", "The source drive or file is not reachable right now.");
@@ -162,7 +175,7 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-          {filtered.map((item) => (
+          {visible.map((item) => (
             <ContextMenu key={item.id} items={menuFor(item)}>
               <div className={cn("group", item.available === false && "opacity-50")}>
                 <div className="relative aspect-video overflow-hidden rounded-sm bg-black">
@@ -187,6 +200,8 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
           ))}
         </div>
       )}
+      <div ref={sentinel} className="h-px" />
+      {visible.length < filtered.length && <p className="mt-6 text-micro text-white/30">{visible.length} of {filtered.length} · scroll for more</p>}
     </div>
   );
 }

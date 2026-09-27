@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { FolderPlus, ShieldOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, FolderPlus, ShieldOff } from "lucide-react";
 import { Tabs, type TabItem, Button } from "@/components/ui";
 import { MediaLibrary } from "./MediaLibrary";
 import { VideoWorkspace } from "./VideoWorkspace";
@@ -8,6 +8,8 @@ import { usePrivacyStore } from "@/state/privacyStore";
 import { useDevStore } from "@/state/devStore";
 import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
 import { useNavigationStore } from "@/state/navigationStore";
+import { useMediaStore } from "@/state/mediaStore";
+import { useSettingsStore } from "@/state/settingsStore";
 import { useAsync } from "@/hooks/useAsync";
 import { getProviders } from "@/providers";
 import { isOffline } from "@/core/errors";
@@ -41,6 +43,17 @@ export function MediaScreen() {
   const withMode = provider as { mode?: () => "real" | "demo" };
   const mode = typeof withMode.mode === "function" ? withMode.mode() : "demo";
 
+  // Privacy curtain: a workspace restored from a previous session stays hidden
+  // until revealed — once per app session. Nothing plays until then.
+  const restoreWorkspace = useSettingsStore((st) => st.media.restoreWorkspace);
+  const loadedSlots = useMediaStore((st) => st.slots.filter((sl) => sl.itemId).length);
+  const revealed = useMediaStore((st) => st.revealed);
+  const reveal = useMediaStore((st) => st.reveal);
+  useEffect(() => {
+    if (!restoreWorkspace && !revealed && loadedSlots > 0) useMediaStore.getState().clearAll();
+  }, [restoreWorkspace, revealed, loadedSlots]);
+  const curtain = mode === "real" && restoreWorkspace && !revealed && loadedSlots > 0;
+
   const authorize = async () => {
     const r = await provider.authorizeRoot();
     if (r) { notify.success("Folder authorized", "Indexing"); await provider.scanRoot?.(r.id).catch(() => undefined); reload(); }
@@ -66,7 +79,19 @@ export function MediaScreen() {
           <EmptyState eyebrow="Media" title="Source disconnected" body="The authorized location is not reachable. Reconnect the drive or authorize a different folder. Your index and workspace are preserved." action={<div className="flex gap-2"><Button variant="outline" size="sm" onClick={reload}>Retry</Button><Button variant="ghost" size="sm" onClick={() => { navigate("settings"); setSection("media"); }}>Media settings</Button></div>} />
         ) : tab === "workspace" ? (
           <div className="min-h-[520px] flex-1">
-            {mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0 ? (
+            {curtain ? (
+              <div className="flex h-full min-h-[520px] items-center justify-center">
+                <div className="text-center">
+                  <p className="text-micro tracking-cinematic text-white/35">Media workspace</p>
+                  <p className="mt-3 font-display text-display-md font-semibold uppercase tracking-wide text-white/85">{loadedSlots} source{loadedSlots === 1 ? "" : "s"} restored</p>
+                  <p className="mt-3 text-[14px] text-white/40">Nothing is playing. Reveal when you're ready.</p>
+                  <div className="mt-8 flex items-center justify-center gap-3">
+                    <Button variant="primary" onClick={reveal}><Eye size={15} /> Reveal</Button>
+                    <Button variant="ghost" onClick={() => { useMediaStore.getState().clearAll(); reveal(); }}>Start empty</Button>
+                  </div>
+                </div>
+              </div>
+            ) : mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0 ? (
               <EmptyState eyebrow="Media" title="No media location" body="Choose a private folder to enable your local library. NEXUS indexes only that location, on this machine." action={<Button variant="primary" onClick={() => void authorize()}><FolderPlus size={15} /> Add folder</Button>} />
             ) : (
               <VideoWorkspace items={items ?? []} />

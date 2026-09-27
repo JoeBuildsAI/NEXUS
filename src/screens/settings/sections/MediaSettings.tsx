@@ -128,6 +128,9 @@ export function MediaSettingsSection() {
       <SettingRow label="Pause when hidden" description="Pause all players when the workspace is hidden.">
         <Toggle checked={media.pauseOnHide} onChange={(v) => setMedia({ pauseOnHide: v })} />
       </SettingRow>
+      <SettingRow label="Restore workspace" description="Bring back the last workspace structure on launch — behind a curtain, never auto-playing. Off clears players on every start.">
+        <Toggle checked={media.restoreWorkspace} onChange={(v) => setMedia({ restoreWorkspace: v })} />
+      </SettingRow>
       <SettingRow label="Local thumbnails" description={config.isTauri ? "Rendered by Windows' own thumbnail provider and cached locally under hashed names. Removed with the location's authorization." : "Available in the desktop build."}>
         <Toggle checked={media.thumbnails} disabled={!config.isTauri} onChange={(v) => { setMedia({ thumbnails: v }); if (!v) void provider.purgeThumbnails?.(); }} />
       </SettingRow>
