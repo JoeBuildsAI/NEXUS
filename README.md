@@ -11,12 +11,14 @@ Built for **Joseph**.
 NEXUS is a Tauri 2 desktop app (Rust native layer + React/TypeScript frontend) with a coherent, restrained sci‑fi design system: deep charcoal glass surfaces, subtle depth and glow, an animated ambient background, and smooth, tasteful motion.
 
 ### Modes / screens
-- **Home** — command center with `WELCOME, JOSEPH`, live date/time, system telemetry (CPU/GPU/RAM/SSD/Network) and quick cards for Gaming, Communications, Storage, Media and Recent Activity.
-- **Gaming** — library (Continue Playing / Recently Played / Installed / Completion) and a rich game‑detail view with achievements, closest achievements, and playtime. Steam‑shaped provider interface.
+- **Today** — the Home: greeting, NEXT / NOW, a chronological day that references calendar events, routines, workouts, meals and tasks (each owned by its domain), quiet Communications signals, nutrition against your targets.
+- **Calendar** — local-first Day / Week / Month / Year / Agenda with create, edit, drag-to-move, all-day, multi-day, recurrence and series exceptions; scheduled workouts appear automatically. External calendars stay behind an honest provider boundary (not connected in this build).
+- **Life** — routines (generic engine: schedules, conditional steps, one-click logging, history), fitness (templates, weekly/rotating/manual programs, live sessions with targets, previous values, PBs, rest timer, history), nutrition (provenance-aware metrics vs your own targets), meals (planner + logging + derived nutrition), groceries (derived from the plan, pantry-aware, priced only when known), tasks. Stored in a local SQLite database with backups, export and import.
+- **Play** — console-style rail (keyboard/controller friendly) over Steam and locally discovered Xbox PC games, plus a library (Continue Playing / Recently Played / Installed / Completion) and a rich game‑detail view with achievements, closest achievements, and playtime. Steam‑shaped provider interface.
 - **Media** — private local video wall: an adaptive layout optimizer for 1–6 players (aspect‑aware, primary/focus modes), Smart fill / Fit / Fill without distortion, original‑quality playback, Full and precise A–B segment looping with saved presets, saved workspaces, removable‑drive resilience, and an instant global **privacy hotkey**.
 - **System** — live telemetry, a safe process viewer with safety classification, storage analyzer, and startup apps.
 - **Communications** — unified multi‑account Outlook + Gmail inbox (demo inbox until connected): explainable local classification into 15 categories, twelve views and filters, Inbox Health with honest KNOWN/ESTIMATED/UNAVAILABLE figures, subscription manager with safe bulk unsubscribe (RFC 8058 one‑click or rule fallback), real Gmail filters / Outlook rules with preview, review‑first cleanup transactions, and an optional (unconfigured, never faked) intelligence boundary.
-- **Settings** — General, Appearance, Startup, Gaming, Media, Privacy, System, Integrations, AI.
+- **Settings** — General, Appearance, Startup, Gaming, Media, Privacy, System, Shortcuts, Integrations, AI, Life, Data.
 
 ### Signature features
 - **Boot sequence** — `INITIALIZING NEXUS` → `WELCOME, JOSEPH` → Home (skippable, respects reduced motion).

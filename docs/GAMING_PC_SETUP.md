@@ -15,7 +15,7 @@ npm run tauri:build
 Artifact (NSIS, per-user install, no admin required):
 
 ```
-src-tauri\target\release\bundle\nsis\NEXUS_0.4.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\NEXUS_0.5.0_x64-setup.exe
 ```
 
 Run it. It installs to the current user's profile and creates a Start Menu
@@ -115,6 +115,40 @@ positions/volumes, loop presets and the thumbnail cache — it lists exactly
 what goes. While Media is open, authorized drives are re-validated every few
 seconds: unplugging pauses affected players; plugging back in re-grants only
 the same canonical folder and offers resume.
+
+## 4b. Today · Calendar · Life (local-first)
+
+Nothing here needs an account. Personal data lives in
+`%APPDATA%\ai.nexus.desktop\life.db` (SQLite, WAL). Settings → Data shows
+the path, record counts and integrity, and offers **Back up now** (consistent
+snapshot into `backups\`, keeps the newest N), an optional daily local backup,
+**Restore…** (integrity-checked before anything is replaced), versioned
+**Export / Import** of your life data (never tokens, mail, media paths or sample
+rows), **Load / Remove sample data** and **Delete all personal data**.
+
+- **Today** answers "what does my day look like": NEXT, NOW, the chronological
+  agenda with completed items receding, inline routine steps, meal quick-log,
+  workout start, task toggles, and counts from Communications (never bodies).
+- **Calendar**: double-click to create, drag to move, ← → / T / N and D W M Y A
+  keys. Recurring series can drop a single occurrence.
+- **Routines** are generic: any schedule (daily, weekdays, specific days, every
+  N days, date range), steps with conditions (e.g. Retinol on Tue/Fri), one
+  click per step, Complete all / Undo / Skip / Not today, 28-day history and a
+  quiet consistency count. Personal care uses the same engine.
+- **Fitness**: templates → program (weekly / rotating / manual) → Today and
+  Calendar. Start a session: targets, previous values, weight/reps/RPE, PB
+  marks, rest timer, add/remove sets, skip, finish or abandon. History shows
+  volume, time, adherence and per-exercise bests (Epley e1RM) — planning
+  figures, not medical guidance.
+- **Nutrition**: values are KNOWN / ESTIMATED / USER or UNKNOWN; unknown parts
+  are excluded and flagged (†), never counted as zero. Targets are yours.
+- **Meals**: reusable templates built from foods, weekly planner, eaten /
+  half / skip / swap logging, derived nutrition per serving.
+- **Groceries**: MEAL PLAN → requirements → aggregation with unit families →
+  pantry subtraction → list by category; purchased / have-it survive rebuilds;
+  totals only from foods you priced. No retailer integration.
+- **Reminders** (Settings → Life) are opt-in, per domain, quiet-hour aware and
+  suppressed in Gaming and Focus modes.
 
 ## 5. Privacy hotkey
 

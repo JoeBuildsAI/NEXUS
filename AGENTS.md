@@ -24,7 +24,7 @@ Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchai
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer;
 `cargo test --lib` runs the Rust unit tests (steam/media/storage/system fixtures).
 
-Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.4.0_x64-setup.exe`
+Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.5.0_x64-setup.exe`
 (NSIS, per-user, unsigned; ~3 min release compile).
 
 Adding a Tauri feature to `Cargo.toml` (e.g. `protocol-asset`) must be paired
@@ -67,6 +67,14 @@ If port 1420 is stuck between runs, kill the listening PID:
 - Media: `src/core/media/layout.ts` (deterministic wall optimizer), `loop.ts` (A–B model); `PlayerTile`/`VideoWall`/`Timeline`; `loopPresetsStore` purged with roots; `useMediaRootWatch` (drive lifecycle). Demo clips in `public/demo` (generated, synthetic). `node scripts/gen-fixtures.mjs` makes larger fixtures for `node scripts/media-audit.mjs` (layout/loop/perf audit with real playback).
 - Comms: `src/core/email/{classify,unsubscribe,rules,cleanup,health}.ts` are pure and tested; providers in `src/providers/email` (slot-scoped RealMailProvider, EmailAutoProvider over `emailAccountsStore`); native tokens `email.<provider>.<slot>.*`; `unsubscribe_one_click` in `oauth.rs`. `node scripts/comms-audit.mjs [--stress]` drives the demo/synthetic inbox incl. chaos states.
 - Intelligence boundary: `src/providers/intelligence` — only `NoIntelligenceProvider` exists; never fake output.
+
+## 0.5.0 additions (Life OS)
+- Portable domain: `src/core/life/**` is UI- and platform-free (ESLint `no-restricted-imports` enforces it) — time (local DayKeys), recurrence, calendar, routines, fitness, nutrition, grocery, tasks, today aggregation, repository interface, transfer (export/import), sample + synthetic data. A future mobile app consumes this folder unchanged.
+- Persistence: `LifeRepository` → `SqliteLifeRepository` (desktop, tauri-plugin-sql, migrations in `src-tauri/src/life_db.rs`, WAL, integrity check, VACUUM INTO backups, attach-validate-swap restore) or `MemoryLifeRepository` (browser preview/tests, localStorage). App state lives in `src/state/lifeStore.ts`. DB: `%APPDATA%/ai.nexus.desktop/life.db`; backups under `backups/`.
+- Screens: `src/screens/today` (Home), `src/screens/calendar`, `src/screens/life/*`. Settings → Life (reminders) and Data (backup/restore/export/import/sample data/wipe).
+- Play: `src-tauri/src/xbox.rs` discovers GDK titles from `<drive>:\XboxGames\*\Content\MicrosoftGame.config`; `src/providers/xbox`; rail in `src/screens/gaming/GameRail.tsx`.
+- Media: BROWSER surfaces (`BrowserTile`, sandboxed iframe, https only) share the wall; CSP `frame-src https:`.
+- Audits: `node scripts/life-audit.mjs [WxH]`; scale/perf: `npx vitest run src/core/life/scale`.
 
 ## Native/provider boundaries
 - Steam: discovery reads only registry-located Steam paths + manifests; launch

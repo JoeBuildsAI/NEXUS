@@ -1,5 +1,29 @@
 # Architecture
 
+## Life OS layering and the future mobile boundary (0.5)
+
+```
+src/core/life/        PORTABLE DOMAIN — no React, DOM, Tauri, Windows, zustand
+  time · recurrence · calendar · routines · fitness · nutrition · grocery ·
+  tasks · today · models · repository (interface + memory impl) · transfer ·
+  sample · synthetic
+src/providers/life/   DESKTOP persistence: SqliteLifeRepository (tauri-plugin-sql)
+src/state/lifeStore   App cache + domain operations over LifeRepository
+src/screens/today|calendar|life   Desktop UI
+src-tauri/src/life_db.rs          Migrations, paths, backups, quarantine
+```
+
+The mobile app of the future imports `src/core/life` as-is and supplies its
+own `LifeRepository` (e.g. SQLite on device) and UI. ESLint blocks any import
+of React, Tauri, providers, state or components from that folder. Entities are
+sync-ready (stable ids, createdAt/updatedAt, rev, tombstones; SQLite keeps a
+change log) but no cloud sync exists — nothing is faked.
+
+Privacy classes: SECRET (OAuth tokens, credentials → Credential Manager only),
+PRIVATE (email content, media paths → never logged/exported), PERSONAL
+(routines, fitness, nutrition, calendar, tasks → life.db, exportable by the
+user), PUBLIC APP STATE (settings, layout).
+
 NEXUS separates six concerns into distinct layers. Dependencies point inward:
 UI depends on state and provider *interfaces*, never on concrete integrations.
 
