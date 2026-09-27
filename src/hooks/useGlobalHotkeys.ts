@@ -1,10 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { SCREEN_ORDER, useNavigationStore } from "@/state/navigationStore";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useConfirmStore } from "@/state/confirmStore";
 import { useModeStore } from "@/state/modeStore";
+import { useHotkeyStore } from "@/state/hotkeyStore";
+import { notify } from "@/state/toastStore";
+import { matchesAccelerator, parseAccelerator } from "@/lib/hotkeys";
 import { config } from "@/core/config";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("hotkeys");
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -15,18 +21,20 @@ function isTypingTarget(el: EventTarget | null): boolean {
 /**
  * Global keyboard shortcuts.
  *  - Ctrl+Space          command palette (works even while typing)
- *  - Ctrl+Shift+`        privacy mode (always)
- *  - Ctrl/Alt+1..5       screens (not while typing)
- *  - Esc                 closes palette / dialogs / preview
+ *  - privacy accelerator privacy mode (always; configurable)
+ *  - Ctrl/Alt+1..6       screens (not while typing)
+ *  - Esc                 closes palette / dialogs / preview / detail
  *
- * Under Tauri the privacy hotkey is also registered OS-wide so it fires when
- * NEXUS is not focused.
+ * Under Tauri the privacy hotkey is also registered OS-wide so it fires when a
+ * game or player has focus. Registration is verified on every window focus so a
+ * collision or a lost registration after sleep is detected and reported.
  */
 export function useGlobalHotkeys() {
   const togglePalette = useNavigationStore((s) => s.toggleCommandPalette);
   const activatePrivacy = usePrivacyStore((s) => s.activate);
   const shortcuts = useSettingsStore((s) => s.shortcuts);
   const privacyHotkey = useSettingsStore((s) => s.privacy.hotkey);
+  const parsedPrivacy = useMemo(() => parseAccelerator(privacyHotkey), [privacyHotkey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -35,7 +43,7 @@ export function useGlobalHotkeys() {
         togglePalette();
         return;
       }
-      if (e.ctrlKey && e.shiftKey && (e.key === "`" || e.key === "~" || e.code === "Backquote")) {
+      if (parsedPrivacy && matchesAccelerator(e, parsedPrivacy)) {
         e.preventDefault();
         activatePrivacy("hotkey");
         return;
@@ -67,24 +75,49 @@ export function useGlobalHotkeys() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [togglePalette, activatePrivacy, shortcuts]);
+  }, [togglePalette, activatePrivacy, shortcuts, parsedPrivacy]);
 
-  // OS-level global shortcut for privacy (Tauri only).
+  // OS-level global shortcut for privacy (Tauri only), with verification on focus.
   useEffect(() => {
     if (!config.isTauri) return;
-    let unregister: (() => void) | undefined;
-    (async () => {
+    let disposed = false;
+    let registeredAccel: string | null = null;
+    const hk = useHotkeyStore.getState();
+
+    const register = async () => {
       try {
         const mod = await import("@tauri-apps/plugin-global-shortcut");
         if (await mod.isRegistered(privacyHotkey)) await mod.unregister(privacyHotkey);
         await mod.register(privacyHotkey, (ev) => {
           if (ev.state === "Pressed") activatePrivacy("hotkey");
         });
-        unregister = () => void mod.unregister(privacyHotkey);
+        registeredAccel = privacyHotkey;
+        if (!disposed) hk.set({ registered: true, error: null, accelerator: privacyHotkey });
       } catch (err) {
-        console.warn("[hotkeys] global shortcut registration failed", err);
+        const message = String((err as Error)?.message ?? err);
+        log.warn("Privacy shortcut registration failed", { accelerator: privacyHotkey, error: message });
+        if (!disposed) {
+          const wasOk = useHotkeyStore.getState().registered;
+          hk.set({ registered: false, error: message, accelerator: privacyHotkey });
+          if (wasOk !== false) notify.warn("Privacy hotkey unavailable", "Another app may own this shortcut. Choose a different one in Settings → Privacy.");
+        }
       }
-    })();
-    return () => unregister?.();
+    };
+    void register();
+
+    const verify = async () => {
+      try {
+        const mod = await import("@tauri-apps/plugin-global-shortcut");
+        if (!(await mod.isRegistered(privacyHotkey))) await register();
+      } catch {
+        /* plugin unavailable */
+      }
+    };
+    window.addEventListener("focus", verify);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", verify);
+      if (registeredAccel) void import("@tauri-apps/plugin-global-shortcut").then((m) => m.unregister(registeredAccel!)).catch(() => undefined);
+    };
   }, [privacyHotkey, activatePrivacy]);
 }

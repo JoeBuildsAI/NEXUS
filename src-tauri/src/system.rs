@@ -184,6 +184,24 @@ fn estimate_impact(command: &str) -> String {
     }
 }
 
+/// Mirror the user's close-button preference into native state.
+#[tauri::command]
+pub fn set_close_behavior(state: State<AppState>, behavior: String) -> Result<(), String> {
+    let b = match behavior.as_str() {
+        "exit" => crate::state::CloseBehavior::Exit,
+        "tray" => crate::state::CloseBehavior::Tray,
+        _ => return Err("unknown close behavior".into()),
+    };
+    *state.close_behavior.lock().map_err(|e| e.to_string())? = b;
+    Ok(())
+}
+
+/// Explicit exit (tray "Exit" and Settings). Never triggered by the close button in tray mode.
+#[tauri::command]
+pub fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 /// Open a URL/URI (e.g. steam://rungameid/<appid>) via the OS default handler.
 /// This maps to an explicit, predefined command — never arbitrary shell input.
 #[tauri::command]

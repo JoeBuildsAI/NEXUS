@@ -18,6 +18,7 @@ import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
 import { useCleanupStore } from "@/state/cleanupStore";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
+import { useNativeEvents } from "@/hooks/useNativeEvents";
 import { setupActions } from "@/core/actions/setup";
 import { getProviders } from "@/providers";
 import { isDevBuild } from "@/state/devStore";
@@ -35,6 +36,7 @@ export function App() {
   const setDevPanelOpen = useSettingsStore((s) => s.setDevPanelOpen);
 
   useGlobalHotkeys();
+  useNativeEvents();
 
   const gameRunning = useModeStore((s) => s.gameRunning);
 

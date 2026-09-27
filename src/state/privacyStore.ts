@@ -10,7 +10,7 @@ interface PrivacyState {
   /** When true, a full-screen privacy veil is shown and media is hidden. */
   active: boolean;
   lastActivatedAt: number | null;
-  activate: (source?: "hotkey" | "ui" | "test") => void;
+  activate: (source?: "hotkey" | "ui" | "test" | "tray") => void;
   deactivate: () => void;
 }
 

@@ -13,7 +13,7 @@ import { config } from "@/core/config";
 import { containsSensitive, createBackup, validateBackup } from "@/core/backup/configBackup";
 
 export function GeneralSettings() {
-  const { startup, setStartup, profile, setProfile } = useSettingsStore();
+  const { startup, setStartup, profile, setProfile, window: win, setWindow } = useSettingsStore();
   const [includeRoots, setIncludeRoots] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +93,9 @@ export function GeneralSettings() {
       </SettingRow>
       <SettingRow label="Start minimized" description="Open directly to the system tray on launch.">
         <Toggle checked={startup.startMinimized} onChange={(v) => setStartup({ startMinimized: v })} />
+      </SettingRow>
+      <SettingRow label="Close button" description="Minimize to the tray and keep running, or exit NEXUS.">
+        <Select value={win.closeBehavior} onChange={(v) => setWindow({ closeBehavior: v })} options={[{ value: "tray" as const, label: "Minimize to tray" }, { value: "exit" as const, label: "Exit NEXUS" }]} />
       </SettingRow>
       <SettingRow label="Startup animation" description="Show the cinematic boot sequence.">
         <Toggle checked={startup.startupAnimation} onChange={(v) => setStartup({ startupAnimation: v })} />
