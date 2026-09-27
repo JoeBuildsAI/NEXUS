@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { FlaskConical, X, Zap } from "lucide-react";
 import { isDevBuild, useDevStore } from "@/state/devStore";
+import { useMediaStore } from "@/state/mediaStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { notify } from "@/state/toastStore";
 import { activity } from "@/state/activityStore";
 import { Toggle, Button } from "@/components/ui";
 import { DEMO_GAMES } from "@/core/demo/games";
+import { getProviders } from "@/providers";
 
 /**
  * Development-only simulation panel (Ctrl+Shift+D). Lets us exercise offline,
@@ -15,9 +17,15 @@ declare global {
   interface Window {
     /** Dev builds only: lets the screenshot/stress scripts drive simulations. */
     __nexusDev?: typeof useDevStore;
+    __nexusMedia?: typeof useMediaStore;
+    __nexusProviders?: ReturnType<typeof getProviders>;
   }
 }
-if (isDevBuild && typeof window !== "undefined") window.__nexusDev = useDevStore;
+if (isDevBuild && typeof window !== "undefined") {
+  window.__nexusDev = useDevStore;
+  window.__nexusMedia = useMediaStore;
+  Object.defineProperty(window, "__nexusProviders", { get: () => getProviders(), configurable: true });
+}
 
 export function DevPanel() {
   const open = useSettingsStore((s) => s.devPanelOpen);
@@ -76,6 +84,7 @@ export function DevPanel() {
               <Toggle label="Steam profile private" checked={dev.steamPrivateProfile} onChange={(v) => { dev.set({ steamPrivateProfile: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => useLibraryStore.getState().clearCache()); }} />
               <Toggle label="Extreme titles" checked={dev.extremeText} onChange={(v) => { dev.set({ extremeText: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => { useLibraryStore.getState().clearCache(); void useLibraryStore.getState().load({ force: true }); }); }} />
               <Toggle label="Provider exceptions" checked={dev.providerExceptions} onChange={(v) => dev.set({ providerExceptions: v })} />
+              <Toggle label="Synthetic fixture videos" checked={dev.syntheticVideos} onChange={(v) => dev.set({ syntheticVideos: v })} />
               <div className="hairline-t my-1" />
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="flex-1" onClick={fireAchievement}><Zap size={12} /> Achievement</Button>

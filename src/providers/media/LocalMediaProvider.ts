@@ -4,6 +4,7 @@ import { generatedPalette } from "@/core/steam/artwork";
 import { useMediaLibraryStore, type IndexedFile } from "@/state/mediaLibraryStore";
 import { useModeStore } from "@/state/modeStore";
 import { activity } from "@/state/activityStore";
+import { useLoopPresetsStore } from "@/state/loopPresetsStore";
 import { createLogger } from "@/lib/logger";
 import type { MediaBridge } from "./MediaBridge";
 import type { MediaProvider } from "./MediaProvider";
@@ -104,6 +105,7 @@ export class LocalMediaProvider implements MediaProvider {
     try {
       await this.bridge.revokeRoot(root.path);
       await this.bridge.purgeThumbnails(rootId).catch(() => undefined);
+      useLoopPresetsStore.getState().purgeRoot(rootId);
     } finally {
       this.store.getState().removeRoot(rootId);
       log.info("Media root authorization removed");
@@ -114,6 +116,7 @@ export class LocalMediaProvider implements MediaProvider {
   async clearHistory(): Promise<void> {
     this.store.getState().clearHistory();
     this.store.getState().clearThumbs();
+    useLoopPresetsStore.getState().clear();
     await this.bridge.purgeThumbnails().catch(() => undefined);
   }
 

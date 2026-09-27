@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, FolderPlus, ShieldOff } from "lucide-react";
 import { Tabs, type TabItem, Button, ErrorNotice } from "@/components/ui";
 import { MediaLibrary } from "./MediaLibrary";
-import { VideoWorkspace } from "./VideoWorkspace";
+import { VideoWall } from "./VideoWall";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useDevStore } from "@/state/devStore";
@@ -95,7 +95,7 @@ export function MediaScreen() {
             ) : mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0 ? (
               <EmptyState eyebrow="Media" title="No media location" body="Choose a private folder to enable your local library. NEXUS indexes only that location, on this machine." action={<Button variant="primary" onClick={() => void authorize()}><FolderPlus size={15} /> Add folder</Button>} />
             ) : (
-              <VideoWorkspace items={items ?? []} />
+              <VideoWall items={items ?? []} onOpenLibrary={() => setTab("library")} onAuthorize={() => void authorize()} realMode={mode === "real"} />
             )}
           </div>
         ) : (

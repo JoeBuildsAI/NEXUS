@@ -23,6 +23,8 @@ export interface DevSimulation {
   providerExceptions: boolean;
   /** Extreme text: very long / Unicode / emoji titles. */
   extremeText: boolean;
+  /** Demo media plays local synthetic fixture videos (dev only). */
+  syntheticVideos: boolean;
 }
 
 interface DevState extends DevSimulation {
@@ -47,6 +49,7 @@ export const useDevStore = create<DevState>((set) => ({
   steamPrivateProfile: false,
   providerExceptions: false,
   extremeText: false,
+  syntheticVideos: false,
   achievementPulse: 0,
   emailPulse: 0,
   set: (patch) => set(patch),

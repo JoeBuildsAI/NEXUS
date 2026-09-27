@@ -22,6 +22,7 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
   const [newCollection, setNewCollection] = useState("");
   const slots = useMediaStore((s) => s.slots);
   const setSlotItem = useMediaStore((s) => s.setSlotItem);
+  const addToWall = useMediaStore((s) => s.addToWall);
 
   const folders = useMemo(() => {
     const set = new Set<string>();
@@ -65,9 +66,13 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
 
   const sendToSlot = (item: MediaItem, index?: number) => {
     if (item.available === false) return notify.warn("Unavailable", "The source drive or file is not reachable right now.");
-    const target = index ?? (slots.find((s) => !s.itemId) ?? slots[0]!).index;
-    setSlotItem(target, item.id);
-    notify.success(`Player ${target + 1}`, item.title);
+    if (index == null) {
+      const added = addToWall(item.id);
+      if (added == null) return notify.warn("Wall is full", "Remove a player first (six at once).");
+      return notify.success(`Added to the wall · P${added + 1}`);
+    }
+    setSlotItem(index, item.id);
+    notify.success(`Player ${index + 1} replaced`);
   };
   const toggleFav = async (item: MediaItem) => { await provider.setFavorite?.(item.id, !item.favorite); onChanged(); reloadCollections(); };
   const addToCollection = async (item: MediaItem, collectionId: string | null) => { await provider.setItemCollection?.(item.id, collectionId); onChanged(); reloadCollections(); };
@@ -85,8 +90,9 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
   };
 
   const menuFor = (item: MediaItem): (ContextMenuItem | "separator")[] => [
-    { id: "load", label: "Load into next player", icon: <Play size={13} />, onSelect: () => sendToSlot(item) },
-    ...slots.slice(0, 6).map((s) => ({ id: `slot-${s.index}`, label: `Load into player ${s.index + 1}`, onSelect: () => sendToSlot(item, s.index) })),
+    { id: "load", label: "Add to wall", icon: <Play size={13} />, onSelect: () => sendToSlot(item) },
+    { id: "primary", label: "Play as primary", onSelect: () => { const i = addToWall(item.id, { primary: true, play: true }); if (i == null) notify.warn("Wall is full"); } },
+    ...slots.filter((s) => s.itemId).map((s) => ({ id: `slot-${s.index}`, label: `Replace player ${s.index + 1}`, onSelect: () => sendToSlot(item, s.index) })),
     "separator" as const,
     { id: "fav", label: item.favorite ? "Remove from favorites" : "Add to favorites", icon: <Star size={13} />, onSelect: () => void toggleFav(item) },
     ...((collections ?? []).filter((c) => c.id !== "favorites").map((c) => ({ id: `col-${c.id}`, label: item.collectionId === c.id ? `Remove from ${c.name}` : `Add to ${c.name}`, onSelect: () => void addToCollection(item, item.collectionId === c.id ? null : c.id) })) as ContextMenuItem[]),

@@ -6,8 +6,10 @@ import path from "node:path";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [react()],
+  // Dev only: lets the simulation lab load synthetic fixture videos via /@fs/. Never part of a production bundle.
+  define: { __NEXUS_DEV_ROOT__: JSON.stringify(command === "serve" ? process.cwd().split(path.sep).join("/") : "") },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

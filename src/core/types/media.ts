@@ -52,13 +52,36 @@ export interface MediaScanProgress {
   readonly truncated: boolean;
 }
 
-/** State for a single slot in the six-player workspace. */
+export type FitMode = "fit" | "fill" | "smart";
+export type LoopMode = "off" | "full" | "ab";
+
+/** State for a single player on the adaptive wall (up to 6). */
 export interface PlayerSlot {
   readonly index: number;
   readonly itemId: string | null;
   readonly playing: boolean;
   readonly muted: boolean;
   readonly volume: number;
+  /** null = inherit the workspace default. */
+  readonly fit: FitMode | null;
+  readonly loop: LoopMode;
+  readonly loopA: number | null;
+  readonly loopB: number | null;
+  readonly rate: number;
+}
+
+/** Per-player state captured in a saved workspace. */
+export interface SavedPlayer {
+  readonly itemId: string;
+  readonly fit: FitMode | null;
+  readonly loop: LoopMode;
+  readonly loopA: number | null;
+  readonly loopB: number | null;
+  readonly volume: number;
+  readonly muted: boolean;
+  readonly rate: number;
+  /** Optional resume position (only when the user enabled position restore). */
+  readonly position?: number | null;
 }
 
 export interface WorkspaceLayout {
@@ -66,8 +89,22 @@ export interface WorkspaceLayout {
   readonly name: string;
   readonly columns: number;
   readonly rows: number;
-  /** Layout preset id (e.g. "3x2", "focus"). Optional for older saves. */
+  /** Layout preset id (legacy "3x2"…; v3 uses wall modes "auto" | "grid" | "primary" | "focus"). */
   readonly layout?: string;
   readonly slots: readonly (string | null)[];
   readonly savedAt: number;
+  /** v3: full per-player state and the primary player. */
+  readonly players?: readonly SavedPlayer[];
+  readonly primaryIndex?: number | null;
+}
+
+/** A saved A–B segment for one file. Keyed by the file's hashed id; purged with its root. */
+export interface LoopPreset {
+  readonly id: string;
+  readonly itemId: string;
+  readonly rootId: string | null;
+  readonly name: string;
+  readonly a: number;
+  readonly b: number;
+  readonly createdAt: number;
 }

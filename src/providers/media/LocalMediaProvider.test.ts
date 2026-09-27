@@ -146,3 +146,21 @@ describe("LocalMediaProvider", () => {
     expect(await provider.getAuthorizedRoots()).toHaveLength(1);
   });
 });
+
+describe("loop presets follow media authorization", () => {
+  it("revoking a root purges its presets; other roots keep theirs", async () => {
+    const { useLoopPresetsStore } = await import("@/state/loopPresetsStore");
+    useLoopPresetsStore.setState({ presets: [] });
+    const { provider } = setup();
+    const root = await provider.authorizeRoot();
+    await provider.scanRoot(root!.id);
+    const item = (await provider.getItems())[0]!;
+    useLoopPresetsStore.getState().save({ itemId: item.id, rootId: root!.id, name: "Favorite", a: 5, b: 15 });
+    useLoopPresetsStore.getState().save({ itemId: "other-file", rootId: "another-root", name: "Keep", a: 1, b: 3 });
+    expect(useLoopPresetsStore.getState().presets).toHaveLength(2);
+    await provider.revokeRoot(root!.id);
+    const left = useLoopPresetsStore.getState().presets;
+    expect(left).toHaveLength(1);
+    expect(left[0]!.rootId).toBe("another-root");
+  });
+});

@@ -29,7 +29,10 @@ export const usePrivacyStore = create<PrivacyState>((set) => ({
     const settings = useSettingsStore.getState().privacy;
     const media = useMediaStore.getState();
 
-    if (settings.stopPlaybackOnTrigger) media.pauseAll();
+    if (settings.stopPlaybackOnTrigger) {
+      media.pauseAll();
+      media.muteAll(true); // suppress audio even if a pause is slow to take effect
+    }
     if (settings.clearWorkspaceOnTrigger) media.clearAll();
 
     const nav = useNavigationStore.getState();

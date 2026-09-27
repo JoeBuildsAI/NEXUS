@@ -14,8 +14,8 @@ describe("privacy mode", () => {
     // Put a couple of players into a playing state.
     useMediaStore.setState({
       slots: [
-        { index: 0, itemId: "media-0", playing: true, muted: false, volume: 0.8 },
-        { index: 1, itemId: "media-1", playing: true, muted: false, volume: 0.8 },
+        { index: 0, itemId: "media-0", playing: true, muted: false, volume: 0.8, fit: null, loop: "full", loopA: null, loopB: null, rate: 1 },
+        { index: 1, itemId: "media-1", playing: true, muted: false, volume: 0.8, fit: null, loop: "full", loopA: null, loopB: null, rate: 1 },
       ],
     });
   });
@@ -66,7 +66,7 @@ describe("privacy mode", () => {
   it("respects the stopPlaybackOnTrigger=false setting", () => {
     useSettingsStore.getState().setPrivacy({ stopPlaybackOnTrigger: false });
     useMediaStore.setState({
-      slots: [{ index: 0, itemId: "media-0", playing: true, muted: false, volume: 0.8 }],
+      slots: [{ index: 0, itemId: "media-0", playing: true, muted: false, volume: 0.8, fit: null, loop: "full", loopA: null, loopB: null, rate: 1 }],
     });
     usePrivacyStore.getState().activate();
     // Playback is left running when the user opts out of auto-pause.

@@ -4,6 +4,7 @@ import type { MediaProvider } from "./MediaProvider";
 import { ProviderOfflineError } from "@/core/errors";
 import { useDevStore } from "@/state/devStore";
 import { syntheticMedia } from "@/core/demo/synthetic";
+import { FIXTURE_VIDEOS, fixtureUrl, fixturesAvailable } from "@/core/demo/fixtures";
 
 export class MockMediaProvider implements MediaProvider {
   readonly id = "mock-media";
@@ -35,6 +36,13 @@ export class MockMediaProvider implements MediaProvider {
   async getItems(): Promise<readonly MediaItem[]> {
     this.guard();
     this.ensureSynthetic();
+    if (useDevStore.getState().syntheticVideos && fixturesAvailable()) {
+      // Dev lab: the first items become playable local fixture videos with real aspect ratios.
+      return this.items.map((item, i) => {
+        const f = FIXTURE_VIDEOS[i];
+        return f ? { ...item, src: fixtureUrl(f.name), durationSeconds: f.seconds, ext: "webm", playability: "playable" as const, available: true } : item;
+      });
+    }
     return this.items;
   }
 
