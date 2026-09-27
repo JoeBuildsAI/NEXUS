@@ -43,12 +43,15 @@ export function CommandPalette() {
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Guards against a second Enter landing during the close animation.
+  const executedRef = useRef(false);
   const assistant = useMemo(() => getProviders().assistant, []);
 
   useEffect(() => {
     if (open) {
       setQuery("");
       setSelected(0);
+      executedRef.current = false;
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
@@ -80,6 +83,8 @@ export function CommandPalette() {
   }, [selected]);
 
   const run = (match: AssistantMatch) => {
+    if (executedRef.current) return;
+    executedRef.current = true;
     const def = actionRegistry.get(match.actionId);
     close();
     if (!def) return;

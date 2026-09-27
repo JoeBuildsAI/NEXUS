@@ -96,4 +96,36 @@ describe("LocalCommandProvider", () => {
       expect(m.actionId).not.toContain(" ");
     }
   });
+
+  it("settings search resolves individual settings to their section", async () => {
+    expect(await topMatch("launch on startup")).toMatchObject({ actionId: "open-settings", args: { section: "general" } });
+    expect(await topMatch("privacy hotkey")).toMatchObject({ actionId: "open-settings", args: { section: "privacy" } });
+    expect(await topMatch("thumbnails")).toMatchObject({ actionId: "open-settings", args: { section: "media" } });
+    expect(await topMatch("connect outlook")).toMatchObject({ actionId: "open-settings", args: { section: "integrations" } });
+    expect(await topMatch("primary gpu")).toMatchObject({ actionId: "open-settings", args: { section: "system" } });
+  });
+
+  it("hardware, startup, diagnostics and workspace commands exist", async () => {
+    expect((await topMatch("hardware"))?.actionId).toBe("show-hardware");
+    expect((await topMatch("startup apps"))?.actionId).toBe("show-startup");
+    expect((await topMatch("diagnostics"))?.actionId).toBe("open-diagnostics");
+    expect((await topMatch("clear workspace"))?.actionId).toBe("clear-workspace");
+  });
+
+  it("RANKING: exact game and app names outrank weak generic matches", async () => {
+    const cyber = await provider.interpret("cyberpunk");
+    expect(cyber[0]?.group).toBe("game");
+    expect(cyber[0]?.label).toMatch(/Cyberpunk 2077/);
+    const discord = await provider.interpret("discord");
+    expect(discord[0]).toMatchObject({ actionId: "launch-app", args: { appId: "app-1" } });
+    const gaming = await provider.interpret("gaming");
+    expect(gaming[0]).toMatchObject({ actionId: "navigate", args: { screen: "gaming" } });
+  });
+
+  it("long or nonsense queries return quickly with no results", async () => {
+    const t0 = performance.now();
+    expect(await provider.interpret("x".repeat(300))).toEqual([]);
+    expect(await provider.interpret("zzqxv plorp")).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
 });

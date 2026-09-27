@@ -18,7 +18,11 @@ export type ActionId =
   | "privacy-mode"
   | "toggle-command-palette"
   | "set-environment"
-  | "replay-onboarding";
+  | "replay-onboarding"
+  | "show-hardware"
+  | "show-startup"
+  | "clear-workspace"
+  | "open-diagnostics";
 
 export interface ActionContext {
   /** Free-form arguments parsed from the command (e.g. { screen: "gaming" }). */

@@ -170,6 +170,53 @@ export function setupActions(): void {
       },
     },
     {
+      id: "show-hardware",
+      title: "Show Hardware",
+      description: "Open the hardware inventory.",
+      requiresConfirmation: false,
+      keywords: ["hardware", "gpu", "cpu"],
+      handler: () => {
+        openSystemTab("hardware");
+        return { ok: true };
+      },
+    },
+    {
+      id: "show-startup",
+      title: "Show Startup Apps",
+      description: "Open startup management.",
+      requiresConfirmation: false,
+      keywords: ["startup", "autostart"],
+      handler: () => {
+        openSystemTab("startup");
+        return { ok: true };
+      },
+    },
+    {
+      id: "clear-workspace",
+      title: "Clear Media Workspace",
+      description: "Unload every player slot.",
+      requiresConfirmation: true,
+      keywords: ["clear", "workspace"],
+      handler: () => {
+        useMediaStore.getState().clearAll();
+        notify.neutral("Workspace cleared");
+        return { ok: true };
+      },
+    },
+    {
+      id: "open-diagnostics",
+      title: "Open Diagnostics",
+      description: "Sanitized environment diagnostics.",
+      requiresConfirmation: false,
+      keywords: ["diagnostics", "debug", "logs"],
+      handler: () => {
+        const nav = useNavigationStore.getState();
+        nav.navigate("settings");
+        nav.setSettingsSection("system");
+        return { ok: true };
+      },
+    },
+    {
       id: "system-query",
       title: "System Query",
       description: "Report a live system metric.",
