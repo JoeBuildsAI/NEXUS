@@ -238,7 +238,42 @@ fn older_than(meta: &std::fs::Metadata, days: u64) -> bool {
     meta.modified().map(|m| SystemTime::now().duration_since(m).map(|d| d > Duration::from_secs(days * 86400)).unwrap_or(false)).unwrap_or(false)
 }
 
-fn rule_paths(id: &str) -> Vec<PathBuf> {
+/// Path suffixes each rule is allowed to operate on. A rule root must END with
+/// one of these (case-insensitive) — so a misconfigured %TEMP% pointing at a
+/// drive root, Documents, or anything unexpected is refused outright.
+fn allowed_suffixes(id: &str) -> &'static [&'static str] {
+    match id {
+        "user-temp" => &["\\temp", "\\tmp"],
+        "windows-temp" => &["\\windows\\temp"],
+        "shader-cache" => &["\\nvidia\\dxcache", "\\d3dscache", "\\amd\\dxcache"],
+        "crash-dumps" => &["\\crashdumps"],
+        "error-reports" => &["\\wer\\reportarchive", "\\wer\\reportqueue"],
+        _ => &[],
+    }
+}
+
+/// Pure root validation: canonical-looking path, expected suffix, never a drive
+/// root or shallower than 3 components, never UNC.
+pub fn validate_rule_root(id: &str, canonical: &Path) -> Result<(), String> {
+    let s = canonical.to_string_lossy().to_lowercase();
+    let s = s.trim_end_matches('\\').to_string();
+    if s.starts_with("\\\\") {
+        return Err("network paths are never cleaned".into());
+    }
+    let comps: Vec<&str> = s.split('\\').filter(|c| !c.is_empty()).collect();
+    if comps.len() < 3 {
+        return Err("path too shallow to be a cleanup root".into());
+    }
+    if s.contains("\\..") {
+        return Err("relative segments are not allowed".into());
+    }
+    if !allowed_suffixes(id).iter().any(|suf| s.ends_with(suf)) {
+        return Err(format!("{id} may not operate on this folder"));
+    }
+    Ok(())
+}
+
+fn candidate_roots(id: &str) -> Vec<PathBuf> {
     let la = env_path("LOCALAPPDATA");
     let sysroot = env_path("SystemRoot").unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let v: Vec<Option<PathBuf>> = match id {
@@ -249,7 +284,72 @@ fn rule_paths(id: &str) -> Vec<PathBuf> {
         "error-reports" => vec![la.as_ref().map(|l| l.join("Microsoft").join("Windows").join("WER").join("ReportArchive")), la.as_ref().map(|l| l.join("Microsoft").join("Windows").join("WER").join("ReportQueue"))],
         _ => vec![],
     };
-    v.into_iter().flatten().filter(|p| p.is_dir()).collect()
+    v.into_iter().flatten().collect()
+}
+
+fn on_fixed_drive(p: &Path) -> bool {
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let s = p.to_string_lossy().to_lowercase();
+    let mut best: Option<(usize, bool)> = None;
+    for d in disks.list() {
+        let mp = d.mount_point().to_string_lossy().to_lowercase();
+        let mp_t = mp.trim_end_matches('\\');
+        if s.starts_with(mp_t) && best.map(|(l, _)| mp.len() > l).unwrap_or(true) {
+            best = Some((mp.len(), !d.is_removable()));
+        }
+    }
+    best.map(|(_, fixed)| fixed).unwrap_or(false)
+}
+
+/// Roots a rule may touch right now: exist, canonicalized, validated, on a fixed drive.
+fn rule_paths(id: &str) -> Vec<PathBuf> {
+    candidate_roots(id)
+        .into_iter()
+        .filter(|p| p.is_dir())
+        .filter_map(|p| p.canonicalize().ok())
+        .map(|p| crate::media::normalize(&p))
+        .filter(|p| validate_rule_root(id, p).is_ok() && on_fixed_drive(p))
+        .collect()
+}
+
+/// Walk `roots`, removing (or counting, when `dry_run`) files that pass
+/// `filter`. Never follows reparse points, never removes directories, never
+/// fails the whole run on a locked/denied/vanished file.
+pub fn execute_rule(roots: &[PathBuf], filter: &dyn Fn(&Path, &std::fs::Metadata) -> bool, dry_run: bool) -> (u64, usize, usize) {
+    let (mut freed, mut removed, mut skipped) = (0u64, 0usize, 0usize);
+    for root in roots {
+        let mut stack = vec![root.clone()];
+        while let Some(dir) = stack.pop() {
+            let Ok(rd) = std::fs::read_dir(&dir) else { skipped += 1; continue };
+            for e in rd.flatten() {
+                let p = e.path();
+                let Ok(meta) = std::fs::symlink_metadata(&p) else { continue };
+                if meta.file_type().is_symlink() {
+                    continue;
+                }
+                if meta.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if !filter(&p, &meta) {
+                    continue;
+                }
+                if dry_run {
+                    freed += meta.len();
+                    removed += 1;
+                } else {
+                    match std::fs::remove_file(&p) {
+                        Ok(()) => {
+                            freed += meta.len();
+                            removed += 1;
+                        }
+                        Err(_) => skipped += 1,
+                    }
+                }
+            }
+        }
+    }
+    (freed, removed, skipped)
 }
 
 fn rule_filter(id: &str) -> Box<dyn Fn(&Path, &std::fs::Metadata) -> bool> {
@@ -326,40 +426,9 @@ pub fn cleanup_execute(rule_ids: Vec<String>, dry_run: bool) -> Result<Vec<Clean
             continue;
         }
         let filter = rule_filter(rule.id);
-        let (mut freed, mut removed, mut skipped) = (0u64, 0usize, 0usize);
-        for root in rule_paths(rule.id) {
-            let mut stack = vec![root];
-            while let Some(dir) = stack.pop() {
-                let Ok(rd) = std::fs::read_dir(&dir) else { skipped += 1; continue };
-                for e in rd.flatten() {
-                    let p = e.path();
-                    let Ok(meta) = std::fs::symlink_metadata(&p) else { continue };
-                    if meta.file_type().is_symlink() {
-                        continue;
-                    }
-                    if meta.is_dir() {
-                        stack.push(p);
-                        continue;
-                    }
-                    if !filter(&p, &meta) {
-                        continue;
-                    }
-                    if dry_run {
-                        freed += meta.len();
-                        removed += 1;
-                    } else {
-                        match std::fs::remove_file(&p) {
-                            Ok(()) => {
-                                freed += meta.len();
-                                removed += 1;
-                            }
-                            Err(_) => skipped += 1,
-                        }
-                    }
-                }
-            }
-        }
-        report.push(CleanupReportItem { rule_id: id, freed_bytes: freed, removed, skipped, dry_run, error: None });
+        let roots = rule_paths(rule.id);
+        let (freed, removed, skipped) = execute_rule(&roots, &*filter, dry_run);
+        report.push(CleanupReportItem { rule_id: id, freed_bytes: freed, removed, skipped, dry_run, error: if roots.is_empty() { Some("no eligible folder".into()) } else { None } });
     }
     Ok(report)
 }
@@ -388,6 +457,93 @@ mod tests {
         for r in RULES {
             assert!(["safe", "review"].contains(&r.risk));
             assert!(!r.execution.is_empty() && !r.discovery.is_empty());
+            assert!(r.id == "recycle-bin" || !allowed_suffixes(r.id).is_empty(), "{} has no allowed roots", r.id);
         }
+    }
+
+    // ---- adversarial: a misconfigured environment must never widen the blast radius ----
+
+    #[test]
+    fn rejects_dangerous_cleanup_roots() {
+        // drive roots, shallow paths, wrong folders, UNC, traversal
+        assert!(validate_rule_root("user-temp", Path::new(r"D:\")).is_err());
+        assert!(validate_rule_root("user-temp", Path::new(r"C:\Users")).is_err());
+        assert!(validate_rule_root("user-temp", Path::new(r"C:\Users\joseph\Documents")).is_err());
+        assert!(validate_rule_root("user-temp", Path::new(r"\\nas\share\Temp")).is_err());
+        assert!(validate_rule_root("user-temp", Path::new(r"C:\Users\joseph\AppData\Local\Temp\..\..")).is_err());
+        assert!(validate_rule_root("windows-temp", Path::new(r"C:\Windows")).is_err());
+        assert!(validate_rule_root("windows-temp", Path::new(r"C:\Windows\System32")).is_err());
+        assert!(validate_rule_root("crash-dumps", Path::new(r"X:\Videos")).is_err());
+        // legitimate
+        assert!(validate_rule_root("user-temp", Path::new(r"C:\Users\joseph\AppData\Local\Temp")).is_ok());
+        assert!(validate_rule_root("windows-temp", Path::new(r"C:\Windows\Temp")).is_ok());
+        assert!(validate_rule_root("shader-cache", Path::new(r"C:\Users\joseph\AppData\Local\NVIDIA\DXCache")).is_ok());
+        assert!(validate_rule_root("error-reports", Path::new(r"C:\Users\joseph\AppData\Local\Microsoft\Windows\WER\ReportQueue")).is_ok());
+    }
+
+    fn fixture(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("nexus-cleanup-{}-{}-{}", tag, std::process::id(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir_all(dir.join("nested")).unwrap();
+        std::fs::write(dir.join("old.dmp"), vec![0u8; 100]).unwrap();
+        std::fs::write(dir.join("nested").join("deep.dmp"), vec![0u8; 50]).unwrap();
+        std::fs::write(dir.join("keep.txt"), vec![0u8; 7]).unwrap();
+        dir
+    }
+
+    #[test]
+    fn dry_run_removes_nothing_and_reports_exact_bytes() {
+        let dir = fixture("dry");
+        let (freed, removed, skipped) = execute_rule(&[dir.clone()], &*rule_filter("crash-dumps"), true);
+        assert_eq!((freed, removed, skipped), (150, 2, 0));
+        assert!(dir.join("old.dmp").exists() && dir.join("nested").join("deep.dmp").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn execute_removes_only_matched_files_and_never_directories() {
+        let dir = fixture("exec");
+        let (freed, removed, _) = execute_rule(&[dir.clone()], &*rule_filter("crash-dumps"), false);
+        assert_eq!((freed, removed), (150, 2));
+        assert!(!dir.join("old.dmp").exists());
+        assert!(dir.join("keep.txt").exists(), "unmatched file must survive");
+        assert!(dir.join("nested").is_dir(), "directories are never removed");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn junction_inside_cleanup_root_is_not_followed() {
+        let dir = fixture("junction");
+        let outside = std::env::temp_dir().join(format!("nexus-cleanup-outside-{}", std::process::id()));
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("precious.dmp"), vec![0u8; 9]).unwrap();
+        let link = dir.join("link");
+        let made = std::process::Command::new("cmd").args(["/C", "mklink", "/J", &link.to_string_lossy(), &outside.to_string_lossy()]).output().map(|o| o.status.success()).unwrap_or(false);
+        if made {
+            execute_rule(&[dir.clone()], &*rule_filter("crash-dumps"), false);
+            assert!(outside.join("precious.dmp").exists(), "file behind a junction was deleted");
+            let _ = std::fs::remove_dir(&link);
+        }
+        let _ = std::fs::remove_dir_all(&outside);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn vanished_file_and_missing_root_are_skipped_not_fatal() {
+        let dir = fixture("vanish");
+        let ghost = dir.join("ghost.dmp");
+        // Filter that deletes the file underneath the executor before it tries to remove it.
+        let filter = move |p: &Path, _: &std::fs::Metadata| {
+            if p.file_name().map(|n| n == "old.dmp").unwrap_or(false) {
+                let _ = std::fs::remove_file(p);
+            }
+            let _ = &ghost;
+            p.extension().map(|e| e == "dmp").unwrap_or(false)
+        };
+        let missing = std::env::temp_dir().join("nexus-does-not-exist-root");
+        let (_, removed, skipped) = execute_rule(&[missing, dir.clone()], &filter, false);
+        assert_eq!(removed, 1, "deep.dmp");
+        assert!(skipped >= 2, "missing root + vanished file are counted, not fatal");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
