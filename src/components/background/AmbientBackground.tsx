@@ -3,6 +3,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
 import { useNavigationStore } from "@/state/navigationStore";
+import { useLibraryStore } from "@/state/libraryStore";
 import { ENVIRONMENTS, MODE_MOOD } from "./environments";
 
 interface Particle {
@@ -30,6 +31,9 @@ export function AmbientBackground() {
   const mode = useModeStore((s) => s.current);
   const gameRunning = useModeStore((s) => s.gameRunning);
   const screen = useNavigationStore((s) => s.screen);
+  // Selected game's artwork colour bleeds faintly into the Gaming environment.
+  const selectedGameId = useNavigationStore((s) => s.selectedGameId);
+  const gameTint = useLibraryStore((s) => (screen === "gaming" && selectedGameId ? s.games.find((g) => g.id === selectedGameId)?.heroColor ?? null : null));
 
   const spec = ENVIRONMENTS[appearance.environment];
   // Media screen blacks out the environment regardless of mode.
@@ -189,6 +193,10 @@ export function AmbientBackground() {
           background: `radial-gradient(120% 80% at 50% -10%, ${spec.base[0]} 0%, ${spec.base[1]} 45%, ${spec.base[2]} 100%)`,
           opacity: appearance.backgroundImage && !blackout ? 0.75 : 1,
         }}
+      />
+      <div
+        className="absolute inset-0 transition-all duration-[1400ms]"
+        style={{ background: gameTint ? `radial-gradient(70% 60% at 30% 40%, ${gameTint} 0%, transparent 70%)` : "transparent", opacity: gameTint ? 0.16 * (0.6 + intensity * 0.6) : 0 }}
       />
 
       {/* Light fields */}
