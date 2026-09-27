@@ -8,6 +8,21 @@ import { activity } from "@/state/activityStore";
 import { Toggle, Button } from "@/components/ui";
 import { DEMO_GAMES } from "@/core/demo/games";
 import { getProviders } from "@/providers";
+import { LIFE_SCENARIOS, syntheticLife } from "@/core/life/synthetic";
+import { useLifeStore } from "@/state/lifeStore";
+import { getLifeRepository } from "@/providers/life";
+import { LIFE_COLLECTIONS } from "@/core/life/models";
+import { todayKey } from "@/core/life/time";
+
+async function loadScenario(id: string) {
+  const sc = LIFE_SCENARIOS.find((s) => s.id === id);
+  if (!sc) return;
+  const dump = syntheticLife(todayKey(), sc.opts);
+  const repo = getLifeRepository();
+  for (const c of LIFE_COLLECTIONS) if (dump[c].length) await repo.put(c, dump[c] as never[]);
+  await useLifeStore.getState().load({ force: true });
+  notify.neutral("Life lab", `${sc.label} loaded (demo rows)`);
+}
 
 /**
  * Development-only simulation panel (Ctrl+Shift+D). Lets us exercise offline,
@@ -85,6 +100,13 @@ export function DevPanel() {
               <Toggle label="Extreme titles" checked={dev.extremeText} onChange={(v) => { dev.set({ extremeText: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => { useLibraryStore.getState().clearCache(); void useLibraryStore.getState().load({ force: true }); }); }} />
               <Toggle label="Provider exceptions" checked={dev.providerExceptions} onChange={(v) => dev.set({ providerExceptions: v })} />
               <Toggle label="Synthetic fixture videos" checked={dev.syntheticVideos} onChange={(v) => dev.set({ syntheticVideos: v })} />
+              <div className="hairline-t my-1" />
+              <p className="text-micro text-white/35">Life lab · synthetic, demo-flagged</p>
+              <select defaultValue="" onChange={(e) => { if (e.target.value) void loadScenario(e.target.value); e.target.value = ""; }} className="w-full bg-transparent text-[12px] text-white/80 [color-scheme:dark] focus:outline-none">
+                <option value="">Load a scenario…</option>
+                {LIFE_SCENARIOS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+              <Button size="sm" variant="ghost" className="w-full" onClick={() => void useLifeStore.getState().removeSampleData()}>Remove all demo rows</Button>
               <div className="hairline-t my-1" />
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="flex-1" onClick={fireAchievement}><Zap size={12} /> Achievement</Button>
