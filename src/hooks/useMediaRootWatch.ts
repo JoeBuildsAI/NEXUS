@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getProviders } from "@/providers";
+import { useModeStore } from "@/state/modeStore";
 import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
 import { useMediaStore } from "@/state/mediaStore";
 import { notify } from "@/state/toastStore";
@@ -23,6 +24,8 @@ export function useMediaRootWatch(active: boolean) {
     if (!provider.refreshRoots) return;
     let cancelled = false;
     const tick = async () => {
+      // Gaming Mode: no background drive polling while a game runs.
+      if (useModeStore.getState().current === "gaming") return;
       const before = Object.fromEntries(useMediaLibraryStore.getState().roots.map((r) => [r.id, r.exists !== false]));
       try {
         await provider.refreshRoots!();

@@ -98,7 +98,7 @@ export function planModeSteps(config: ModeConfig, opts: EnterModeOptions): ModeS
   steps.push({ id: "env", label: "Shift environment", detail: `Apply the ${config.label} ambience and layout.`, kind: "environment", live: true });
 
   if (config.mode === "gaming") {
-    steps.push({ id: "perf", label: "Reduce NEXUS footprint", detail: "Lower ambient animation and telemetry polling while you play.", kind: "performance", live: true });
+    steps.push({ id: "perf", label: "Reduce NEXUS footprint", detail: "Lower ambient animation and telemetry polling; pause media indexing, thumbnails, drive re-validation and Life reminders while you play.", kind: "performance", live: true });
   }
 
   if (config.powerProfile && config.powerProfile !== "balanced") {
