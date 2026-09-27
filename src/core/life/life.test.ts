@@ -8,7 +8,7 @@ import { convertUnit, dayNutrition, facts, ingredient, mealFacts, servingsOf, we
 import { buildGroceryList, deriveRequirements, estimatePrice, subtractPantry, summarizeList } from "./grocery";
 import { parseQuickAdd, tasksForView } from "./tasks";
 import { buildAgenda, overview, phaseOf } from "./today";
-import type { CalendarEvent, Food, Meal, MealPlanEntry, PantryItem, Routine, RoutineCompletion, Task, WorkoutSession, WorkoutTemplate } from "./models";
+import type { CalendarEvent, Entity, Food, Meal, MealPlanEntry, PantryItem, Routine, RoutineCompletion, Task, WorkoutSession, WorkoutTemplate } from "./models";
 import { stamp } from "./models";
 
 const now = Date.parse("2026-09-27T10:00:00");
@@ -327,5 +327,67 @@ describe("today aggregation", () => {
     expect(ov.completed.map((i) => i.title)).toEqual(["Oats", "Evening Skincare"]);
     expect(phaseOf(items.find((i) => i.kind === "workout")!, 10 * 60 + 40)).toBe("next");
     expect(ov.counts.routine).toEqual({ total: 1, done: 1 });
+  });
+});
+
+describe("repository, transfer and sample data", () => {
+  it("memory repository: tombstones, ranged loads, demo purge, dump/restore, kv", async () => {
+    const { MemoryLifeRepository } = await import("./repository");
+    const repo = new MemoryLifeRepository(null);
+    const ev1 = ev({ title: "a", day: "2026-09-01", endDay: "2026-09-01" });
+    const ev2 = ev({ title: "b", day: "2026-09-20", endDay: "2026-09-20" });
+    await repo.put("events", [ev1, { ...ev2, demo: true }]);
+    expect((await repo.load("events", { days: { from: "2026-09-15", to: "2026-09-30" } })).map((e) => e.title)).toEqual(["b"]);
+    await repo.remove("events", [ev1.id]);
+    expect(await repo.load("events")).toHaveLength(1);
+    expect(await repo.load("events", { includeDeleted: true })).toHaveLength(2);
+    expect(await repo.purgeDemo()).toBe(1);
+    expect((await repo.counts()).events).toBe(0);
+    await repo.setKV("nutrition.targets", { calories: 2000 });
+    expect(await repo.getKV<{ calories: number }>("nutrition.targets")).toEqual({ calories: 2000 });
+    await repo.put("tasks", [base({ title: "x", priority: "normal" as const, status: "open" as const, tags: [], today: false, someday: false, source: "local" as const }) as Task]);
+    const dump = await repo.dump();
+    expect(dump.tasks).toHaveLength(1);
+    const other = new MemoryLifeRepository(null);
+    await other.restore(dump, "replace");
+    expect((await other.counts()).tasks).toBe(1);
+    expect(await other.getKV("nutrition.targets")).toEqual({ calories: 2000 });
+  });
+  it("export excludes demo rows, external events and any secret-looking key; import validates", async () => {
+    const { createLifeExport, validateLifeImport } = await import("./transfer");
+    const { sampleLifeData } = await import("./sample");
+    const dump = sampleLifeData("2026-09-27", now);
+    (dump.events as CalendarEvent[]).push(ev({ title: "External", source: "google", readOnly: true }));
+    dump.kv = { ...dump.kv, "oauth.token": "should-not-export" };
+    const ex = createLifeExport(dump, "0.5.0");
+    expect(ex.counts.routines).toBe(0); // all sample rows are demo → excluded by default
+    expect(ex.data.events.map((e) => e.title)).toEqual([]);
+    expect(Object.keys(ex.data.kv)).not.toContain("oauth.token");
+    const full = createLifeExport(dump, "0.5.0", { includeDemo: true });
+    expect(full.counts.routines).toBe(4);
+    expect(full.data.events.some((e) => e.source !== "local")).toBe(false);
+    const v = validateLifeImport(JSON.parse(JSON.stringify(full)));
+    expect(v.ok).toBe(true);
+    expect(v.counts.foods).toBe(15);
+    expect(validateLifeImport({ format: "nexus-config" }).ok).toBe(false);
+    expect(validateLifeImport({ format: "nexus-life", version: 99, data: {} }).ok).toBe(false);
+    const dirty = validateLifeImport({ format: "nexus-life", version: 1, data: { tasks: [{ id: "t", createdAt: 1, updatedAt: 1, title: "x", accessToken: "leak" }, { title: "no-id" }] } });
+    expect(dirty.ok).toBe(true);
+    expect(dirty.counts.tasks).toBe(1);
+    expect(JSON.stringify(dirty.dump)).not.toContain("leak");
+    expect(dirty.warnings.length).toBeGreaterThan(0);
+  });
+  it("sample data is internally consistent and fully flagged demo", async () => {
+    const { sampleLifeData } = await import("./sample");
+    const d = sampleLifeData("2026-09-27", now);
+    const foodIds = new Set(d.foods.map((f) => f.id));
+    for (const m of d.meals) for (const i of m.ingredients) expect(foodIds.has(i.foodId)).toBe(true);
+    const exIds = new Set(d.exercises.map((e) => e.id));
+    for (const t of d.workoutTemplates) for (const e of t.exercises) expect(exIds.has(e.exerciseId)).toBe(true);
+    for (const c of ["events", "tasks", "routines", "foods", "meals", "mealPlan", "sessions"] as const) expect((d[c] as Entity[]).every((r) => r.demo)).toBe(true);
+    const oats = mealFacts(d.meals[0]!, d.foods);
+    expect(oats.calories.value).toBeGreaterThan(400);
+    expect(oats.protein.complete).toBe(true);
+    expect(mealFacts(d.meals.find((m) => m.id === "ml-tacos")!, d.foods).calories.complete).toBe(false); // house sauce unknown
   });
 });

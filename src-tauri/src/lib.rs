@@ -1,6 +1,7 @@
 mod apps;
 mod gpu;
 mod hardware;
+mod life_db;
 mod media;
 mod media_thumbs;
 mod oauth;
@@ -25,6 +26,7 @@ use tauri::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_sql::Builder::default().add_migrations(life_db::DB_URL, life_db::migrations()).build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -98,6 +100,12 @@ pub fn run() {
             media_thumbs::media_thumbnail,
             media_thumbs::media_purge_thumbnails,
             hardware::get_hardware,
+            life_db::life_paths,
+            life_db::life_backup_target,
+            life_db::life_backups,
+            life_db::life_prune_backups,
+            life_db::life_validate_backup,
+            life_db::life_quarantine,
             gpu::gpu_set_preferred,
             session::session_read,
             session::session_write,

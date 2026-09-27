@@ -28,6 +28,7 @@ open = "5"
 png = "0.17"
 sha2 = "0.10"
 ureq = { version = "2", features = ["json"] }
+tauri-plugin-sql = { version = "=2.4.1", features = ["sqlite"] }
 
 [profile.release]
 panic = "abort"
