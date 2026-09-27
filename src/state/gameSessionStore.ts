@@ -3,6 +3,7 @@ import { getProviders } from "@/providers";
 import { useModeStore } from "./modeStore";
 import { notify } from "./toastStore";
 import { createLogger } from "@/lib/logger";
+import { activity } from "./activityStore";
 
 const log = createLogger("session");
 
@@ -68,7 +69,9 @@ export const useGameSessionStore = create<GameSessionState>((set, get) => ({
         set({ phase: "exited" });
         useModeStore.getState().setGameRunning(false);
         stop();
-        notify.neutral("Session complete", `${title} · ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`}`);
+        const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+        notify.neutral("Session complete", `${title} · ${dur}`);
+        activity.record("game-session-ended", `${title} · ${dur}`, { gameId });
         // One achievement refresh after the session — never during it, never repeatedly.
         void import("@/state/libraryStore").then(({ useLibraryStore }) => useLibraryStore.getState().refreshDetails(gameId));
         setTimeout(() => set({ phase: "idle", gameId: null, title: null, startedAt: null }), 1500);

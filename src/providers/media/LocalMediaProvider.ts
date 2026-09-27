@@ -3,6 +3,7 @@ import { ProviderOfflineError } from "@/core/errors";
 import { generatedPalette } from "@/core/steam/artwork";
 import { useMediaLibraryStore, type IndexedFile } from "@/state/mediaLibraryStore";
 import { useModeStore } from "@/state/modeStore";
+import { activity } from "@/state/activityStore";
 import { createLogger } from "@/lib/logger";
 import type { MediaBridge } from "./MediaBridge";
 import type { MediaProvider } from "./MediaProvider";
@@ -93,6 +94,7 @@ export class LocalMediaProvider implements MediaProvider {
     const root: AuthorizedRoot = { id: info.id, path: info.path, kind: info.kind, authorizedAt: Date.now(), exists: true, fileCount: 0, lastScannedAt: null };
     this.store.getState().addRoot(root);
     log.info("Media root authorized", { kind: info.kind });
+    activity.record("media-authorized", `Authorized a ${info.kind === "removable" ? "removable" : "local"} media location`);
     return root;
   }
 
@@ -105,6 +107,7 @@ export class LocalMediaProvider implements MediaProvider {
     } finally {
       this.store.getState().removeRoot(rootId);
       log.info("Media root authorization removed");
+      activity.record("media-revoked", "Removed a media location's authorization");
     }
   }
 

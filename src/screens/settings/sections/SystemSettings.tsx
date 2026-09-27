@@ -3,6 +3,7 @@ import { SettingsSection, SettingRow, Select } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
+import { useActivityStore } from "@/state/activityStore";
 import type { GpuTelemetry } from "@/core/types";
 
 const EMPTY_ADAPTERS: readonly GpuTelemetry[] = [];
@@ -45,6 +46,12 @@ export function SystemSettingsSection() {
           disabled={!enabled}
           onChange={(v) => setSystem({ allowProcessManagement: v })}
         />
+      </SettingRow>
+      <SettingRow label="Activity history" description="Keep a local list of what NEXUS did — launches, sessions, modes, cleanup. Never media names or message content.">
+        <div className="flex items-center gap-4">
+          <button onClick={() => useActivityStore.getState().clear()} className="text-[12.5px] text-white/40 transition-colors hover:text-white">Clear</button>
+          <Toggle checked={system.activityHistory} onChange={(v) => { setSystem({ activityHistory: v }); if (!v) useActivityStore.getState().clear(); }} />
+        </div>
       </SettingRow>
       {adapters.length > 1 && (
         <SettingRow label="Primary GPU" description="NEXUS picks the adapter with the most dedicated memory. Override if the integrated GPU is being reported instead.">

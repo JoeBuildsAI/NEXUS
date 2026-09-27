@@ -9,6 +9,7 @@ import {
 } from "@/state/navigationStore";
 import { useModeStore } from "@/state/modeStore";
 import { useGameSessionStore } from "@/state/gameSessionStore";
+import { activity } from "@/state/activityStore";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useMediaStore } from "@/state/mediaStore";
 import { useSettingsStore, type EnvironmentPreset } from "@/state/settingsStore";
@@ -76,6 +77,7 @@ export function setupActions(): void {
         const ok = await steam.launchGame(gameId);
         if (ok) {
           useGameSessionStore.getState().begin(gameId, title);
+          activity.record("game-launched", `Launched ${title}`, { gameId });
           notify.success(`Launching ${title}`, "NEXUS footprint reduced while the game runs.");
         } else {
           notify.error(`Could not launch ${title}`);

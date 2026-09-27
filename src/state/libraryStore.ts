@@ -5,6 +5,8 @@ import type { Game, GameDetails } from "@/core/types";
 import { getProviders } from "@/providers";
 import { isOffline } from "@/core/errors";
 import { createLogger } from "@/lib/logger";
+import { activity } from "./activityStore";
+import { notify } from "./toastStore";
 
 const log = createLogger("library");
 
@@ -136,6 +138,15 @@ export const useLibraryStore = create<LibraryState>()(
 
       setDetails: (id, value) =>
         set((s) => {
+          const prev = s.details[id]?.value;
+          // Real unlocks: the count grew since our last sync (never invented names).
+          if (prev && value.achievements.status !== "demo" && value.achievements.unlocked > prev.achievements.unlocked) {
+            const n = value.achievements.unlocked - prev.achievements.unlocked;
+            const newly = value.achievements.achievements.filter((a) => a.unlocked && !prev.achievements.achievements.some((p) => p.id === a.id && p.unlocked));
+            const label = newly.length === 1 ? newly[0]!.name : `${n} achievements`;
+            activity.record("achievement-unlocked", `${label} · ${value.title}`, { gameId: id });
+            notify.success("Achievement unlocked", `${label} · ${value.title}`);
+          }
           const details = { ...s.details, [id]: { at: Date.now(), value } };
           const keys = Object.keys(details);
           if (keys.length > MAX_CACHED_DETAILS) {

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { InstrumentLedger } from "./InstrumentLedger";
 import { TelemetryWave } from "./TelemetryWave";
 import { CommsSurface, ContinuePlaying, InsightsSurface, StorageSurface } from "./HomeSurfaces";
+import { RecentActivity } from "./RecentActivity";
 import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
 import { ErrorBoundary } from "@/components/ui";
 import { useClock, greeting } from "@/hooks/useClock";
@@ -81,8 +82,9 @@ export function HomeScreen() {
           </div>
         </motion.section>
 
-        <motion.section variants={rise} className="mt-16 max-w-3xl">
+        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[1.35fr_1fr]">
           <ErrorBoundary inline label="Suggestions"><InsightsSurface /></ErrorBoundary>
+          <ErrorBoundary inline label="Recent"><RecentActivity /></ErrorBoundary>
         </motion.section>
       </motion.div>
     </div>

@@ -14,6 +14,7 @@ import { useProcessPrefsStore } from "./processPrefsStore";
 import { notify } from "./toastStore";
 import { native } from "@/providers/system/nativeBridge";
 import { createLogger } from "@/lib/logger";
+import { activity } from "./activityStore";
 
 const log = createLogger("modes");
 
@@ -168,11 +169,13 @@ export const useModeStore = create<ModeState>((set, get) => ({
       await native.sessionClear();
       set({ current: "normal", session: null, history: nextHistory, notificationsSuppressed: false, gameRunning: false, previousPowerGuid });
       log.info("Returned to normal mode");
+      activity.record("mode-exited", "Returned to Normal Mode");
     } else {
       const changes = stepsToChanges(steps, opts);
       set({ current: mode, session: { mode, enteredAt: Date.now(), changes }, history: nextHistory, notificationsSuppressed: configs[mode].suppressNotifications, previousPowerGuid });
       if (previousPowerGuid || closedApps.length) await native.sessionWrite({ mode, startedAt: Date.now(), previousPowerGuid, closedApps, startupChanges: [] });
       log.info("Entered mode", { mode, changeCount: changes.length, safety: opts.safety, closed: closedApps.length });
+      activity.record("mode-entered", `${configs[mode].label} Mode${closedApps.length ? ` · closed ${closedApps.length} app${closedApps.length === 1 ? "" : "s"}` : ""}${opts.safety === "observe" ? " · observe only" : ""}`);
     }
 
     set((s) => (s.transition ? { transition: { ...s.transition, current: steps.length, done: true } } : {}));
@@ -204,6 +207,7 @@ export const useModeStore = create<ModeState>((set, get) => ({
     }
     await native.sessionClear();
     log.info("Recovered stale mode session", { mode: rec.mode, restoredPower: restored });
+    activity.record("session-recovered", restored ? "Restored the previous power plan after an interrupted session" : "Cleared an interrupted mode session");
     notify.warn(
       "Previous session recovered",
       restored ? "NEXUS closed unexpectedly during Gaming Mode. The previous power plan has been restored." : "NEXUS closed unexpectedly during a mode. Session state was cleared.",

@@ -9,6 +9,7 @@ import type { EmailConnectionState } from "@/core/types";
 import { notify } from "@/state/toastStore";
 import { config } from "@/core/config";
 import { cn } from "@/lib/utils";
+import { activity } from "@/state/activityStore";
 
 const STATE_LABEL: Record<EmailConnectionState, string> = {
   "not-configured": "READY TO CONFIGURE",
@@ -90,7 +91,10 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
     const r = await provider.connect();
     setBusy(false);
     await refresh();
-    if (r.ok) notify.success(`${label} connected`, "Syncing your inbox.");
+    if (r.ok) {
+      notify.success(`${label} connected`, "Syncing your inbox.");
+      activity.record("integration-connected", `${label} connected`);
+    }
     else notify.warn(`${label} not connected`, r.error);
     onChanged();
   };
@@ -101,6 +105,7 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
     setBusy(false);
     await refresh();
     notify.neutral(`${label} disconnected`, "Tokens removed from Credential Manager.");
+    activity.record("integration-disconnected", `${label} disconnected`);
     onChanged();
   };
 

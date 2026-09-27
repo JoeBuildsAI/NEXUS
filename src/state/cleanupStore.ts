@@ -3,6 +3,8 @@ import { config } from "@/core/config";
 import { DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
 import { native, type CleanupReportItem, type NativeCleanupCandidate } from "@/providers/system/nativeBridge";
 import type { CleanupRisk } from "@/core/types";
+import { activity } from "./activityStore";
+import { formatBytes } from "@/lib/utils";
 
 export interface CleanupCandidateView {
   id: string;
@@ -71,7 +73,11 @@ export const useCleanupStore = create<CleanupState>((set, get) => ({
   execute: async (ruleIds, dryRun) => {
     const report = await native.cleanupExecute(ruleIds, dryRun);
     set({ lastReport: report });
-    if (!dryRun) await get().discover({ force: true });
+    if (!dryRun) {
+      const freed = report.reduce((s, r) => s + r.freedBytes, 0);
+      activity.record("cleanup-completed", `Cleanup recovered ${formatBytes(freed)} across ${ruleIds.length} rule${ruleIds.length === 1 ? "" : "s"}`);
+      await get().discover({ force: true });
+    }
     return report;
   },
 

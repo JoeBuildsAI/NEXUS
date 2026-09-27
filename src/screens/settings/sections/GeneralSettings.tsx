@@ -11,6 +11,7 @@ import { requestConfirm } from "@/state/confirmStore";
 import { notify } from "@/state/toastStore";
 import { config } from "@/core/config";
 import { containsSensitive, createBackup, validateBackup } from "@/core/backup/configBackup";
+import { activity } from "@/state/activityStore";
 
 export function GeneralSettings() {
   const { startup, setStartup, profile, setProfile, window: win, setWindow } = useSettingsStore();
@@ -73,6 +74,7 @@ export function GeneralSettings() {
         useProcessPrefsStore.setState({ prefs: b.processPrefs });
         useGamePrefsStore.setState({ tracked: b.trackedAchievements });
         notify.success("Configuration imported", b.mediaRoots?.length ? "Re-authorize media folders in Settings → Media." : undefined);
+        activity.record("config-imported", `Imported configuration (format v${b.version})`);
       },
     });
   };

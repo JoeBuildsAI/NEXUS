@@ -3,6 +3,7 @@ import { FlaskConical, X, Zap } from "lucide-react";
 import { isDevBuild, useDevStore } from "@/state/devStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { notify } from "@/state/toastStore";
+import { activity } from "@/state/activityStore";
 import { Toggle, Button } from "@/components/ui";
 import { DEMO_GAMES } from "@/core/demo/games";
 
@@ -21,6 +22,7 @@ export function DevPanel() {
     const g = DEMO_GAMES[0]!;
     const locked = g.achievements.achievements.find((a) => !a.unlocked);
     dev.triggerAchievement();
+    activity.record("achievement-unlocked", `${locked?.name ?? "Kings & Pawns"} · ${g.title}`, { gameId: g.id });
     notify.success(`Achievement unlocked — ${locked?.name ?? "Kings & Pawns"}`, `${g.title} · ${locked?.globalPercent ?? 22}% of players`);
   };
   const fireEmail = () => {

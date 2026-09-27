@@ -11,6 +11,7 @@ import { notify } from "@/state/toastStore";
 import type { ProviderHealth, ProviderHealthState, SteamStatus } from "@/core/types";
 import { cn } from "@/lib/utils";
 import { MailAccountsPanel } from "./MailAccountsPanel";
+import { activity } from "@/state/activityStore";
 
 const STATE_TONE: Record<ProviderHealthState, "nominal" | "warning" | "neutral" | "attention" | "critical"> = {
   available: "nominal",
@@ -112,6 +113,7 @@ function SteamPanel({ status, onChanged }: { status: SteamStatus | null; onChang
       setSteamId("");
       getProviders().steam.invalidate?.();
       notify.success("Steam credentials saved", `${results.join(" and ")} stored in Windows Credential Manager.`);
+      activity.record("integration-connected", "Steam Web API configured");
       onChanged();
     } catch (e) {
       notify.error("Could not save", String((e as Error).message ?? e));
@@ -125,6 +127,7 @@ function SteamPanel({ status, onChanged }: { status: SteamStatus | null; onChang
     await native.secretDelete("steam.steamId");
     getProviders().steam.invalidate?.();
     notify.neutral("Steam credentials removed");
+    activity.record("integration-disconnected", "Steam Web API credentials removed");
     onChanged();
   };
 
