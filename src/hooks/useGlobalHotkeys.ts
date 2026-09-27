@@ -87,7 +87,9 @@ export function useGlobalHotkeys() {
     const register = async () => {
       try {
         const mod = await import("@tauri-apps/plugin-global-shortcut");
-        if (await mod.isRegistered(privacyHotkey)) await mod.unregister(privacyHotkey);
+        // A registration left over from a previous WebView load can refuse to
+        // unregister; unregisterAll clears this app's shortcuts natively.
+        if (await mod.isRegistered(privacyHotkey)) await mod.unregister(privacyHotkey).catch(() => mod.unregisterAll());
         await mod.register(privacyHotkey, (ev) => {
           if (ev.state === "Pressed") activatePrivacy("hotkey");
         });

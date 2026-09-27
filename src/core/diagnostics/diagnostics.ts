@@ -26,7 +26,7 @@ export function renderDiagnostics(d: DiagnosticsInput): string {
   lines.push(`NEXUS Diagnostics`);
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push(`NEXUS version: ${d.appVersion}`);
-  lines.push(`Runtime: ${d.runtime}${d.demoMode ? " (demo mode)" : ""}`);
+  lines.push(`Runtime: ${d.runtime}${d.demoMode ? " (demo fallback allowed where nothing real is connected)" : ""}`);
   lines.push(`Windows: ${d.os ? `${d.os.name} ${d.os.version} (${d.os.arch})` : "unknown (browser preview)"}`);
   lines.push("");
   lines.push("Providers:");
