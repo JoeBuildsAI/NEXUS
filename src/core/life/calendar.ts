@@ -86,7 +86,8 @@ export function layoutColumns(occ: readonly EventOccurrence[]): Map<string, { co
 
 /** Validate/normalize an event draft (end after start; all-day spans whole days). */
 export function normalizeEvent<T extends Pick<CalendarEvent, "day" | "startMinute" | "endDay" | "endMinute" | "allDay">>(e: T): T {
-  let { day, startMinute, endDay, endMinute } = e;
+  const { day, startMinute } = e;
+  let { endDay, endMinute } = e;
   if (compareDays(endDay, day) < 0) endDay = day;
   if (e.allDay) return { ...e, startMinute: 0, endMinute: 0, endDay };
   if (endDay === day && endMinute <= startMinute) endMinute = Math.min(1440, startMinute + 30);

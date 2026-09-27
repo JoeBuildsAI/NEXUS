@@ -148,16 +148,13 @@ export function expandRecurrence(startDay: DayKey, r: Recurrence, from: DayKey, 
     }
   } else if (r.freq === "monthly") {
     const dom = r.byMonthDay ?? parseDay(startDay).getDate();
-    let i = 0;
-    while (true) {
+    for (let i = 0; i <= 12 * 200; i++) {
       const base = addMonths(`${startDay.slice(0, 7)}-01`, i * interval);
       const d = parseDay(base);
       const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       const day = `${base.slice(0, 7)}-${String(Math.min(dom, last)).padStart(2, "0")}`;
       if (compareDays(day, until) > 0) break;
       if (compareDays(day, startDay) >= 0 && !push(day)) break;
-      i++;
-      if (i > 12 * 200) break;
     }
   } else {
     const start = parseDay(startDay);
