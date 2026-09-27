@@ -43,3 +43,12 @@ logs/
 *.db
 nexus-data/
 
+
+# Local audit output (screenshots, icon intermediates) — never part of the repository
+scripts/.shots/
+scripts/.icon/*
+!scripts/.icon/source.png
+
+# NSIS installers / packaged binaries built locally
+*.exe
+*.msi
