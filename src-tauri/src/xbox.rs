@@ -47,15 +47,70 @@ pub struct XboxCapabilities {
     pub reason: String,
 }
 
+/// First element named exactly `tag` (so `<Executable` never matches
+/// `<ExecutableList>`); attributes may span lines.
+fn element<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
+    let open = format!("<{tag}");
+    let mut from = 0;
+    while let Some(pos) = xml[from..].find(&open) {
+        let start = from + pos;
+        let after = xml[start + open.len()..].chars().next()?;
+        if after.is_whitespace() || after == '/' || after == '>' {
+            let end = xml[start..].find('>')? + start;
+            return Some(&xml[start..end]);
+        }
+        from = start + open.len();
+    }
+    None
+}
+
 fn attr(xml: &str, tag: &str, name: &str) -> Option<String> {
-    let start = xml.find(&format!("<{tag}"))?;
-    let rest = &xml[start..];
-    let end = rest.find('>')?;
-    let elem = &rest[..end];
+    let elem = element(xml, tag)?;
+    let mut from = 0;
     let key = format!("{name}=\"");
-    let i = elem.find(&key)? + key.len();
-    let j = elem[i..].find('"')? + i;
-    Some(elem[i..j].to_string())
+    while let Some(pos) = elem[from..].find(&key) {
+        let i = from + pos;
+        // Whole attribute name only (`Id=` must not match `ResourceId=`).
+        if elem[..i].chars().last().map_or(true, |c| c.is_whitespace()) {
+            let v = i + key.len();
+            let j = elem[v..].find('"')? + v;
+            return Some(elem[v..j].to_string());
+        }
+        from = i + key.len();
+    }
+    None
+}
+
+/// DLC / add-on packages ship their own MicrosoftGame.config under XboxGames
+/// but are not launchable games (a real library can hold dozens of content packs).
+pub fn is_dlc_config(xml: &str) -> bool {
+    xml.contains("<TargetDeviceFamilyForDLC") || element(xml, "MainPackageDependency").is_some() || element(xml, "Executable").is_none()
+}
+
+/// The shell AUMID's application id as Windows registered it
+/// (`Content\appxmanifest.xml` generated at install), when readable.
+fn registered_app_id(content_dir: &Path) -> Option<String> {
+    let p = content_dir.join("appxmanifest.xml");
+    if std::fs::metadata(&p).ok()?.len() > 1024 * 1024 {
+        return None;
+    }
+    let xml = std::fs::read_to_string(p).ok()?;
+    attr(&xml, "Application", "Id").filter(|id| valid_app_id(id))
+}
+
+/// Human publisher name: `PublisherDisplayName`, else the certificate CN unless
+/// it is an opaque GUID (as some large publishers' packages use).
+pub fn publisher_display(xml: &str, cert: Option<&str>) -> Option<String> {
+    if let Some(d) = attr(xml, "ShellVisuals", "PublisherDisplayName").map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && !s.starts_with("ms-resource:")) {
+        return Some(d);
+    }
+    let cn = cert?.split(',').next()?.trim().trim_start_matches("CN=").to_string();
+    let guid_like = cn.len() == 36 && cn.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+    if cn.is_empty() || guid_like { None } else { Some(cn) }
+}
+
+fn valid_app_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_')
 }
 
 fn text(xml: &str, tag: &str) -> Option<String> {
@@ -90,7 +145,12 @@ pub fn parse_config(xml: &str) -> Option<(String, String, String, Option<String>
     let name = attr(xml, "Identity", "Name")?;
     let publisher = attr(xml, "Identity", "Publisher");
     let display = attr(xml, "ShellVisuals", "DefaultDisplayName").unwrap_or_else(|| name.clone());
-    let exe_id = attr(xml, "Executable", "Id").unwrap_or_else(|| "Game".to_string());
+    // Without an explicit Id, Windows registers the executable's stem (observed:
+    // `Name="Minecraft.exe"` → AUMID `…!Minecraft`).
+    let exe_id = attr(xml, "Executable", "Id")
+        .or_else(|| attr(xml, "Executable", "Name").and_then(|n| Path::new(&n).file_stem().and_then(|s| s.to_str()).map(str::to_string)))
+        .filter(|id| valid_app_id(id))
+        .unwrap_or_else(|| "Game".to_string());
     let logo = attr(xml, "ShellVisuals", "Square150x150Logo");
     let store_id = text(xml, "StoreId");
     Some((name, display, exe_id, publisher, logo, store_id))
@@ -167,7 +227,9 @@ pub fn discover(roots: &[PathBuf]) -> Vec<XboxGame> {
             let content = dir.join("Content");
             let cfg = content.join("MicrosoftGame.config");
             let Ok(xml) = std::fs::read_to_string(&cfg) else { continue };
+            if is_dlc_config(&xml) { continue; }
             let Some((name, display, exe_id, publisher, logo, store_id)) = parse_config(&xml) else { continue };
+            let exe_id = registered_app_id(&content).unwrap_or(exe_id);
             let pfn = publisher.as_ref().map(|p| format!("{name}_{}", publisher_hash(p)));
             let mut budget = 4000u32;
             let size = dir_size(&content, &mut budget);
@@ -180,7 +242,7 @@ pub fn discover(roots: &[PathBuf]) -> Vec<XboxGame> {
                 install_size_bytes: if budget > 0 { Some(size) } else { None },
                 logo_data_url: logo_data_url(&content, &logo),
                 store_id,
-                publisher: publisher.map(|p| p.split(',').next().unwrap_or("").trim_start_matches("CN=").to_string()),
+                publisher: publisher_display(&xml, publisher.as_deref()),
             });
         }
     }
@@ -213,7 +275,7 @@ pub fn xbox_launch(package_family_name: String, app_id: String) -> Result<(), St
     if !package_family_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-') || package_family_name.len() > 200 {
         return Err("invalid package family name".into());
     }
-    if !app_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_') || app_id.is_empty() || app_id.len() > 64 {
+    if !valid_app_id(&app_id) {
         return Err("invalid app id".into());
     }
     let target = format!("shell:AppsFolder\\{package_family_name}!{app_id}");
@@ -251,6 +313,61 @@ mod tests {
         let h = publisher_hash("CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US");
         assert_eq!(h.len(), 13);
         assert_eq!(h, "8wekyb3d8bbwe");
+    }
+
+    /// Shape of a real multi-line GDK config: `<ExecutableList>` precedes the
+    /// `<Executable Id=…>` and Identity carries `ResourceId`.
+    const MULTILINE: &str = "\u{feff}<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<Game\n  configVersion=\"1\">\n  <Identity\n    Name=\"12345Studio.CoreBase\"\n    Publisher=\"CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92\"\n    Version=\"1.0.215.0\"\n    ResourceId=\"ww\"/>\n  <ExecutableList>\n    <Executable Name=\"bootstrapper.exe\" Id=\"coreShip\" IsDevOnly=\"false\" TargetDeviceFamily=\"PC\" />\n  </ExecutableList>\n  <ShellVisuals\n    DefaultDisplayName=\"Shooter\u{ae}\"\n    Square150x150Logo=\"Square150x150Logo.png\" />\n</Game>";
+
+    const DLC: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+<Game configVersion="1">
+  <Identity Name="12345Studio.DLC11Pack" Publisher="CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92" Version="0.0.9.0" />
+  <ShellVisuals DefaultDisplayName="DLC11 Pack" Square150x150Logo="media\logos\logo.png" />
+  <StoreId>9N7VJK93W35D</StoreId>
+  <TargetDeviceFamilyForDLC>PC</TargetDeviceFamilyForDLC>
+  <DesktopRegistration><MainPackageDependency Name="12345Studio.CoreBase" /></DesktopRegistration>
+</Game>"#;
+
+    #[test]
+    fn executable_id_is_not_shadowed_by_executable_list() {
+        let (name, display, exe, publisher, _, _) = parse_config(MULTILINE).unwrap();
+        assert_eq!(name, "12345Studio.CoreBase");
+        assert_eq!(display, "Shooter\u{ae}");
+        assert_eq!(exe, "coreShip");
+        assert_eq!(publisher_hash(&publisher.unwrap()), "5bkah9njm3e9g", "matches the PFN Windows registered for this publisher");
+        assert_eq!(publisher_display(MULTILINE, Some("CN=07A9AC0F-5502-4D92-BA69-01D5D39D1E92")), None, "opaque GUID CN is never shown");
+        assert_eq!(publisher_display(SAMPLE, None).as_deref(), Some("Sample Studio"));
+        let no_id = SAMPLE.replace(" Id=\"Game\"", "").replace("Sample.exe", "Launcher.exe");
+        assert_eq!(parse_config(&no_id).unwrap().2, "Launcher");
+    }
+
+    #[test]
+    fn dlc_packages_are_not_games() {
+        assert!(is_dlc_config(DLC));
+        assert!(!is_dlc_config(SAMPLE));
+        assert!(!is_dlc_config(MULTILINE));
+        let root = std::env::temp_dir().join(format!("nexus-xbox-dlc-{}", std::process::id()));
+        for (dir, cfg) in [("Shooter", MULTILINE), ("DLC11 Pack", DLC)] {
+            let content = root.join(dir).join("Content");
+            std::fs::create_dir_all(&content).unwrap();
+            std::fs::write(content.join("MicrosoftGame.config"), cfg).unwrap();
+        }
+        std::fs::write(root.join("Shooter").join("Content").join("appxmanifest.xml"), r#"<Package><Identity Name="12345Studio.CoreBase" ResourceId="ww"/><Applications><Application Id="coreShipReg" Executable="GameLaunchHelper.exe"/></Applications></Package>"#).unwrap();
+        let games = discover(&[root.clone()]);
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].app_id, "coreShipReg", "registered AUMID wins over the config");
+        assert_eq!(games[0].package_family_name.as_deref(), Some("12345Studio.CoreBase_5bkah9njm3e9g"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[ignore]
+    fn print_live_inventory() {
+        let inv = xbox_inventory();
+        println!("app={} roots={}", inv.xbox_app_installed, inv.roots.len());
+        for g in inv.games {
+            println!("{} | {:?}!{} | logo={} | size={:?}", g.title, g.package_family_name, g.app_id, g.logo_data_url.is_some(), g.install_size_bytes);
+        }
     }
 
     #[test]
