@@ -301,8 +301,9 @@ export function newId(prefix = "l"): string {
   seq = (seq + 1) % 4096;
   return `${prefix}-${Date.now().toString(36)}${seq.toString(36).padStart(3, "0")}-${Math.random().toString(36).slice(2, 8)}`;
 }
-export function stamp<T extends Omit<Entity, "id" | "createdAt" | "updatedAt" | "rev"> & { id?: string }>(data: T, now = Date.now(), prefix?: string): T & Entity {
-  return { ...data, id: data.id ?? newId(prefix), createdAt: now, updatedAt: now, rev: 1 } as T & Entity;
+export function stamp<T extends object>(data: T, now = Date.now(), prefix?: string): T & Entity {
+  const id = (data as { id?: unknown }).id;
+  return { ...data, id: typeof id === "string" && id ? id : newId(prefix), createdAt: now, updatedAt: now, rev: 1 } as T & Entity;
 }
 export function touch<T extends Entity>(e: T, patch: Partial<T>, now = Date.now()): T {
   return { ...e, ...patch, updatedAt: now, rev: e.rev + 1 };
