@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Play, Search, Target } from "lucide-react";
+import { Play, Search, Target } from "lucide-react";
 import { GameCard } from "./GameCard";
+import { GameRail } from "./GameRail";
 import { HeroArt } from "./HeroArt";
 import { useLibraryStore } from "@/state/libraryStore";
 import { useNavigationStore } from "@/state/navigationStore";
@@ -75,6 +76,7 @@ export function GameLibrary() {
   const [sort, setSort] = useState<SortKey>("recent");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [page, setPage] = useState(1);
+  const [railId, setRailId] = useState<string | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,7 +84,10 @@ export function GameLibrary() {
   }, [steamConnected]);
 
   const all = useMemo(() => useLibraryStore.getState().withDetails(), [games, details]); // eslint-disable-line react-hooks/exhaustive-deps
-  const featured = useMemo(() => [...all].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0], [all]);
+  const continueGame = useMemo(() => [...all].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0], [all]);
+  // The rail's selection drives the hero; it starts on the "continue" game.
+  const railGames = useMemo(() => [...all].sort((a, b) => Number(b.installed) - Number(a.installed) || (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0) || a.title.localeCompare(b.title)).slice(0, 60), [all]);
+  const featured = useMemo(() => all.find((g) => g.id === railId) ?? continueGame, [all, railId, continueGame]);
   const recent = useMemo(() => [...all].filter((g) => g.lastPlayed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0)).slice(0, 12), [all]);
 
   // Progressive detail fetch: featured + recent first; whole library only when small.
@@ -178,7 +183,7 @@ export function GameLibrary() {
         )}
 
         <div className="space-y-14">
-          {recent.length > 0 && !query && filter === "all" && <GameRow title="Recently played" games={recent} onSelect={(g) => selectGame(g.id)} />}
+          {!query && filter === "all" && railGames.length > 1 && <GameRail games={railGames} selectedId={featured?.id ?? null} onSelect={setRailId} onOpen={selectGame} />}
 
           {/* Library controls */}
           <section>
@@ -238,28 +243,6 @@ function Stat({ n, label }: { n: number | string; label: string }) {
   return <span><span className="text-white/85">{n}</span> {label}</span>;
 }
 
-function GameRow({ title, games, onSelect }: { title: string; games: GameDetails[]; onSelect: (g: Game) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const scroll = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * 720, behavior: "smooth" });
-  return (
-    <section>
-      <div className="mb-4 flex items-baseline justify-between">
-        <p className="label">{title} <span className="ml-2 text-white/20">{games.length}</span></p>
-        <div className="flex gap-1 opacity-0 transition-opacity [section:hover>&]:opacity-100">
-          <button onClick={() => scroll(-1)} className="p-1 text-white/30 hover:text-white" aria-label="Scroll left"><ChevronLeft size={16} /></button>
-          <button onClick={() => scroll(1)} className="p-1 text-white/30 hover:text-white" aria-label="Scroll right"><ChevronRight size={16} /></button>
-        </div>
-      </div>
-      <div ref={ref} className="-mx-3 flex gap-4 overflow-x-auto px-3 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {games.map((g) => (
-          <ContextMenu key={g.id} items={gameContextItems(g, { select: (id) => onSelect({ ...g, id }) })} className="w-[172px] shrink-0 2xl:w-[196px]">
-            <GameCard game={g} completion={g.achievements.total ? completionPercent(g.achievements) : undefined} onClick={() => onSelect(g)} />
-          </ContextMenu>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function CompletionColumn({ title, games, onSelect }: { title: string; games: GameDetails[]; onSelect: (g: Game) => void }) {
   return (
