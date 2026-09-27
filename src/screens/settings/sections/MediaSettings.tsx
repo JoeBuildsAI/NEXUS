@@ -137,13 +137,6 @@ export function MediaSettingsSection() {
         )}
       </div>
 
-      <SettingRow label="Default grid" description="Player layout used when opening the workspace.">
-        <Select
-          value={`${media.defaultColumns}x${media.defaultRows}`}
-          onChange={(v) => { const [c, r] = v.split("x").map(Number); setMedia({ defaultColumns: c, defaultRows: r }); }}
-          options={[{ value: "2x1", label: "2 × 1" }, { value: "2x2", label: "2 × 2" }, { value: "3x2", label: "3 × 2" }, { value: "3x3", label: "3 × 3" }]}
-        />
-      </SettingRow>
       <SettingRow label="Pause when hidden" description="Pause all players when the workspace is hidden.">
         <Toggle checked={media.pauseOnHide} onChange={(v) => setMedia({ pauseOnHide: v })} />
       </SettingRow>
