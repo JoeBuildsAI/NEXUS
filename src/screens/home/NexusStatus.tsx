@@ -71,7 +71,7 @@ export function NexusStatus() {
                 />
               )}
             </div>
-            <span className="w-14 text-right text-[11px] text-white/25">
+            <span className="w-12 text-right text-[10px] text-white/25">
               {r.label === "MEMORY" ? formatBytes(s.memory.totalBytes, 0) : r.label === "STORAGE" && primary ? formatBytes(primary.totalBytes, 0) : ""}
             </span>
           </div>

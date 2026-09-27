@@ -89,13 +89,8 @@ export function TelemetryWave({ height = 110 }: { height?: number }) {
 
       // Scan cursor
       if (!reduced) {
-        const x = (t % 600) / 600 * w;
-        const g = ctx.createLinearGradient(x - 60, 0, x, 0);
-        g.addColorStop(0, "rgba(94,208,230,0)");
-        g.addColorStop(1, "rgba(94,208,230,0.12)");
-        ctx.fillStyle = g;
-        ctx.fillRect(x - 60, 0, 60, h);
-        ctx.fillStyle = "rgba(94,208,230,0.5)";
+        const x = (t % 900) / 900 * w;
+        ctx.fillStyle = "rgba(94,208,230,0.18)";
         ctx.fillRect(x, 0, 1, h);
         t += 1;
         raf = requestAnimationFrame(draw);

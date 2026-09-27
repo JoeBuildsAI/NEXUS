@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, ChevronRight, Clock, Play, Sparkles, Trophy, HardDrive } from "lucide-react";
 import { useNavigationStore } from "@/state/navigationStore";
@@ -123,7 +124,8 @@ export function CommsSurface() {
 export function StorageSurface() {
   const navigate = useNavigationStore((s) => s.navigate);
   const setTab = useNavigationStore((s) => s.setSystemTab);
-  const drives = useTelemetryStore((s) => s.snapshot?.storage.filter((d) => d.kind === "fixed") ?? []);
+  const storage = useTelemetryStore((s) => s.snapshot?.storage);
+  const drives = useMemo(() => storage?.filter((d) => d.kind === "fixed") ?? [], [storage]);
   const go = () => { navigate("system"); setTab("storage"); };
   return (
     <div>

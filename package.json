@@ -17,6 +17,9 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-autostart": "^2.6.0",
     "@tauri-apps/plugin-dialog": "^2.8.0",
@@ -45,6 +48,7 @@
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "jsdom": "^25.0.1",
+    "playwright-core": "^1.63.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",

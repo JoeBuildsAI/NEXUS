@@ -15,6 +15,11 @@ npm run build          # tsc --noEmit && vite build
 npm run tauri:build    # NSIS installer (Windows)
 ```
 
+Visual audit (headless Edge via playwright-core, needs `npm run dev` or `tauri:dev` running):
+`node scripts/screenshots.mjs 1920x1080` → `scripts/.shots/*.png` (also reports page errors).
+Quick error probe: `node scripts/diag.mjs`.
+Dev simulation panel in the app: `Ctrl+Shift+D` (dev builds only).
+
 Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchain
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer.
 

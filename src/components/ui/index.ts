@@ -9,3 +9,4 @@ export { Slider } from "./Slider";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { Tabs, type TabItem } from "./Tabs";
 export { LiveChart } from "./LiveChart";
+export { ErrorBoundary } from "./ErrorBoundary";

@@ -33,7 +33,7 @@ export function DevPanel() {
       <button
         onClick={() => setOpen(!open)}
         title="Developer panel (Ctrl+Shift+D)"
-        className="fixed bottom-4 left-4 z-[340] flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-void-900/80 text-white/30 backdrop-blur transition-colors hover:text-accent"
+        className="fixed bottom-4 left-[100px] z-[340] flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.06] bg-void-900/60 text-white/20 backdrop-blur transition-colors hover:text-accent"
       >
         <FlaskConical size={14} />
       </button>
@@ -43,7 +43,7 @@ export function DevPanel() {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -16 }}
-            className="glass-strong fixed bottom-14 left-4 z-[340] w-72 rounded-2xl p-4 shadow-panel"
+            className="glass-strong fixed bottom-14 left-[100px] z-[340] w-72 rounded-2xl p-4 shadow-panel"
           >
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-2 text-[11px] uppercase tracking-wide2 text-white/50">

@@ -42,3 +42,7 @@ logs/
 *.sqlite3
 *.db
 nexus-data/
+
+# Local visual-audit artifacts
+scripts/.shots/
+scripts/.icon/

@@ -14,21 +14,23 @@ export function GameCard({ game, completion, onClick }: GameCardProps) {
   return (
     <button
       onClick={onClick}
-      className="no-drag group relative aspect-[3/4] overflow-hidden rounded-xl border border-white/[0.06] text-left transition-all duration-300 hover:border-white/20 hover:shadow-glow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+      className="no-drag group relative block aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/[0.06] text-left transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-glow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
     >
       {/* Cover placeholder gradient */}
       <div
         className="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
         style={{
-          background: `linear-gradient(155deg, ${game.coverColor} 0%, ${game.heroColor} 100%)`,
+          background: `radial-gradient(120% 80% at 30% 0%, ${game.coverColor} 0%, ${game.heroColor} 55%, #07090d 100%)`,
         }}
       >
-        <div className="absolute inset-0 bg-grid opacity-20" />
+        <div className="absolute inset-0 bg-grid opacity-[0.12]" />
+        <div className="absolute inset-0 nx-noise opacity-[0.06]" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-display text-5xl font-bold text-white/10">
+          <span className="font-display text-6xl font-bold text-white/[0.07]">
             {game.title.charAt(0)}
           </span>
         </div>
+        <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
       </div>
 
       {/* Gradient scrim */}

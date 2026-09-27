@@ -10,6 +10,7 @@ import {
   StorageSurface,
 } from "./HomeSurfaces";
 import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
+import { ErrorBoundary } from "@/components/ui";
 import { useClock, formatDateLong, formatTime, greeting } from "@/hooks/useClock";
 import { useSettingsStore } from "@/state/settingsStore";
 
@@ -26,7 +27,7 @@ export function HomeScreen() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1500px] flex-col px-10 pb-10 pt-8 2xl:px-14">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1500px] flex-col px-10 pb-10 pt-8 2xl:max-w-[1700px] 2xl:px-14 2xl:pt-12">
         {/* Identity row */}
         <motion.header variants={rise} className="flex items-start justify-between gap-8">
           <div>
@@ -45,7 +46,7 @@ export function HomeScreen() {
         </motion.header>
 
         {/* Status + wave */}
-        <motion.section variants={rise} className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[340px_1fr]">
+        <motion.section variants={rise} className="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-[minmax(380px,32%)_1fr]">
           <NexusStatus />
           <div className="flex flex-col justify-end">
             <TelemetryWave height={150} />
@@ -59,13 +60,13 @@ export function HomeScreen() {
         {/* Context */}
         <motion.section variants={rise} className="mt-14 grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[1.4fr_1fr]">
           <div className="space-y-10">
-            <ContinuePlaying />
-            <InsightsSurface />
+            <ErrorBoundary inline label="Continue playing"><ContinuePlaying /></ErrorBoundary>
+            <ErrorBoundary inline label="Suggestions"><InsightsSurface /></ErrorBoundary>
           </div>
           <div className="space-y-10 lg:border-l lg:border-white/[0.05] lg:pl-12">
-            <CommsSurface />
-            <StorageSurface />
-            <MediaSurface />
+            <ErrorBoundary inline label="Communications"><CommsSurface /></ErrorBoundary>
+            <ErrorBoundary inline label="Storage"><StorageSurface /></ErrorBoundary>
+            <ErrorBoundary inline label="Media"><MediaSurface /></ErrorBoundary>
           </div>
         </motion.section>
       </motion.div>

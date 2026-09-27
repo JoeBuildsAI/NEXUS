@@ -54,7 +54,7 @@ export default {
           "sans-serif",
         ],
         mono: ["JetBrains Mono", "SF Mono", "Consolas", "monospace"],
-        display: ["Orbitron", "Inter", "sans-serif"],
+        display: ["Space Grotesk", "Inter", "Segoe UI", "sans-serif"],
       },
       letterSpacing: {
         cinematic: "0.35em",
