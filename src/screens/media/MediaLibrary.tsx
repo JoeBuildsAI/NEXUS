@@ -20,6 +20,7 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
   const [folder, setFolder] = useState<string>("");
   const [query, setQuery] = useState("");
   const [newCollection, setNewCollection] = useState("");
+  const [sort, setSort] = useState<"name" | "added" | "duration" | "size">("added");
   const slots = useMediaStore((s) => s.slots);
   const setSlotItem = useMediaStore((s) => s.setSlotItem);
   const addToWall = useMediaStore((s) => s.addToWall);
@@ -46,8 +47,17 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
     else if (view === "recent") all = all.sort((a, b) => b.addedAt - a.addedAt).slice(0, 24);
     else if (view === "collections" && collection) all = collection === "favorites" ? all.filter((i) => i.favorite) : all.filter((i) => i.collectionId === collection);
     else if (view === "library") all = all.filter((i) => (i.folder ?? "") === folder);
+    if (view !== "recent") {
+      const by: Record<typeof sort, (a: MediaItem, b: MediaItem) => number> = {
+        name: (a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }),
+        added: (a, b) => b.addedAt - a.addedAt,
+        duration: (a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0),
+        size: (a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0),
+      };
+      all.sort(by[sort]);
+    }
     return all;
-  }, [items, view, collection, folder, query]);
+  }, [items, view, collection, folder, query, sort]);
 
   // Windowed rendering: 10k-file libraries never mount 10k tiles.
   const PAGE = 60;
@@ -152,6 +162,15 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
             <Search size={13} className="text-white/30" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search library (local)" className="h-8 w-40 border-b border-white/10 bg-transparent text-sm text-white/85 placeholder:text-white/25 focus:border-white/50 focus:outline-none" />
           </div>
+          <div className="flex items-center gap-3 text-[12px]">
+            <span className="text-white/30">Sort</span>
+            {(["added", "name", "duration", "size"] as const).map((k) => (
+              <button key={k} onClick={() => setSort(k)} className={cn("relative pb-0.5 transition-colors", sort === k ? "text-white" : "text-white/40 hover:text-white/75")}>
+                {k}
+                {sort === k && <span className="absolute inset-x-0 -bottom-px h-px bg-white/70" />}
+              </button>
+            ))}
+          </div>
           <Button size="sm" variant="ghost" onClick={() => void authorize()}><FolderPlus size={14} /> Add folder</Button>
         </div>
       </div>
@@ -183,7 +202,11 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
         <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {visible.map((item) => (
             <ContextMenu key={item.id} items={menuFor(item)}>
-              <div className={cn("group", item.available === false && "opacity-50")}>
+              <div
+                className={cn("group", item.available === false && "opacity-50")}
+                draggable={item.available !== false}
+                onDragStart={(e) => { e.dataTransfer.setData("application/x-nexus-media", item.id); e.dataTransfer.effectAllowed = "copy"; }}
+              >
                 <div className="relative aspect-video overflow-hidden rounded-sm bg-black">
                   <div className="absolute inset-0 transition-transform duration-700 ease-nexus group-hover:scale-[1.03]" style={{ background: `radial-gradient(90% 90% at 30% 20%, ${item.thumbnailColor}, #000 90%)` }}>
                     {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
@@ -199,7 +222,7 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
                 </div>
                 <div className="mt-2.5 flex items-baseline justify-between gap-3">
                   <p className="truncate text-[13.5px] text-white/85">{item.title}</p>
-                  <span className="shrink-0 font-mono text-[10.5px] tabular text-white/35">{item.durationSeconds ? formatDuration(item.durationSeconds) : item.sizeBytes ? formatBytes(item.sizeBytes, 0) : ""}</span>
+                  <span className="shrink-0 font-mono text-[10.5px] tabular text-white/35">{item.durationSeconds ? formatDuration(item.durationSeconds) : ""}{item.durationSeconds && item.sizeBytes ? " · " : ""}{item.sizeBytes ? formatBytes(item.sizeBytes, 0) : ""}</span>
                 </div>
               </div>
             </ContextMenu>

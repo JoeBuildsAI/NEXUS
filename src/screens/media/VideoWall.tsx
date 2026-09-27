@@ -128,16 +128,31 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
     requestConfirm({ title: "Clear the wall?", message: "Unloads every player. Your files, presets and saved workspaces are untouched.", confirmLabel: "Clear", danger: true, onConfirm: () => { store.clearAll(); notify.neutral("Wall cleared"); } });
   };
   const positions = () => Object.fromEntries(Object.entries(videoEls.current).filter(([, v]) => v).map(([k, v]) => [Number(k), v!.currentTime]));
+  const [dropHint, setDropHint] = useState(false);
+  // Drag/drop from the library: only NEXUS item ids are accepted. File drops from
+  // outside are ignored — authorization never expands because something was dragged in.
+  const dragId = (e: React.DragEvent) => (e.dataTransfer.types.includes("application/x-nexus-media") ? e.dataTransfer.getData("application/x-nexus-media") : null);
+  const onDragOver = (e: React.DragEvent) => { if (e.dataTransfer.types.includes("application/x-nexus-media")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDropHint(true); } };
+  const onDrop = (e: React.DragEvent, replaceIndex?: number) => {
+    setDropHint(false);
+    const id = dragId(e);
+    if (!id || !itemById.has(id)) return; // unknown / external → rejected
+    e.preventDefault();
+    e.stopPropagation();
+    if (replaceIndex != null) { store.setSlotItem(replaceIndex, id); store.setActiveIndex(replaceIndex); return; }
+    const added = store.addToWall(id);
+    if (added == null) notify.warn("Wall is full", "Drop onto a player to replace it.");
+  };
 
   // Empty wall: calm environment, not six dead rectangles.
   if (loaded === 0) {
     return (
-      <div ref={containerRef} className="flex h-full flex-col">
+      <div ref={containerRef} data-wall className={cn("flex h-full flex-col transition-colors", dropHint && "bg-white/[0.02]")} onDragOver={onDragOver} onDragLeave={() => setDropHint(false)} onDrop={(e) => onDrop(e)}>
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <p className="text-micro tracking-cinematic text-white/35">Private local workspace</p>
             <p className="mt-4 font-display text-display-md font-semibold uppercase tracking-wide text-white/85">Nothing on the wall</p>
-            <p className="mx-auto mt-4 max-w-md text-[14px] leading-relaxed text-white/40">Add a video and it takes the whole workspace. Add more and the wall arranges itself around them — up to six at once.</p>
+            <p className="mx-auto mt-4 max-w-md text-[14px] leading-relaxed text-white/40">Add a video and it takes the whole workspace. Add more and the wall arranges itself around them — up to six at once. You can also drag videos here from the Library.</p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button variant="primary" onClick={() => setPickerSlot(0)}><Plus size={15} /> Add video</Button>
               <Button variant="ghost" onClick={onOpenLibrary}><Library size={15} /> Library</Button>
@@ -182,7 +197,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
       </div>
 
       {/* The wall */}
-      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden bg-black" onMouseDown={(e) => { if (e.target === e.currentTarget) store.setActiveIndex(null); }}>
+      <div ref={containerRef} data-wall className={cn("relative min-h-0 flex-1 overflow-hidden bg-black", dropHint && "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]")} onMouseDown={(e) => { if (e.target === e.currentTarget) store.setActiveIndex(null); }} onDragOver={onDragOver} onDragLeave={() => setDropHint(false)} onDrop={(e) => onDrop(e)}>
         {size.width > 0 && layout.tiles.map((tile) => {
           const slot = slots[tile.index]!;
           const item = itemById.get(slot.itemId!)!;
@@ -199,6 +214,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
               onAssign={setPickerSlot}
               onActivate={store.setActiveIndex}
               register={register}
+              onDropItem={(e) => onDrop(e, slot.index)}
             />
           );
         })}

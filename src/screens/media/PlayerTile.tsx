@@ -25,6 +25,8 @@ interface Props {
   onActivate: (index: number) => void;
   /** Exposes the element so the wall can read playback positions (saved workspaces). */
   register: (index: number, el: HTMLVideoElement | null) => void;
+  /** Library drag/drop onto this player (replace). */
+  onDropItem?: (e: React.DragEvent) => void;
 }
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -41,7 +43,7 @@ const FAILURE_COPY: Record<Exclude<PlayerFailure, null>, { title: string; body: 
  * stays inside this component (refs + ~4 Hz local ticks); only structural
  * state (item, loop mode, A/B, volume) lives in the workspace store.
  */
-export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, reducedMotion, onAssign, onActivate, register }: Props) {
+export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, reducedMotion, onAssign, onActivate, register, onDropItem }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { setSlotPlaying, setSlotMuted, setSlotVolume, setSlotFit, setSlotRate, setSlotLoop, setLoopPoint, clearSegment, clearSlot, setPrimary, setMode, setFocusIndex, requestSeek, rememberPosition } = useMediaStore();
   const seekRequest = useMediaStore((s) => s.seekRequest);
@@ -246,6 +248,8 @@ export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, 
       onDoubleClick={(e) => { if ((e.target as HTMLElement).tagName === "VIDEO") setPrimary(isPrimary ? null : slot.index); }}
       data-player={slot.index}
       data-active={isActive || undefined}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("application/x-nexus-media")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
+      onDrop={(e) => onDropItem?.(e)}
     >
       {failure ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center" style={{ background: `radial-gradient(80% 80% at 50% 50%, ${item.thumbnailColor}18, #000)` }}>

@@ -81,6 +81,34 @@ const samples = await page.evaluate(async () => {
 const outOfRange = samples.filter((t) => t < 3.5 || t > 9.6);
 console.log("A–B samples", samples.map((t) => t.toFixed(2)).join(" "), outOfRange.length ? `OUT OF RANGE: ${outOfRange.length}` : "stable");
 
+// Drag/drop: a library tile dropped on the wall is added; a fake external file drop is ignored.
+await clear();
+await page.getByRole("tab", { name: "Library", exact: true }).first().click(); await page.waitForTimeout(600);
+const dndAdded = await page.evaluate(async ([id]) => {
+  const dt = new DataTransfer();
+  dt.setData("application/x-nexus-media", id);
+  // The wall lives on the Workspace tab; dispatch to the document-level drop target after switching.
+  return dt.types.includes("application/x-nexus-media");
+}, [ids[0]]);
+console.log("dnd payload ok:", dndAdded);
+await page.getByRole("tab", { name: "Workspace", exact: true }).first().click(); await page.waitForTimeout(500);
+const dropResult = await page.evaluate(([id]) => {
+  const wall = document.querySelector('[data-wall]') ?? document.body;
+  const fire = (types) => {
+    const dt = new DataTransfer();
+    for (const [k, v] of Object.entries(types)) dt.setData(k, v);
+    wall.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    wall.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+  };
+  fire({ "text/plain": "C:/Users/someone/Videos/private.mp4" }); // external-looking drop → must be ignored
+  const afterExternal = window.__nexusMedia.getState().slots.filter((s) => s.itemId).length;
+  fire({ "application/x-nexus-media": id });
+  const afterItem = window.__nexusMedia.getState().slots.filter((s) => s.itemId).length;
+  return { afterExternal, afterItem };
+}, [ids[0]]);
+console.log("drop external ignored:", dropResult.afterExternal === 0, "· drop item added:", dropResult.afterItem === 1);
+if (dropResult.afterExternal !== 0 || dropResult.afterItem !== 1) errors.push("drag/drop behaviour wrong: " + JSON.stringify(dropResult));
+
 // Privacy curtain on restore: reload with the workspace persisted
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(800);
