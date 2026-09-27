@@ -104,7 +104,7 @@ export function CommandPalette() {
       {open && (
         <motion.div className="fixed inset-0 z-[150]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
           {/* Environment recedes */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-[6px]" onClick={close} />
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-xl" onClick={close} />
 
           <motion.div
             initial={{ y: -8, opacity: 0 }}
@@ -146,12 +146,6 @@ export function CommandPalette() {
                       onMouseEnter={() => setSelected(i)}
                       className="group relative flex w-full items-baseline gap-6 py-2.5 text-left"
                     >
-                      <motion.span
-                        className="absolute -left-4 top-1/2 h-4 w-px -translate-y-1/2 bg-white"
-                        initial={false}
-                        animate={{ opacity: active ? 1 : 0, scaleY: active ? 1 : 0.4 }}
-                        transition={{ duration: 0.15 }}
-                      />
                       <span className={cn("w-[72px] shrink-0 text-micro transition-colors", active ? "text-white/60" : "text-white/25")}>{GROUP_LABEL[m.group]}</span>
                       <span className={cn("flex-1 truncate font-display text-[19px] tracking-wide transition-colors duration-150", active ? "text-white" : "text-white/55 group-hover:text-white/80")}>{m.label}</span>
                       {m.hint && <span className={cn("shrink-0 text-xs transition-colors", active ? "text-white/45" : "text-white/20")}>{m.hint}</span>}

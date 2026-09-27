@@ -39,7 +39,7 @@ export function HomeScreen() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1560px] flex-col px-12 pb-16 pt-10 2xl:max-w-[1760px] 2xl:px-16 2xl:pt-14">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1560px] flex-col px-12 pb-16 pt-10 2xl:max-w-[1760px] 2xl:px-16 2xl:pt-14 min-[2400px]:max-w-[2200px] min-[2400px]:pt-24">
         {/* Hero */}
         <motion.header variants={rise} className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1fr_auto]">
           <div>
