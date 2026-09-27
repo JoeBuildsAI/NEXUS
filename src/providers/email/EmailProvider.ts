@@ -1,10 +1,11 @@
-import type { EmailAccount, InboxSummary, Message, Subscription } from "@/core/types";
+import type { EmailAccount, InboxSummary, Message, ProviderHealth, Subscription } from "@/core/types";
 
 /**
- * Abstraction over communications sources. Real adapters (Gmail, Microsoft
- * Graph) come later; credentials must use OS secure storage and never be
- * committed. Classification is heuristic and must never be presented as AI
- * certainty.
+ * Abstraction over communications sources: MockEmailProvider (demo),
+ * RealMailProvider (Outlook via Microsoft Graph, Gmail via Gmail API) and the
+ * unifying EmailAutoProvider. Tokens live in the OS credential store and are
+ * injected natively. Classification is heuristic, explainable, and never
+ * presented as AI certainty.
  */
 export interface EmailProvider {
   readonly id: string;
@@ -17,4 +18,5 @@ export interface EmailProvider {
   unsubscribe(messageId: string): Promise<void>;
   getSubscriptions(): Promise<readonly Subscription[]>;
   unsubscribeSender(subscriptionId: string): Promise<void>;
+  health?(): Promise<ProviderHealth>;
 }

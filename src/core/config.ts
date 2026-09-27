@@ -45,20 +45,22 @@ const isTauri =
   typeof window !== "undefined" &&
   ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 
-// Demo mode defaults ON unless explicitly disabled. This guarantees the app
-// looks impressive on the development laptop with zero integrations.
+// Demo FALLBACK defaults ON unless explicitly disabled: when a real provider is
+// not detected/connected, demo data fills in (clearly labelled). Real providers
+// always take precedence when they are viable — the desktop build never hides a
+// real Steam library or media root behind demo data.
 const demoMode = envFlag("VITE_DEMO_MODE", true);
 
 export const config: NexusConfig = {
   isTauri,
   demoMode,
   providers: {
-    // Real system telemetry is safe and desirable, so prefer it whenever running
-    // under Tauri — even in demo mode. Other domains default to mock demo data.
+    // Under Tauri every domain is real-first ("auto"): real when detected or
+    // connected, demo fallback otherwise. In the browser preview everything is mock.
     system: envProvider("VITE_PROVIDER_SYSTEM", isTauri ? "auto" : "mock"),
-    steam: envProvider("VITE_PROVIDER_STEAM", "mock"),
-    media: envProvider("VITE_PROVIDER_MEDIA", isTauri && !demoMode ? "auto" : "mock"),
-    email: envProvider("VITE_PROVIDER_EMAIL", "mock"),
+    steam: envProvider("VITE_PROVIDER_STEAM", isTauri ? "auto" : "mock"),
+    media: envProvider("VITE_PROVIDER_MEDIA", isTauri ? "auto" : "mock"),
+    email: envProvider("VITE_PROVIDER_EMAIL", isTauri ? "auto" : "mock"),
     assistant: envProvider("VITE_PROVIDER_ASSISTANT", "mock"),
   },
   systemSafety: (import.meta.env.VITE_SYSTEM_SAFETY as "observe" | "enabled") || "observe",

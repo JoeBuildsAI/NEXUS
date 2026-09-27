@@ -3,12 +3,16 @@ import { SettingsSection, SettingRow, Select } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
+import type { GpuTelemetry } from "@/core/types";
+
+const EMPTY_ADAPTERS: readonly GpuTelemetry[] = [];
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 
 export function SystemSettingsSection() {
   const { system, setSystem } = useSettingsStore();
   const enabled = system.safety === "enabled";
-  const adapters = useTelemetryStore((st) => st.snapshot?.gpuAdapters ?? []);
+  const adaptersRaw = useTelemetryStore((st) => st.snapshot?.gpuAdapters);
+  const adapters = adaptersRaw ?? EMPTY_ADAPTERS;
 
   return (
     <SettingsSection title="System" description="Cleanup and process-management permissions.">

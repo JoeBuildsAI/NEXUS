@@ -8,8 +8,22 @@ use serde::Serialize;
 
 const SERVICE: &str = "ai.nexus.desktop";
 
-/// Allowlist of secret keys the UI may manage.
-const ALLOWED_KEYS: &[&str] = &["steam.apiKey", "steam.steamId"];
+/// Allowlist of secret keys the UI may manage (set/delete/status). Token keys
+/// are written only by the native OAuth flow; the UI can read their status.
+const ALLOWED_KEYS: &[&str] = &[
+    "steam.apiKey",
+    "steam.steamId",
+    "email.outlook.clientId",
+    "email.gmail.clientId",
+    "email.gmail.clientSecret",
+];
+/// Keys the native layer manages itself; never settable from the UI.
+const NATIVE_KEYS: &[&str] = &[
+    "email.outlook.accessToken",
+    "email.outlook.refreshToken",
+    "email.gmail.accessToken",
+    "email.gmail.refreshToken",
+];
 
 fn entry(key: &str) -> Result<Entry, String> {
     if !ALLOWED_KEYS.contains(&key) {
@@ -18,8 +32,28 @@ fn entry(key: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, key).map_err(|e| e.to_string())
 }
 
+fn native_entry(key: &str) -> Result<Entry, String> {
+    if !ALLOWED_KEYS.contains(&key) && !NATIVE_KEYS.contains(&key) {
+        return Err(format!("unknown secret key: {key}"));
+    }
+    Entry::new(SERVICE, key).map_err(|e| e.to_string())
+}
+
 pub fn read_secret(key: &str) -> Option<String> {
-    entry(key).ok()?.get_password().ok().filter(|s| !s.trim().is_empty())
+    native_entry(key).ok()?.get_password().ok().filter(|s| !s.trim().is_empty())
+}
+
+/// Native-only write (OAuth tokens). Not exposed as a command.
+pub fn write_secret(key: &str, value: &str) -> Result<(), String> {
+    native_entry(key)?.set_password(value).map_err(|e| e.to_string())
+}
+
+/// Native-only delete; missing entries are not an error.
+pub fn delete_secret(key: &str) -> Result<(), String> {
+    match native_entry(key)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// Shape checks so a mis-pasted value is rejected before it is stored.
@@ -45,6 +79,8 @@ mod tests {
         assert!(validate_format("steam.steamId", "76561198000000000").is_ok());
         assert!(validate_format("steam.steamId", "joseph").is_err());
         assert!(entry("email.password").is_err(), "only allowlisted keys may be stored");
+        assert!(entry("email.outlook.refreshToken").is_err(), "tokens are never settable from the UI");
+        assert!(native_entry("email.outlook.refreshToken").is_ok());
     }
 }
 
@@ -84,7 +120,8 @@ pub fn secret_status(keys: Vec<String>) -> Result<Vec<SecretStatus>, String> {
     Ok(keys
         .into_iter()
         .map(|k| {
-            let configured = ALLOWED_KEYS.contains(&k.as_str()) && read_secret(&k).is_some();
+            let known = ALLOWED_KEYS.contains(&k.as_str()) || NATIVE_KEYS.contains(&k.as_str());
+            let configured = known && read_secret(&k).is_some();
             SecretStatus { key: k, configured }
         })
         .collect())

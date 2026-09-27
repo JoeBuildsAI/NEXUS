@@ -14,14 +14,16 @@ import { Tabs, type TabItem, Button } from "@/components/ui";
 import { notify } from "@/state/toastStore";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "unread" | "important" | "newsletter" | "receipt" | "subscriptions";
+type Filter = "all" | "unread" | "important" | "personal" | "newsletter" | "receipt" | "notification" | "subscriptions";
 
 const TABS: TabItem<Filter>[] = [
   { id: "all", label: "Inbox" },
   { id: "unread", label: "Unread" },
   { id: "important", label: "Priority" },
+  { id: "personal", label: "Personal" },
   { id: "newsletter", label: "Newsletters" },
   { id: "receipt", label: "Receipts" },
+  { id: "notification", label: "Notifications" },
   { id: "subscriptions", label: "Subscriptions" },
 ];
 
@@ -32,7 +34,11 @@ export function CommunicationsScreen() {
   const navigate = useNavigationStore((s) => s.navigate);
   const setSection = useNavigationStore((s) => s.setSettingsSection);
   const { data, loading, error, reload } = useAsync(() => provider.getMessages(), [emailConnected, emailPulse]);
-  const { data: accounts } = useAsync<readonly EmailAccount[]>(() => provider.getAccounts(), []);
+  const { data: accounts } = useAsync<readonly EmailAccount[]>(() => provider.getAccounts(), [emailConnected]);
+  const { data: mode } = useAsync<"real" | "demo" | "none">(async () => {
+    const p = provider as { mode?: () => Promise<"real" | "demo" | "none"> };
+    return typeof p.mode === "function" ? p.mode() : "demo";
+  }, [emailConnected]);
   const [filter, setFilter] = useState<Filter>("all");
   const [account, setAccount] = useState<string | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -41,6 +47,8 @@ export function CommunicationsScreen() {
     let all = [...(data ?? [])].sort((a, b) => b.timestamp - a.timestamp);
     if (account !== "all") all = all.filter((m) => m.accountId === account);
     if (filter === "unread") all = all.filter((m) => !m.read);
+    else if (filter === "newsletter") all = all.filter((m) => m.category === "newsletter" || m.category === "subscription");
+    else if (filter === "notification") all = all.filter((m) => m.category === "notification" || m.category === "social");
     else if (filter !== "all" && filter !== "subscriptions") all = all.filter((m) => m.category === (filter as MessageCategory));
     return all;
   }, [data, filter, account]);
@@ -53,7 +61,10 @@ export function CommunicationsScreen() {
   const unread = (data ?? []).filter((m) => !m.read).length;
 
   if (error && isOffline(error)) {
-    return <EmptyState eyebrow="Communications" title="Offline" body="Connect an account when you're ready. NEXUS uses a mock inbox on this machine." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Integrations</Button>} />;
+    return <EmptyState eyebrow="Communications" title="Offline" body="The mail service is unreachable. Cached messages return when the connection does." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Integrations</Button>} />;
+  }
+  if (mode === "none" && !loading && (data?.length ?? 0) === 0) {
+    return <EmptyState eyebrow="Communications" title="No account connected" body="Connect Outlook or Gmail when you're ready. Until then this space stays quiet." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Connect an account</Button>} />;
   }
 
   return (
@@ -61,7 +72,7 @@ export function CommunicationsScreen() {
       <div className="mx-auto flex w-full max-w-[1880px] flex-wrap items-end justify-between gap-6 px-12 pb-8 pt-10 2xl:px-16">
         <div className="flex items-end gap-10">
           <div>
-            <p className="text-micro tracking-cinematic text-white/35">Communications</p>
+            <p className="text-micro tracking-cinematic text-white/35">Communications{mode === "demo" && <span className="ml-3 normal-case tracking-normal text-white/25">demo inbox</span>}</p>
             <h1 className="mt-3 font-sans text-display-lg font-semibold tabular tracking-tight text-white">{unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></h1>
           </div>
           <Tabs tabs={TABS} value={filter} onChange={setFilter} className="pb-2" />
@@ -99,6 +110,7 @@ export function CommunicationsScreen() {
                 onArchive={(m) => { setSelectedId(null); void act(() => provider.archive(m.id), "Archived"); }}
                 onDelete={(m) => { setSelectedId(null); void act(() => provider.delete(m.id), "Deleted"); }}
                 onUnsubscribe={(m) => { setSelectedId(null); void act(() => provider.unsubscribe(m.id), `Unsubscribed · ${m.sender}`); }}
+                onRuleChanged={reload}
               />
             </div>
           </div>

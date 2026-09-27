@@ -14,6 +14,10 @@ import { MediaAutoProvider } from "./media/MediaAutoProvider";
 import { TauriMediaBridge } from "./media/MediaBridge";
 import type { EmailProvider } from "./email/EmailProvider";
 import { MockEmailProvider } from "./email/MockEmailProvider";
+import { RealMailProvider } from "./email/RealMailProvider";
+import { EmailAutoProvider } from "./email/EmailAutoProvider";
+import { TauriMailBridge } from "./email/MailBridge";
+import { gmailAdapter, outlookAdapter } from "./email/adapters";
 import type { AssistantProvider } from "./assistant/AssistantProvider";
 import { LocalCommandProvider } from "./assistant/LocalCommandProvider";
 import type { AppProvider } from "./apps/AppProvider";
@@ -28,7 +32,7 @@ import { TauriAppProvider } from "./apps/TauriAppProvider";
  *   apps    → Start Menu discovery
  *   steam   → real discovery when Steam is detected, demo library otherwise
  *   media   → real once a folder is authorized, demo library until then
- *   email   → mock (adapters come later)
+ *   email   → unified real accounts (Outlook/Gmail) once connected, demo inbox until then
  * Env overrides (VITE_PROVIDER_*) force "mock" or "real" per domain; "auto" is
  * the default described above. Demo fallback is disabled when VITE_DEMO_MODE=false.
  */
@@ -71,7 +75,13 @@ export function getProviders(): Providers {
     media = mediaMode === "real" ? local : new MediaAutoProvider(local, new MockMediaProvider(), demoFallback);
   }
 
-  const email: EmailProvider = new MockEmailProvider(); // Real adapters come later.
+  const emailMode = config.providers.email;
+  let email: EmailProvider;
+  if (emailMode === "mock" || !tauri) email = new MockEmailProvider();
+  else {
+    const bridge = new TauriMailBridge();
+    email = new EmailAutoProvider([new RealMailProvider(bridge, outlookAdapter), new RealMailProvider(bridge, gmailAdapter)], new MockEmailProvider(), demoFallback);
+  }
   const apps: AppProvider = tauri ? new TauriAppProvider() : new MockAppProvider();
 
   cached = {

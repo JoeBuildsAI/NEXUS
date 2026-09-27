@@ -3,6 +3,7 @@ mod gpu;
 mod hardware;
 mod media;
 mod media_thumbs;
+mod oauth;
 mod secrets;
 mod session;
 mod state;
@@ -39,6 +40,7 @@ pub fn run() {
         .manage(hardware::HardwareCache(std::sync::Mutex::new(None)))
         .manage(steam_api::ApiCache::new())
         .manage(gpu::GpuState::new())
+        .manage(oauth::OAuthState::new())
         .setup(|app| {
             setup_tray(app.handle())?;
             if let Some(w) = app.get_webview_window("main") {
@@ -81,6 +83,10 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_delete,
             secrets::secret_status,
+            oauth::oauth_status,
+            oauth::oauth_begin,
+            oauth::oauth_disconnect,
+            oauth::mail_api,
             media::media_register_root,
             media::media_revoke_root,
             media::media_root_status,

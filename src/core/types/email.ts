@@ -1,10 +1,13 @@
 /** Communications domain models. */
 
+/** "important" = PRIORITY. Classification is heuristic and explainable, never AI certainty. */
 export type MessageCategory =
   | "important"
   | "newsletter"
   | "subscription"
   | "receipt"
+  | "notification"
+  | "personal"
   | "social"
   | "other";
 
@@ -13,6 +16,16 @@ export interface EmailAccount {
   readonly address: string;
   readonly displayName: string;
   readonly provider: "gmail" | "outlook" | "imap" | "mock";
+}
+
+export type EmailConnectionState = "not-configured" | "ready-to-connect" | "connecting" | "connected" | "auth-error" | "offline";
+
+export interface EmailSyncState {
+  readonly lastSyncAt: number | null;
+  readonly syncing: boolean;
+  readonly error: string | null;
+  /** Seconds until the provider allows more requests (429). */
+  readonly rateLimitedUntil: number | null;
 }
 
 export interface Message {
@@ -26,9 +39,13 @@ export interface Message {
   readonly timestamp: number;
   readonly read: boolean;
   readonly archived: boolean;
-  /** Mock/heuristic classification — never presented as AI certainty. */
+  /** Heuristic classification — never presented as AI certainty. */
   readonly category: MessageCategory;
   readonly canUnsubscribe: boolean;
+  /** Why the classifier chose the category (short, human-readable signals). */
+  readonly signals?: readonly string[];
+  /** Raw List-Unsubscribe header value when the provider exposes it. */
+  readonly listUnsubscribe?: string | null;
 }
 
 export interface Subscription {

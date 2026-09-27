@@ -10,6 +10,7 @@ import { native } from "@/providers/system/nativeBridge";
 import { notify } from "@/state/toastStore";
 import type { ProviderHealth, ProviderHealthState, SteamStatus } from "@/core/types";
 import { cn } from "@/lib/utils";
+import { MailAccountsPanel } from "./MailAccountsPanel";
 
 const STATE_TONE: Record<ProviderHealthState, "nominal" | "warning" | "neutral" | "attention" | "critical"> = {
   available: "nominal",
@@ -54,9 +55,7 @@ export function IntegrationsSettings() {
       <SettingRow label="Media root" description="Authorized local folder or drive for the media workspace. Managed in Settings → Media.">
         <div className="flex items-center gap-2"><HardDrive size={15} className="text-white/40" /><Badge tone={dev.mediaConnected ? "accent" : "warning"}>{health?.find((h) => h.name === "Media")?.health.summary ?? "…"}</Badge></div>
       </SettingRow>
-      <SettingRow label="Email" description="Gmail / Microsoft Graph adapters come later. Mock inbox on this machine.">
-        <div className="flex items-center gap-2"><Mail size={15} className="text-white/40" /><Badge tone={dev.emailConnected ? "neutral" : "warning"}>{dev.emailConnected ? "Mock inbox" : "Disconnected (simulated)"}</Badge></div>
-      </SettingRow>
+      <MailAccountsPanel onChanged={reloadHealth} />
       <SettingRow label="Windows applications" description={config.isTauri ? "Discovered from the Start Menu and Windows built-ins. No disk scanning." : "Demo list in browser preview."}>
         <div className="flex items-center gap-2"><AppWindow size={15} className="text-white/40" /><Badge tone={config.isTauri ? "nominal" : "neutral"}>{apps ? `${apps.length} apps` : "…"}</Badge></div>
       </SettingRow>
@@ -82,7 +81,7 @@ async function collectHealth(): Promise<{ name: string; icon: React.ReactNode; h
     { name: "System", icon: <MonitorCog size={15} />, health: systemHealth },
     { name: "Steam", icon: <Gamepad2 size={15} />, health: await safe(p.steam.health?.bind(p.steam), { state: dev.steamConnected ? "available" : "unavailable", summary: dev.steamConnected ? "Demo library" : "Offline (simulated)", checkedAt: now }) },
     { name: "Media", icon: <HardDrive size={15} />, health: await safe(p.media.health?.bind(p.media), { state: "available", summary: "Demo library", checkedAt: now }) },
-    { name: "Email", icon: <Mail size={15} />, health: { state: dev.emailConnected ? "not-configured" : "unavailable", summary: dev.emailConnected ? "Mock inbox · no account connected" : "Disconnected (simulated)", checkedAt: now } },
+    { name: "Email", icon: <Mail size={15} />, health: await safe(p.email.health?.bind(p.email), { state: dev.emailConnected ? "not-configured" : "unavailable", summary: dev.emailConnected ? "Demo inbox · no account connected" : "Disconnected (simulated)", checkedAt: now }) },
     { name: "AI", icon: <Bot size={15} />, health: { state: "available", summary: "Local command engine · deterministic", checkedAt: now } },
   ];
 }
