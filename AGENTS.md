@@ -24,7 +24,7 @@ Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchai
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer;
 `cargo test --lib` runs the Rust unit tests (steam/media/storage/system fixtures).
 
-Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.3.0_x64-setup.exe`
+Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.4.0_x64-setup.exe`
 (NSIS, per-user, unsigned; ~3 min release compile).
 
 Adding a Tauri feature to `Cargo.toml` (e.g. `protocol-asset`) must be paired
@@ -62,6 +62,11 @@ If port 1420 is stuck between runs, kill the listening PID:
 - `apps.rs` — resolved .lnk targets (IShellLinkW), App Paths, ranking, shell icons.
 - Windows crate features live in `Cargo.toml` `[target.'cfg(windows)'.dependencies]`.
 - Stress/chaos visual audit: `node scripts/stress.mjs` (uses `window.__nexusDev` in dev builds).
+
+## 0.4.0 additions
+- Media: `src/core/media/layout.ts` (deterministic wall optimizer), `loop.ts` (A–B model); `PlayerTile`/`VideoWall`/`Timeline`; `loopPresetsStore` purged with roots; `useMediaRootWatch` (drive lifecycle). Demo clips in `public/demo` (generated, synthetic). `node scripts/gen-fixtures.mjs` makes larger fixtures for `node scripts/media-audit.mjs` (layout/loop/perf audit with real playback).
+- Comms: `src/core/email/{classify,unsubscribe,rules,cleanup,health}.ts` are pure and tested; providers in `src/providers/email` (slot-scoped RealMailProvider, EmailAutoProvider over `emailAccountsStore`); native tokens `email.<provider>.<slot>.*`; `unsubscribe_one_click` in `oauth.rs`. `node scripts/comms-audit.mjs [--stress]` drives the demo/synthetic inbox incl. chaos states.
+- Intelligence boundary: `src/providers/intelligence` — only `NoIntelligenceProvider` exists; never fake output.
 
 ## Native/provider boundaries
 - Steam: discovery reads only registry-located Steam paths + manifests; launch

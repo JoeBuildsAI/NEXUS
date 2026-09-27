@@ -60,7 +60,8 @@ export function createBackup(input: BackupInput): NexusBackup {
     app: { version: input.appVersion },
     settings: {
       profile: { name: s.profile.name },
-      appearance: stripSensitive(s.appearance),
+      // Background image is a private local path — never exported.
+      appearance: stripSensitive({ ...s.appearance, backgroundImage: null }),
       startup: stripSensitive(s.startup),
       gaming: stripSensitive(s.gaming),
       // Only non-path media prefs; authorized folders are excluded by default.

@@ -43,6 +43,26 @@ await add(1); await shot("3", 1500);
 await add(3); await shot("4", 1500);
 await add(4); await shot("5", 1500);
 await add(5); await page.evaluate(() => window.__nexusMedia.getState().playAll()); await shot("6", 2000);
+// Performance: six players, six A–B loops, 6 seconds of playback — JS heap, layout and script time.
+{
+  await page.evaluate(() => { const s = window.__nexusMedia.getState(); for (let i = 0; i < 6; i++) s.setSegment(i, 2, 6, 16); });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const before = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  await page.waitForTimeout(6000);
+  const after = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  const d = (k) => (after[k] - before[k]);
+  console.log(`perf 6 players + 6 A–B loops over 6s: script ${(d("ScriptDuration") * 1000).toFixed(0)}ms · layout ${(d("LayoutDuration") * 1000).toFixed(0)}ms · recalcStyle ${(d("RecalcStyleDuration") * 1000).toFixed(0)}ms · task ${(d("TaskDuration") * 1000).toFixed(0)}ms · heap ${(after.JSHeapUsedSize / 1048576).toFixed(1)}MB · nodes ${after.Nodes} · listeners ${after.JSEventListeners}`);
+  await page.evaluate(() => { const s = window.__nexusMedia.getState(); for (let i = 0; i < 6; i++) s.clearSegment(i); });
+  // Leak check: clear the wall, switch screens repeatedly, compare heap + listeners
+  await page.evaluate(() => window.__nexusMedia.getState().clearAll());
+  for (let i = 0; i < 6; i++) { await page.locator('nav button[aria-label="Home"]').click(); await page.waitForTimeout(250); await page.locator('nav button[aria-label="Media"]').click(); await page.waitForTimeout(250); }
+  await cdp.send("HeapProfiler.collectGarbage").catch(() => {});
+  const end = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  console.log(`after clear + 6 screen round-trips: heap ${(end.JSHeapUsedSize / 1048576).toFixed(1)}MB · nodes ${end.Nodes} · listeners ${end.JSEventListeners}`);
+  for (let i = 0; i < 6; i++) await add(i);
+  await page.evaluate(() => window.__nexusMedia.getState().playAll()); await page.waitForTimeout(1500);
+}
 await page.evaluate(() => window.__nexusMedia.getState().setPrimary(0)); await shot("6-primary", 1500);
 await page.evaluate(() => { const s = window.__nexusMedia.getState(); s.setFocusIndex(0); s.setMode("focus"); }); await shot("focus", 1500);
 await page.evaluate(() => { const s = window.__nexusMedia.getState(); s.setMode("auto"); s.setPrimary(null); });

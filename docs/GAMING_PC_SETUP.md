@@ -15,7 +15,7 @@ npm run tauri:build
 Artifact (NSIS, per-user install, no admin required):
 
 ```
-src-tauri\target\release\bundle\nsis\NEXUS_0.3.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\NEXUS_0.4.0_x64-setup.exe
 ```
 
 Run it. It installs to the current user's profile and creates a Start Menu
@@ -74,9 +74,29 @@ Settings → Media → **Add folder**. Pick `X:\` or `X:\Videos`. NEXUS:
   skips junctions/symlinks, verifies containment), showing progress and Cancel.
 
 Then Media → Library browses folders, favorites, collections and local search;
-click a video to load it into the six-player workspace. `.mp4/.webm/.m4v/.mov`
-play natively; `.mkv/.avi` are flagged *potentially unsupported* (WebView2 codec
-availability).
+**Add to wall** puts a video on the adaptive wall. `.mp4/.webm/.m4v/.mov`
+play natively at original quality (nothing is transcoded or downscaled);
+`.mkv/.avi` are flagged *potentially unsupported* (WebView2 codec availability)
+and a tile that cannot decode says so — UNSUPPORTED / DECODE FAILED / FILE
+MISSING / DRIVE DISCONNECTED — with Reload / Replace / Remove.
+
+**The wall** arranges 1–6 players by aspect ratio and viewport: one video takes
+the whole workspace; a landscape + a portrait pack side by side; six stay
+usable. Modes: Auto · Grid · Primary (one player weighted, double-click or P)
+· Focus (one player alone, Shift+F / Esc). Fit per player: **Smart fill**
+(default; fills the tile when it costs little cropping) · Fit · Fill — never
+distorted. Loop per player: **Off · Full · A–B**. Set **A** and **B** at the
+playhead (buttons or I / O), the segment repeats precisely (frame-callback
+seeks, not "ended"); save it as a preset per file (Bookmark), load or delete
+later. Timeline: buffered, played, A–B range, hover time, drag seek. Master
+bar: play/pause all, mute all, sync start, sync playback, add, workspaces,
+keyboard help (?), clear, privacy. Keyboard: Space L I O F P M ← → ↑ ↓ Tab
+Delete Esc — never while typing, never colliding with Ctrl+Space or the privacy
+hotkey.
+
+**Workspace defaults** (Settings → Media): autoplay, loop, fit, muted on load,
+restore volume, restore position (off by default). Saved **Workspaces** keep
+players, fit, loop, A–B, volume and primary; restoring never plays.
 
 Drive unplugged → **MEDIA SOURCE DISCONNECTED**; the index and workspace are
 preserved for reconnect. **Remove authorization** stops access instantly.
@@ -90,6 +110,11 @@ when that location's authorization is removed. Off by default.
 
 **Restore workspace**: the last workspace structure comes back on launch behind
 a curtain (“6 sources restored — Reveal”); nothing plays until you reveal it.
+**Clear private workspace** (Settings → Media) wipes players, remembered
+positions/volumes, loop presets and the thumbnail cache — it lists exactly
+what goes. While Media is open, authorized drives are re-validated every few
+seconds: unplugging pauses affected players; plugging back in re-grants only
+the same canonical folder and offers resume.
 
 ## 5. Privacy hotkey
 
@@ -146,11 +171,44 @@ NEXUS ships no shared client credentials. Register once, then connect:
   secret into Settings → Integrations → Gmail → Configure.
 
 **Connect** opens your browser; the sign-in returns to a loopback address on
-this machine and the tokens are stored in Windows Credential Manager, used only
-inside the native layer. Scopes are read/modify (mark, archive, delete) —
-NEXUS never sends email. Message bodies are never written to disk.
-Classification is heuristic and explainable (*why?*), correctable per sender
-(“Move messages like this to…”), and stays on this machine.
+this machine and the tokens are stored in Windows Credential Manager (per
+account slot), used only inside the native layer. Scopes: read/modify (mark,
+archive, delete) and mailbox rules — NEXUS never sends email. Message bodies
+are never written to disk. **Add account** creates another slot for the same
+provider (up to nine each); one registration serves them all. Every message
+keeps its account; actions are routed by account and never cross over.
+
+**Inbox**: All mail · Important · People · Purchases · Receipts · Travel ·
+Financial · Subscriptions · Newsletters · Notifications · Promotions · Cleanup,
+filters (account, range, sort, unread, attachments, starred, sender), local
+search (Enter searches the server), threads, "Load older" pages — NEXUS never
+loads a whole mailbox. j/k move, e archives, u marks unread.
+
+**Classification** is deterministic and explainable (*why?* lists the signals:
+List-Unsubscribe header, merchant domain, urgent language, your rule…) and
+correctable (“Move messages like this to…” → a local rule; “Create rule…” → a
+real Gmail filter / Outlook rule with **preview matches** and an honest note of
+what that provider cannot do — Gmail filters cannot be disabled, Outlook rules
+cannot star).
+
+**Today** shows deterministic counts; the AI narrative slot stays empty and
+says so until an intelligence provider is configured (Settings → AI states
+exactly what would leave the machine per mode; default off).
+
+**Health** analyzes loaded mail locally: figures are labelled KNOWN /
+ESTIMATED / UNAVAILABLE (no invented storage estimates), dominant senders,
+lists you never read, trends. **Review cleanup** proposes aged low-value mail
+per sender → approve → confirm ("You are about to archive N messages") →
+provider-sized batches → report with partial failures listed and retry.
+
+**Subscriptions**: recurring senders with cadence, volume, unread rate,
+list-confidence and unsubscribe capability. Bulk select → ledger (one-click /
+rule fallback / manual review) → confirm → per-item results. One-click posts
+the RFC 8058 request natively to a validated https host; mailto-only senders
+get a mute rule instead; manual links are shown, never opened for you.
+
+**Rules** lists every rule NEXUS created (verified against the provider),
+with inspect / duplicate / disable (Outlook) / delete, plus local corrections.
 
 ## 8. Diagnostics & backup
 

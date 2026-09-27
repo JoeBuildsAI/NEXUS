@@ -13,9 +13,9 @@ NEXUS is a Tauri 2 desktop app (Rust native layer + React/TypeScript frontend) w
 ### Modes / screens
 - **Home** — command center with `WELCOME, JOSEPH`, live date/time, system telemetry (CPU/GPU/RAM/SSD/Network) and quick cards for Gaming, Communications, Storage, Media and Recent Activity.
 - **Gaming** — library (Continue Playing / Recently Played / Installed / Completion) and a rich game‑detail view with achievements, closest achievements, and playtime. Steam‑shaped provider interface.
-- **Media** — private local six‑player video workspace (drag videos into slots, per‑player + master controls, saved layouts) with an instant global **privacy hotkey**.
+- **Media** — private local video wall: an adaptive layout optimizer for 1–6 players (aspect‑aware, primary/focus modes), Smart fill / Fit / Fill without distortion, original‑quality playback, Full and precise A–B segment looping with saved presets, saved workspaces, removable‑drive resilience, and an instant global **privacy hotkey**.
 - **System** — live telemetry, a safe process viewer with safety classification, storage analyzer, and startup apps.
-- **Communications** — unified mock inbox with a “since your last check” summary and message actions.
+- **Communications** — unified multi‑account Outlook + Gmail inbox (demo inbox until connected): explainable local classification into 15 categories, twelve views and filters, Inbox Health with honest KNOWN/ESTIMATED/UNAVAILABLE figures, subscription manager with safe bulk unsubscribe (RFC 8058 one‑click or rule fallback), real Gmail filters / Outlook rules with preview, review‑first cleanup transactions, and an optional (unconfigured, never faked) intelligence boundary.
 - **Settings** — General, Appearance, Startup, Gaming, Media, Privacy, System, Integrations, AI.
 
 ### Signature features
