@@ -97,7 +97,8 @@ export function buildAgenda(i: TodayInput): AgendaItem[] {
     if (key !== i.day || items.some((x) => x.refId === t.id)) continue;
     items.push({ key: `task:${t.id}`, kind: "task", refId: t.id, title: t.title, minute: t.dueMinute ?? null, endMinute: null, detail: "Done", progress: null, completed: true, dismissed: false, category: "task", local: true });
   }
-  return items.sort((a, b) => (a.minute ?? -1) - (b.minute ?? -1) || a.title.localeCompare(b.title));
+  // Timed items in order; floating ("anytime") items after them.
+  return items.sort((a, b) => (a.minute ?? 1e9) - (b.minute ?? 1e9) || a.title.localeCompare(b.title));
 }
 
 /** NOW / NEXT / LATER / COMPLETED phases relative to the current minute. */

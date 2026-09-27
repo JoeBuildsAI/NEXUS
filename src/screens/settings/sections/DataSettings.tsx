@@ -70,7 +70,7 @@ export function DataSettings() {
       await sqlite.backupTo(target);
       await native.lifePruneBackups(data.keepBackups).catch(() => 0);
       await refresh();
-      activity.record("session-recovered", "Personal data backed up");
+      activity.record("life-backup", "Personal data backed up");
       notify.success("Backup written", "Stored locally in the NEXUS data folder. Nothing was uploaded.");
     } catch (e) {
       notify.error("Backup failed", String((e as Error)?.message ?? e).slice(0, 140));
@@ -96,6 +96,27 @@ export function DataSettings() {
     });
   };
   const total = life.counts ? Object.values(life.counts).reduce((a, b) => a + b, 0) : 0;
+  const quarantine = () => {
+    if (!sqlite) return;
+    requestConfirm({
+      title: "Set the damaged database aside?",
+      message: "The current file is renamed (never deleted) so a fresh database can be created. Restore a backup afterwards if you have one.",
+      confirmLabel: "Quarantine and start fresh",
+      danger: true,
+      onConfirm: async () => {
+        setBusy("quarantine");
+        try {
+          await sqlite.close();
+          const moved = await native.lifeQuarantine();
+          await life.load({ force: true });
+          await refresh();
+          notify.success("Fresh database created", `Damaged file kept at ${moved.split(/[\\/]/).pop()}`);
+        } catch (e) {
+          notify.error("Could not quarantine", String((e as Error)?.message ?? e).slice(0, 140));
+        } finally { setBusy(null); }
+      },
+    });
+  };
 
   return (
     <SettingsSection title="Data" description="Personal data (routines, fitness, nutrition, meals, groceries, calendar, tasks) lives in a local SQLite database. Configuration, secrets and caches are stored separately. Nothing is uploaded.">
@@ -108,6 +129,13 @@ export function DataSettings() {
         </div>
       </div>
 
+      {(sqlite?.integrity === "corrupt" || life.status === "error") && (
+        <div className="my-4 border-l-2 border-status-critical/70 pl-4">
+          <p className="text-[14px] text-white/90">{life.status === "error" ? "The personal database could not be opened." : "The personal database failed its integrity check."}</p>
+          <p className="mt-1 text-[12.5px] text-white/45">{life.error ?? "Reading may still work; writes are risky. Restore a backup below, or set the damaged file aside and start fresh — the file is never deleted."}</p>
+          <div className="mt-3 flex gap-3"><Button size="sm" variant="outline" onClick={() => void life.reload()}>Try again</Button>{sqlite && <Button size="sm" variant="danger" disabled={busy != null} onClick={quarantine}>Quarantine…</Button>}</div>
+        </div>
+      )}
       <SettingRow label="Sample data" description={life.hasDemo ? "Sample rows are present. They are flagged and excluded from exports." : "Load clearly-labelled sample routines, workouts, meals, groceries, tasks and events to explore."}>
         {life.hasDemo ? <Button size="sm" variant="outline" onClick={() => void life.removeSampleData().then(() => notify.neutral("Sample data removed"))}>Remove sample data</Button> : <Button size="sm" variant="outline" onClick={() => void life.addSampleData()}>Load sample data</Button>}
       </SettingRow>

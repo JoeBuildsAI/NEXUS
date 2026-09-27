@@ -18,7 +18,8 @@ export type ActivityKind =
   | "session-recovered"
   | "email-rule-created"
   | "email-cleanup-completed"
-  | "email-unsubscribed";
+  | "email-unsubscribed"
+  | "life-backup";
 
 export interface ActivityEntry {
   id: string;

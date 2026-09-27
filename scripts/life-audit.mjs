@@ -21,7 +21,7 @@ await shot("today-empty");
 await nav("Life"); await shot("life-empty");
 await page.getByRole("button", { name: "Load sample data" }).click(); await page.waitForTimeout(800);
 await shot("life-overview");
-for (const s of ["Routines", "Fitness", "Nutrition", "Meals", "Groceries", "Tasks"]) { await page.getByRole("button", { name: s, exact: true }).first().click(); await shot(`life-${s.toLowerCase()}`, 500); }
+for (const s of ["Week", "Routines", "Fitness", "Nutrition", "Meals", "Groceries", "Tasks"]) { await page.getByRole("button", { name: s, exact: true }).first().click(); await shot(`life-${s.toLowerCase()}`, 500); }
 // groceries build
 await page.getByRole("button", { name: "Groceries", exact: true }).first().click(); await page.waitForTimeout(300);
 await page.getByRole("button", { name: /Build from meal plan|Rebuild from plan/ }).click(); await shot("life-groceries-built", 700);

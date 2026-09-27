@@ -115,7 +115,10 @@ export function TodayScreen() {
             </div>
           )}
 
-          <p className="label">Today</p>
+          <div className="flex items-baseline justify-between">
+            <p className="label">Today</p>
+            {items.length > 0 && <p className="font-mono text-[11px] tabular text-white/30">{[`${items.length} items`, ov.counts.event.total ? `${ov.counts.event.total} event${ov.counts.event.total === 1 ? "" : "s"}` : "", ov.counts.workout.total ? "1 workout" : "", ov.counts.meal.total ? `${ov.counts.meal.total} meals` : "", ov.counts.routine.total ? `${ov.counts.routine.total} routine${ov.counts.routine.total === 1 ? "" : "s"}` : "", ov.counts.task.total ? `${ov.counts.task.total} task${ov.counts.task.total === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ")}</p>}
+          </div>
           <div className="rule mt-3" />
           {life.status === "loading" && <p className="py-6 text-[13px] text-white/35">Loading your day…</p>}
           {empty && (
@@ -136,7 +139,7 @@ export function TodayScreen() {
               return (
                 <li key={it.key} className={cn("transition-opacity", phase === "completed" && "opacity-45", phase === "past" && "opacity-70")}>
                   <div className="flex items-baseline gap-5 py-3">
-                    <span className={cn("w-[88px] shrink-0 font-mono text-[12.5px] tabular", phase === "now" ? "text-white" : "text-white/40")}>{it.minute != null ? formatMinute(it.minute, hour12) : "—"}</span>
+                    <span className={cn("w-[88px] shrink-0 font-mono text-[12.5px] tabular", phase === "now" ? "text-white" : "text-white/40")}>{it.minute != null ? formatMinute(it.minute, hour12) : <span className="text-[10.5px] uppercase tracking-wide2 text-white/30">anytime</span>}</span>
                     <button onClick={() => act(it)} className="flex min-w-0 flex-1 items-baseline gap-3 text-left">
                       <PhaseMark phase={phase} kind={it.kind} />
                       <span className={cn("truncate text-[15px]", phase === "completed" ? "text-white/60 line-through decoration-white/20" : "text-white/90")}>{it.title}</span>

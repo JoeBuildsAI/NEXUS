@@ -10,7 +10,7 @@ export type Screen =
   | "communications"
   | "settings";
 
-export type LifeSection = "overview" | "routines" | "fitness" | "nutrition" | "meals" | "groceries" | "tasks";
+export type LifeSection = "overview" | "week" | "routines" | "fitness" | "nutrition" | "meals" | "groceries" | "tasks";
 export type CalendarView = "day" | "week" | "month" | "year" | "agenda";
 
 export type BootPhase = "booting" | "ready";

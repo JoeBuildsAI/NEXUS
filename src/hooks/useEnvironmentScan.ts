@@ -21,6 +21,7 @@ export function useEnvironmentScan(active: boolean): { lines: ScanLine[]; done: 
   const [lines, setLines] = useState<ScanLine[]>([
     { id: "windows", label: "Windows", state: "pending", detail: "" },
     { id: "steam", label: "Steam", state: "pending", detail: "" },
+    { id: "xbox", label: "Xbox", state: "pending", detail: "" },
     { id: "gpu", label: "GPU", state: "pending", detail: "" },
     { id: "media", label: "Media", state: "pending", detail: "" },
     { id: "email", label: "Email", state: "pending", detail: "" },
@@ -44,6 +45,15 @@ export function useEnvironmentScan(active: boolean): { lines: ScanLine[]; done: 
         else set("steam", { state: "none", detail: config.demoMode ? "Not detected · demo library available" : "Not detected" });
       } catch {
         set("steam", { state: "none", detail: "Not detected" });
+      }
+
+      await delay(250);
+      try {
+        const x = await getProviders().xbox.inventory();
+        if (x && (x.games.length || x.xboxAppInstalled)) set("xbox", { state: x.games.length ? "ok" : "none", detail: `${x.xboxAppInstalled ? "Xbox app" : "No Xbox app"} · ${x.games.length} PC game${x.games.length === 1 ? "" : "s"} discovered locally` });
+        else set("xbox", { state: "none", detail: config.isTauri ? "Not detected" : "Desktop build only" });
+      } catch {
+        set("xbox", { state: "none", detail: "Not detected" });
       }
 
       await delay(300);

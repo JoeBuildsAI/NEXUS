@@ -9,10 +9,11 @@ import { NutritionSection } from "./NutritionSection";
 import { MealsSection } from "./MealsSection";
 import { GroceriesSection } from "./GroceriesSection";
 import { TasksSection } from "./TasksSection";
+import { WeekSection } from "./WeekSection";
 import { cn } from "@/lib/utils";
 
 const SECTIONS: { id: LifeSection; label: string }[] = [
-  { id: "overview", label: "Overview" }, { id: "routines", label: "Routines" }, { id: "fitness", label: "Fitness" }, { id: "nutrition", label: "Nutrition" }, { id: "meals", label: "Meals" }, { id: "groceries", label: "Groceries" }, { id: "tasks", label: "Tasks" },
+  { id: "overview", label: "Overview" }, { id: "week", label: "Week" }, { id: "routines", label: "Routines" }, { id: "fitness", label: "Fitness" }, { id: "nutrition", label: "Nutrition" }, { id: "meals", label: "Meals" }, { id: "groceries", label: "Groceries" }, { id: "tasks", label: "Tasks" },
 ];
 
 /** LIFE — routines, fitness, nutrition, meals, groceries, tasks. Local-first; nothing here needs an account. */
@@ -58,6 +59,7 @@ export function LifeScreen() {
         ) : (
           <>
             {section === "overview" && <LifeOverview />}
+            {section === "week" && <WeekSection />}
             {section === "routines" && <RoutinesSection />}
             {section === "fitness" && <FitnessSection />}
             {section === "nutrition" && <NutritionSection />}

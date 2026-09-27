@@ -181,11 +181,11 @@ export function Onboarding() {
               <h2 className="mt-3 font-display text-display-md font-semibold tracking-wide text-white">What NEXUS can do</h2>
               <div className="mt-8 divide-y divide-white/[0.06]">
                 {PERMISSIONS.map((p, i) => (
-                  <motion.div key={p.area} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.08 }} className="grid grid-cols-[110px_1fr] gap-6 py-4">
+                  <motion.div key={p.area} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.08 }} className="grid grid-cols-[110px_1fr] gap-6 py-2.5">
                     <span className="font-display text-[12px] font-semibold uppercase tracking-[0.22em] text-white/70">{p.area}</span>
                     <span>
-                      <span className="block text-[14px] text-white/85">{p.can}</span>
-                      <span className="mt-1 block text-[12.5px] text-white/38">{p.cannot}</span>
+                      <span className="block text-[13.5px] text-white/85">{p.can}</span>
+                      <span className="mt-0.5 block text-[12px] text-white/38">{p.cannot}</span>
                     </span>
                   </motion.div>
                 ))}
