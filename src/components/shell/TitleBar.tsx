@@ -18,6 +18,8 @@ async function windowAction(action: "minimize" | "toggleMaximize" | "close") {
 /** Borderless custom titlebar. The center strip is the OS drag region. */
 export function TitleBar() {
   const mode = useModeStore((s) => s.current);
+  const gameRunning = useModeStore((s) => s.gameRunning);
+  const setGameRunning = useModeStore((s) => s.setGameRunning);
 
   return (
     <div className="drag-region flex h-9 shrink-0 items-center justify-between px-3 select-none">
@@ -37,6 +39,17 @@ export function TitleBar() {
           <Badge tone="warning" dot className="uppercase">
             {mode} MODE
           </Badge>
+        )}
+        {gameRunning && (
+          <button
+            onClick={() => setGameRunning(false)}
+            title="A game session is active; ambient effects are reduced. Click to end the session."
+            className="no-drag"
+          >
+            <Badge tone="accent" dot className="uppercase hover:bg-accent/20">
+              Game session · end
+            </Badge>
+          </button>
         )}
       </div>
 

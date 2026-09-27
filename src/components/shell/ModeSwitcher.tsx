@@ -18,7 +18,7 @@ const ORDER: OperatingMode[] = ["normal", "gaming", "media", "work", "focus"];
 /** Compact operating-mode selector. */
 export function ModeSwitcher() {
   const current = useModeStore((s) => s.current);
-  const enterMode = useModeStore((s) => s.enterMode);
+  const enterMode = useModeStore((s) => s.requestMode);
   const [open, setOpen] = useState(false);
   const Current = MODE_META[current].icon;
 

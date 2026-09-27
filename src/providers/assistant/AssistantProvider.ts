@@ -1,5 +1,7 @@
 import type { ActionId } from "@/core/actions/types";
 
+export type MatchGroup = "navigate" | "app" | "game" | "mode" | "system" | "media" | "settings";
+
 export interface AssistantMatch {
   readonly actionId: ActionId;
   readonly args: Record<string, string>;
@@ -7,6 +9,8 @@ export interface AssistantMatch {
   readonly confidence: number;
   /** Human-readable label describing what will happen. */
   readonly label: string;
+  readonly group: MatchGroup;
+  readonly hint?: string;
 }
 
 /**

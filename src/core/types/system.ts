@@ -15,7 +15,16 @@ export interface TelemetrySnapshot {
   readonly storage: readonly DriveInfo[];
   readonly network: NetworkTelemetry;
   readonly uptimeSeconds: number;
+  readonly processCount: number;
   readonly health: HealthStatus;
+}
+
+/** A launchable application discovered through safe Windows mechanisms. */
+export interface AppEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly source: "start-menu" | "start-menu-user" | "builtin" | "mock" | "user";
 }
 
 export interface CpuTelemetry {

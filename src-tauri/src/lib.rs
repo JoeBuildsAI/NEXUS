@@ -1,7 +1,9 @@
+mod apps;
 mod state;
 mod system;
 mod telemetry;
 
+use apps::AppRegistry;
 use state::AppState;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -21,6 +23,7 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .manage(AppState::new())
+        .manage(AppRegistry::new())
         .setup(|app| {
             setup_tray(app.handle())?;
             Ok(())
@@ -38,6 +41,8 @@ pub fn run() {
             system::get_processes,
             system::get_startup_apps,
             system::open_external,
+            apps::discover_apps,
+            apps::launch_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEXUS");

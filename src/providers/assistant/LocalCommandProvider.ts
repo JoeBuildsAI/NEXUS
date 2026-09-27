@@ -1,97 +1,144 @@
 import type { AssistantMatch, AssistantProvider } from "./AssistantProvider";
 import type { ActionId } from "@/core/actions/types";
-import { DEMO_GAMES } from "@/core/demo/games";
+import type { AppEntry, Game } from "@/core/types";
+import { fuzzyScore } from "@/lib/fuzzy";
 
 interface Rule {
   readonly actionId: ActionId;
   readonly phrases: readonly string[];
   readonly args?: Record<string, string>;
   readonly label: string;
+  readonly hint?: string;
+  readonly group: AssistantMatch["group"];
 }
 
-const SCREEN_RULES: Rule[] = [
-  { actionId: "navigate", phrases: ["home", "go home", "dashboard", "command center"], args: { screen: "home" }, label: "Open Home" },
-  { actionId: "navigate", phrases: ["gaming", "games", "open games", "go to gaming", "game hub"], args: { screen: "gaming" }, label: "Open Gaming" },
-  { actionId: "navigate", phrases: ["media", "videos", "workspace", "open media"], args: { screen: "media" }, label: "Open Media" },
-  { actionId: "navigate", phrases: ["system", "system health", "telemetry", "performance"], args: { screen: "system" }, label: "Open System" },
-  { actionId: "navigate", phrases: ["communications", "comms", "email", "inbox", "mail", "messages"], args: { screen: "communications" }, label: "Open Communications" },
-  { actionId: "navigate", phrases: ["settings", "preferences", "options", "config"], args: { screen: "settings" }, label: "Open Settings" },
-  { actionId: "open-storage", phrases: ["storage", "show storage", "disk", "drives", "disk usage"], label: "Show Storage" },
-  { actionId: "analyze-storage", phrases: ["analyze storage", "scan storage", "clean up", "cleanup", "reclaim space"], label: "Analyze Storage" },
-  { actionId: "show-processes", phrases: ["processes", "show processes", "running processes", "tasks", "task manager"], label: "Show Running Processes" },
+const R = (
+  actionId: ActionId,
+  label: string,
+  phrases: string[],
+  group: AssistantMatch["group"],
+  args?: Record<string, string>,
+  hint?: string,
+): Rule => ({ actionId, label, phrases, group, args, hint });
+
+const RULES: Rule[] = [
+  // Navigation
+  R("navigate", "Open Home", ["home", "go home", "dashboard", "command center"], "navigate", { screen: "home" }),
+  R("navigate", "Open Gaming", ["gaming", "games", "open games", "go to gaming", "game hub", "library"], "navigate", { screen: "gaming" }),
+  R("navigate", "Open Media", ["media", "videos", "workspace", "open media", "players"], "navigate", { screen: "media" }),
+  R("navigate", "Open System", ["system", "system health", "telemetry", "performance", "health"], "navigate", { screen: "system" }),
+  R("navigate", "Open Communications", ["communications", "comms", "email", "inbox", "mail", "messages"], "navigate", { screen: "communications" }),
+  R("open-settings", "Open Settings", ["settings", "preferences", "options", "config"], "navigate", { section: "general" }),
+  // Settings sections
+  R("open-settings", "Settings · Appearance", ["appearance", "theme", "environment", "background", "look"], "settings", { section: "appearance" }),
+  R("open-settings", "Settings · Privacy", ["privacy settings", "hotkey", "privacy hotkey"], "settings", { section: "privacy" }),
+  R("open-settings", "Settings · Startup", ["startup settings", "launch on login", "autostart"], "settings", { section: "startup" }),
+  R("open-settings", "Settings · Gaming", ["gaming settings", "allowlist", "approved apps"], "settings", { section: "gaming" }),
+  R("open-settings", "Settings · Media", ["media settings", "authorized folders"], "settings", { section: "media" }),
+  R("open-settings", "Settings · System", ["system settings", "safety", "process management"], "settings", { section: "system" }),
+  R("open-settings", "Settings · Integrations", ["integrations", "steam integration", "connect steam"], "settings", { section: "integrations" }),
+  R("open-settings", "Settings · AI", ["ai settings", "assistant settings"], "settings", { section: "ai" }),
+  R("open-settings", "Settings · Shortcuts", ["shortcuts", "keyboard shortcuts", "keybinds"], "settings", { section: "shortcuts" }),
+  // System
+  R("open-storage", "Show Storage", ["storage", "show storage", "disk", "drives", "disk usage", "space"], "system"),
+  R("analyze-storage", "Analyze Storage", ["analyze storage", "scan storage", "clean up", "cleanup", "reclaim space"], "system"),
+  R("show-processes", "Show Running Processes", ["processes", "show processes", "running processes", "tasks", "task manager", "background apps"], "system"),
+  R("system-query", "CPU status", ["cpu", "cpu usage", "processor"], "system", { metric: "cpu" }),
+  R("system-query", "Memory status", ["memory", "ram", "memory usage"], "system", { metric: "memory" }),
+  R("system-query", "GPU status", ["gpu", "graphics"], "system", { metric: "gpu" }),
+  R("system-query", "Network status", ["network", "internet", "bandwidth"], "system", { metric: "network" }),
+  R("system-query", "Uptime", ["uptime", "how long"], "system", { metric: "uptime" }),
+  // Modes
+  R("enter-mode", "Enter Gaming Mode", ["gaming mode", "enter gaming mode", "start gaming mode", "game mode"], "mode", { mode: "gaming" }),
+  R("enter-mode", "Enter Media Mode", ["media mode", "enter media mode"], "mode", { mode: "media" }),
+  R("enter-mode", "Enter Work Mode", ["work mode", "enter work mode", "work"], "mode", { mode: "work" }),
+  R("enter-mode", "Enter Focus Mode", ["focus mode", "enter focus mode", "focus", "do not disturb"], "mode", { mode: "focus" }),
+  R("exit-mode", "Return to Normal Mode", ["normal mode", "return to normal", "exit mode", "normal", "leave mode"], "mode", { mode: "normal" }),
+  // Media
+  R("pause-media", "Pause All Media", ["pause", "pause media", "pause all", "stop playback", "stop"], "media"),
+  R("play-media", "Play All Media", ["play all", "resume media", "play media"], "media"),
+  R("mute-media", "Mute All Media", ["mute", "mute all", "silence"], "media"),
+  R("privacy-mode", "Activate Privacy Mode", ["privacy", "privacy mode", "panic", "hide", "hide everything"], "media"),
+  // Environment
+  R("set-environment", "Environment · NEXUS", ["nexus environment", "nexus theme"], "settings", { environment: "nexus" }),
+  R("set-environment", "Environment · Void", ["void", "void environment"], "settings", { environment: "void" }),
+  R("set-environment", "Environment · Aurora", ["aurora", "aurora environment"], "settings", { environment: "aurora" }),
+  R("set-environment", "Environment · Neural", ["neural", "neural environment"], "settings", { environment: "neural" }),
+  R("set-environment", "Environment · Minimal", ["minimal", "minimal environment"], "settings", { environment: "minimal" }),
 ];
 
-const MODE_RULES: Rule[] = [
-  { actionId: "enter-mode", phrases: ["gaming mode", "enter gaming mode", "start gaming mode"], args: { mode: "gaming" }, label: "Enter Gaming Mode" },
-  { actionId: "enter-mode", phrases: ["media mode", "enter media mode"], args: { mode: "media" }, label: "Enter Media Mode" },
-  { actionId: "enter-mode", phrases: ["work mode", "enter work mode"], args: { mode: "work" }, label: "Enter Work Mode" },
-  { actionId: "enter-mode", phrases: ["focus mode", "enter focus mode"], args: { mode: "focus" }, label: "Enter Focus Mode" },
-  { actionId: "exit-mode", phrases: ["normal mode", "return to normal", "exit mode", "normal"], args: { mode: "normal" }, label: "Return to Normal Mode" },
-];
-
-const MEDIA_RULES: Rule[] = [
-  { actionId: "pause-media", phrases: ["pause", "pause media", "pause all", "stop playback"], label: "Pause All Media" },
-  { actionId: "mute-media", phrases: ["mute", "mute all", "silence"], label: "Mute All Media" },
-  { actionId: "privacy-mode", phrases: ["privacy", "privacy mode", "panic", "hide"], label: "Activate Privacy Mode" },
-];
+const LAUNCH_VERBS = /^(open|launch|start|run|play)\s+/;
+const SHOW_VERBS = /^(show|view|go to|details for|info on)\s+/;
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-/** Levenshtein-free lightweight similarity: token overlap ratio. */
-function similarity(a: string, b: string): number {
-  const at = new Set(a.split(" "));
-  const bt = new Set(b.split(" "));
-  let common = 0;
-  for (const t of at) if (bt.has(t)) common++;
-  return common / Math.max(at.size, bt.size);
+export interface CommandContext {
+  getApps: () => Promise<readonly AppEntry[]>;
+  getGames: () => Promise<readonly Game[]>;
 }
 
 /**
  * Deterministic natural-ish command parser. Maps input to registered actions
- * with no external calls. The app already "feels" like an assistant while
- * remaining fully local and predictable.
+ * with no external calls. Supports navigation, app launching, game lookup,
+ * mode switching, system queries, settings navigation and media controls.
+ *
+ * SECURITY: only ever emits registered action ids with structured args.
+ * Apps/games are referenced by opaque ids from providers — never by path.
  */
 export class LocalCommandProvider implements AssistantProvider {
   readonly id = "local-command";
-
-  private rules: Rule[] = [...SCREEN_RULES, ...MODE_RULES, ...MEDIA_RULES];
+  constructor(private ctx?: CommandContext) {}
 
   async interpret(input: string): Promise<readonly AssistantMatch[]> {
     const q = normalize(input);
     if (!q) return [];
     const matches: AssistantMatch[] = [];
+    const stripped = q.replace(LAUNCH_VERBS, "").replace(SHOW_VERBS, "");
+    const wantsLaunch = LAUNCH_VERBS.test(q);
+    const wantsShow = SHOW_VERBS.test(q);
+    const achievementsQuery = /achievements?$/.test(q);
 
-    // 1. Game launch: "open <game>", "play <game>", or a title substring.
-    for (const g of DEMO_GAMES) {
-      const title = normalize(g.title);
-      const launchy = q.startsWith("open ") || q.startsWith("play ") || q.startsWith("launch ");
-      if (q.includes(title) || (launchy && title.includes(q.replace(/^(open|play|launch)\s+/, "")))) {
-        matches.push({
-          actionId: "launch-game",
-          args: { gameId: g.id },
-          confidence: q.includes(title) ? 0.95 : 0.8,
-          label: `Launch ${g.title}`,
-        });
+    // Games — launch / show / achievements.
+    const games = (await this.ctx?.getGames().catch(() => [])) ?? [];
+    for (const g of games) {
+      const target = stripped.replace(/\s*achievements?$/, "");
+      const score = fuzzyScore(target, g.title);
+      if (score < 0.6) continue;
+      if (achievementsQuery || wantsShow) {
+        matches.push({ actionId: "show-game", args: { gameId: g.id }, confidence: score, label: `${g.title} — ${achievementsQuery ? "achievements" : "details"}`, group: "game", hint: g.installed ? "Installed" : "Not installed" });
+      } else {
+        matches.push({ actionId: "launch-game", args: { gameId: g.id }, confidence: score * (wantsLaunch ? 1 : 0.97), label: `Play ${g.title}`, group: "game", hint: g.installed ? "Steam" : "Not installed" });
+        matches.push({ actionId: "show-game", args: { gameId: g.id }, confidence: score * 0.9, label: `${g.title} — details`, group: "game" });
       }
     }
 
-    // 2. Rule-based exact and fuzzy matching.
-    for (const rule of this.rules) {
+    // Applications — launch.
+    const apps = (await this.ctx?.getApps().catch(() => [])) ?? [];
+    for (const a of apps) {
+      const score = fuzzyScore(stripped, a.name);
+      if (score < 0.6) continue;
+      matches.push({
+        actionId: "launch-app",
+        args: { appId: a.id },
+        confidence: score * (wantsLaunch ? 1 : 0.9),
+        label: `Launch ${a.name}`,
+        group: "app",
+        hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : "Installed",
+      });
+    }
+
+    // Rules
+    for (const rule of RULES) {
       let best = 0;
       for (const phrase of rule.phrases) {
-        if (q === phrase) best = Math.max(best, 1);
-        else if (q.includes(phrase) || phrase.includes(q)) best = Math.max(best, 0.85);
-        else best = Math.max(best, similarity(q, phrase) * 0.7);
+        const s = fuzzyScore(q, phrase);
+        best = Math.max(best, s);
+        if (phrase.includes(q) && q.length >= 3) best = Math.max(best, 0.86);
       }
-      if (best >= 0.5) {
-        matches.push({
-          actionId: rule.actionId,
-          args: rule.args ?? {},
-          confidence: best,
-          label: rule.label,
-        });
+      if (best >= 0.6) {
+        matches.push({ actionId: rule.actionId, args: rule.args ?? {}, confidence: best, label: rule.label, group: rule.group, hint: rule.hint });
       }
     }
 
@@ -102,6 +149,6 @@ export class LocalCommandProvider implements AssistantProvider {
       const existing = byKey.get(key);
       if (!existing || m.confidence > existing.confidence) byKey.set(key, m);
     }
-    return [...byKey.values()].sort((a, b) => b.confidence - a.confidence).slice(0, 6);
+    return [...byKey.values()].sort((a, b) => b.confidence - a.confidence).slice(0, 8);
   }
 }

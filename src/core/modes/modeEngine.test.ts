@@ -8,9 +8,28 @@ describe("mode engine", () => {
       approvedApps: ["Spotify.exe", "Discord.exe"],
     });
     expect(changes.length).toBeGreaterThan(0);
-    for (const c of changes) {
+    // System-mutating kinds must be observe-prefixed; in-app notification
+    // suppression is not a system mutation and may apply.
+    const mutating = changes.filter((c) => c.kind !== "notifications");
+    expect(mutating.length).toBeGreaterThan(0);
+    for (const c of mutating) {
       expect(c.description).toMatch(/^\[observe\] Would /);
     }
+  });
+
+  it("planModeSteps marks system-mutating steps as not live in observe mode", async () => {
+    const { planModeSteps } = await import("./modeEngine");
+    const steps = planModeSteps(DEFAULT_MODE_CONFIGS.gaming, { safety: "observe", approvedApps: ["Spotify.exe"] });
+    const power = steps.find((s) => s.kind === "power-profile");
+    const apps = steps.find((s) => s.kind === "process-suspend");
+    expect(power?.live).toBe(false);
+    expect(apps?.live).toBe(false);
+  });
+
+  it("allowlist matching is case-insensitive", async () => {
+    const { planModeSteps } = await import("./modeEngine");
+    const steps = planModeSteps(DEFAULT_MODE_CONFIGS.gaming, { safety: "enabled", approvedApps: ["spotify.exe"] });
+    expect(steps.find((s) => s.kind === "process-suspend")?.detail).toContain("Spotify.exe");
   });
 
   it("only suspends apps in the intersection of allowlist and approved apps", () => {

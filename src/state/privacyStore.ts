@@ -9,41 +9,38 @@ const log = createLogger("privacy");
 interface PrivacyState {
   /** When true, a full-screen privacy veil is shown and media is hidden. */
   active: boolean;
-  activate: () => void;
+  lastActivatedAt: number | null;
+  activate: (source?: "hotkey" | "ui" | "test") => void;
   deactivate: () => void;
 }
 
 /**
- * Privacy mode. Triggering is IMMEDIATE and does not rely on animation:
- *  - media playback is paused/stopped synchronously
- *  - the media workspace is hidden behind a veil / navigation moves to Home
- *  - the app may minimize depending on settings
+ * Privacy mode. Activation is SYNCHRONOUS and does not rely on animation:
+ *  1. media playback is paused (and optionally the workspace is cleared)
+ *  2. navigation leaves media surfaces; the veil flag flips on
+ *  3. depending on setting, the window is minimized or hidden to tray
  *
  * No media filenames are logged.
  */
 export const usePrivacyStore = create<PrivacyState>((set) => ({
   active: false,
-  activate: () => {
+  lastActivatedAt: null,
+  activate: (source = "ui") => {
     const settings = useSettingsStore.getState().privacy;
+    const media = useMediaStore.getState();
 
-    // 1. Stop/pause playback synchronously.
-    if (settings.stopPlaybackOnTrigger) {
-      useMediaStore.getState().pauseAll();
-    }
+    if (settings.stopPlaybackOnTrigger) media.pauseAll();
+    if (settings.clearWorkspaceOnTrigger) media.clearAll();
 
-    // 2. Move away from media surfaces immediately.
     const nav = useNavigationStore.getState();
-    if (settings.action === "home") {
-      nav.navigate("home");
-      nav.closeCommandPalette();
-    }
-    set({ active: true });
-    log.info("Privacy mode activated", { action: settings.action });
+    nav.closeCommandPalette();
+    if (nav.screen === "media" || settings.action === "home") nav.navigate("home");
 
-    // 3. Optionally minimize the window (best-effort, non-blocking).
-    if (settings.action === "minimize") {
-      void minimizeWindow();
-    }
+    set({ active: true, lastActivatedAt: Date.now() });
+    log.info("Privacy mode activated", { action: settings.action, source });
+
+    if (settings.action === "minimize") void windowOp("minimize");
+    else if (settings.action === "tray") void windowOp("hide");
   },
   deactivate: () => {
     set({ active: false });
@@ -51,10 +48,12 @@ export const usePrivacyStore = create<PrivacyState>((set) => ({
   },
 }));
 
-async function minimizeWindow(): Promise<void> {
+async function windowOp(op: "minimize" | "hide"): Promise<void> {
   try {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().minimize();
+    const w = getCurrentWindow();
+    if (op === "minimize") await w.minimize();
+    else await w.hide();
   } catch {
     // Not in Tauri (browser dev) — the veil is sufficient.
   }

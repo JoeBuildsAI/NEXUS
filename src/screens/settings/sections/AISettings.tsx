@@ -7,7 +7,7 @@ export function AISettingsSection() {
   const { ai, setAI } = useSettingsStore();
   return (
     <SettingsSection title="AI" description="Command interpretation and assistant configuration.">
-      <div className="flex items-start gap-3 border-b border-white/[0.04] px-5 py-4">
+      <div className="flex items-start gap-3 py-4">
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-status-nominal" />
         <p className="text-xs leading-relaxed text-white/50">
           The assistant can only trigger registered application actions. It never

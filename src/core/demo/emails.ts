@@ -1,8 +1,40 @@
-import type { EmailAccount, Message } from "@/core/types";
+import type { EmailAccount, Message, Subscription } from "@/core/types";
 
 const now = Date.now();
 const min = 60 * 1000;
 const hour = 60 * min;
+const day = 24 * hour;
+
+export const DEMO_SUBSCRIPTIONS: readonly Subscription[] = [
+  { id: "sub-1", sender: "Morning Brew", senderAddress: "crew@morningbrew.com", category: "newsletter", frequencyPerWeek: 5, lastOpened: now - 2 * day, status: "active" },
+  { id: "sub-2", sender: "Larian Studios", senderAddress: "news@larian.com", category: "newsletter", frequencyPerWeek: 1, lastOpened: now - 5 * hour, status: "active" },
+  { id: "sub-3", sender: "Humble Bundle", senderAddress: "hello@humblebundle.com", category: "promotional", frequencyPerWeek: 3, lastOpened: now - 14 * hour, status: "active" },
+  { id: "sub-4", sender: "Retailer X Deals", senderAddress: "deals@retailerx.com", category: "promotional", frequencyPerWeek: 12, lastOpened: now - 120 * day, status: "active" },
+  { id: "sub-5", sender: "Medium Daily Digest", senderAddress: "noreply@medium.com", category: "newsletter", frequencyPerWeek: 7, lastOpened: now - 52 * hour, status: "active" },
+  { id: "sub-6", sender: "Epic Games", senderAddress: "help@epicgames.com", category: "promotional", frequencyPerWeek: 2, lastOpened: now - 32 * hour, status: "active" },
+  { id: "sub-7", sender: "Vercel", senderAddress: "notifications@vercel.com", category: "subscription", frequencyPerWeek: 1, lastOpened: now - 20 * hour, status: "active" },
+  { id: "sub-8", sender: "Spotify", senderAddress: "no-reply@spotify.com", category: "subscription", frequencyPerWeek: 1, lastOpened: now - 72 * hour, status: "active" },
+  { id: "sub-9", sender: "Notion", senderAddress: "team@notion.so", category: "newsletter", frequencyPerWeek: 1, lastOpened: now - 60 * hour, status: "active" },
+  { id: "sub-10", sender: "TechCrunch", senderAddress: "newsletters@techcrunch.com", category: "newsletter", frequencyPerWeek: 10, lastOpened: now - 200 * day, status: "active" },
+];
+
+/** One-shot demo incoming message (used by the dev panel). */
+export function demoIncomingMessage(n: number): Message {
+  return {
+    id: `msg-live-${n}-${Date.now()}`,
+    accountId: "acc-personal",
+    sender: "Alex",
+    senderAddress: "alex@example.com",
+    subject: n % 2 ? "Co-op tonight?" : "Sending you that save file",
+    preview: n % 2 ? "Free after 9 — We Were Here Too speedrun attempt?" : "Attached the honour-mode save, don't die…",
+    body: n % 2 ? "Free after 9 — We Were Here Too speedrun attempt? We were 2 achievements away." : "Attached the honour-mode save. Don't die.",
+    timestamp: Date.now(),
+    read: false,
+    archived: false,
+    category: "important",
+    canUnsubscribe: false,
+  };
+}
 
 export const DEMO_ACCOUNTS: readonly EmailAccount[] = [
   { id: "acc-personal", address: "joseph@proton.me", displayName: "Personal", provider: "mock" },

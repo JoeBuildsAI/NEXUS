@@ -9,7 +9,7 @@ export function SystemSettingsSection() {
 
   return (
     <SettingsSection title="System" description="Cleanup and process-management permissions.">
-      <div className="flex items-start gap-3 border-b border-white/[0.04] px-5 py-4">
+      <div className="flex items-start gap-3 py-4">
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-status-attention" />
         <p className="text-xs leading-relaxed text-white/50">
           NEXUS defaults to <span className="text-white/80">observe-only</span>. It

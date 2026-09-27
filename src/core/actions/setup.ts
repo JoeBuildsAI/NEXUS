@@ -1,13 +1,21 @@
 import type { OperatingMode } from "@/core/types";
 import { actionRegistry } from "./registry";
 import type { ActionDefinition } from "./types";
-import { useNavigationStore, type Screen, type SystemTab } from "@/state/navigationStore";
+import {
+  useNavigationStore,
+  type Screen,
+  type SettingsSection,
+  type SystemTab,
+} from "@/state/navigationStore";
 import { useModeStore } from "@/state/modeStore";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useMediaStore } from "@/state/mediaStore";
+import { useSettingsStore, type EnvironmentPreset } from "@/state/settingsStore";
+import { useTelemetryStore } from "@/state/telemetryStore";
+import { notify } from "@/state/toastStore";
 import { getProviders } from "@/providers";
-import { DEMO_GAMES } from "@/core/demo/games";
 import { createLogger } from "@/lib/logger";
+import { formatBitrate, formatBytes, formatUptime } from "@/lib/utils";
 
 const log = createLogger("actions");
 
@@ -36,6 +44,19 @@ export function setupActions(): void {
       },
     },
     {
+      id: "open-settings",
+      title: "Open Settings",
+      description: "Open a settings section.",
+      requiresConfirmation: false,
+      keywords: ["settings"],
+      handler: ({ args }) => {
+        const nav = useNavigationStore.getState();
+        nav.navigate("settings");
+        nav.setSettingsSection((args.section as SettingsSection) ?? "general");
+        return { ok: true };
+      },
+    },
+    {
       id: "launch-game",
       title: "Launch Game",
       description: "Launch a game via its configured launcher.",
@@ -44,12 +65,49 @@ export function setupActions(): void {
       handler: async ({ args }) => {
         const gameId = args.gameId;
         if (!gameId) return { ok: false, message: "No game specified" };
-        const title = DEMO_GAMES.find((g) => g.id === gameId)?.title ?? gameId;
-        const ok = await getProviders().steam.launchGame(gameId);
-        return {
-          ok,
-          message: ok ? `Launching ${title}…` : `Could not launch ${title}`,
-        };
+        const { steam } = getProviders();
+        const game = await steam.getGameDetails(gameId);
+        const title = game?.title ?? gameId;
+        if (game && !game.installed) {
+          notify.warn(`${title} is not installed`, "Install it from your launcher first.");
+          return { ok: false, message: "Not installed" };
+        }
+        const ok = await steam.launchGame(gameId);
+        if (ok) {
+          useModeStore.getState().setGameRunning(true);
+          notify.success(`Launching ${title}`, "Ambient effects reduced while the game runs.");
+        } else {
+          notify.error(`Could not launch ${title}`);
+        }
+        return { ok, message: ok ? `Launching ${title}…` : `Could not launch ${title}` };
+      },
+    },
+    {
+      id: "show-game",
+      title: "Show Game",
+      description: "Open a game's detail view.",
+      requiresConfirmation: false,
+      keywords: ["show", "details"],
+      handler: ({ args }) => {
+        if (!args.gameId) return { ok: false };
+        const nav = useNavigationStore.getState();
+        nav.navigate("gaming");
+        nav.selectGame(args.gameId);
+        return { ok: true };
+      },
+    },
+    {
+      id: "launch-app",
+      title: "Launch Application",
+      description: "Launch a discovered Windows application by id.",
+      requiresConfirmation: false,
+      keywords: ["open", "launch", "run"],
+      handler: async ({ args }) => {
+        if (!args.appId) return { ok: false, message: "No application specified" };
+        const res = await getProviders().apps.launch(args.appId);
+        if (res.ok) notify.success(`Launched ${res.name ?? "application"}`);
+        else notify.error("Launch failed", res.message);
+        return { ok: res.ok, message: res.message };
       },
     },
     {
@@ -60,8 +118,8 @@ export function setupActions(): void {
       keywords: ["mode"],
       handler: ({ args }) => {
         const mode = (args.mode as OperatingMode) ?? "normal";
-        useModeStore.getState().enterMode(mode);
-        return { ok: true, message: `Entered ${mode} mode` };
+        void useModeStore.getState().enterMode(mode);
+        return { ok: true, message: `Entering ${mode} mode` };
       },
     },
     {
@@ -71,8 +129,8 @@ export function setupActions(): void {
       requiresConfirmation: false,
       keywords: ["normal", "exit mode"],
       handler: () => {
-        useModeStore.getState().exitToNormal();
-        return { ok: true, message: "Returned to normal mode" };
+        void useModeStore.getState().exitToNormal();
+        return { ok: true, message: "Returning to normal mode" };
       },
     },
     {
@@ -83,7 +141,7 @@ export function setupActions(): void {
       keywords: ["storage", "disk"],
       handler: () => {
         openSystemTab("storage");
-        return { ok: true, message: "Opened storage" };
+        return { ok: true };
       },
     },
     {
@@ -94,18 +152,41 @@ export function setupActions(): void {
       keywords: ["analyze", "scan", "cleanup"],
       handler: () => {
         openSystemTab("storage");
-        return { ok: true, message: "Storage analysis ready" };
+        return { ok: true };
       },
     },
     {
       id: "show-processes",
       title: "Show Running Processes",
-      description: "Open the process viewer.",
+      description: "Open the process explorer.",
       requiresConfirmation: false,
       keywords: ["processes", "tasks"],
       handler: () => {
         openSystemTab("processes");
-        return { ok: true, message: "Opened processes" };
+        return { ok: true };
+      },
+    },
+    {
+      id: "system-query",
+      title: "System Query",
+      description: "Report a live system metric.",
+      requiresConfirmation: false,
+      keywords: ["cpu", "memory", "gpu", "network", "uptime"],
+      handler: ({ args }) => {
+        const s = useTelemetryStore.getState().snapshot;
+        if (!s) return { ok: false, message: "Telemetry unavailable" };
+        const metric = args.metric ?? "cpu";
+        const text: Record<string, [string, string]> = {
+          cpu: [`CPU ${s.cpu.usagePercent}%`, `${s.cpu.name} · ${s.cpu.cores} cores`],
+          memory: [`Memory ${s.memory.usagePercent}%`, `${formatBytes(s.memory.usedBytes, 1)} of ${formatBytes(s.memory.totalBytes, 0)} in use`],
+          gpu: s.gpu ? [`GPU ${s.gpu.usagePercent}%`, s.gpu.name] : ["GPU telemetry unavailable", "No reliable source on this machine."],
+          network: [`Network ↓ ${formatBitrate(s.network.downBytesPerSec)}`, `↑ ${formatBitrate(s.network.upBytesPerSec)} · ${s.network.ssidOrInterface ?? "offline"}`],
+          uptime: [`Uptime ${formatUptime(s.uptimeSeconds)}`, `${s.processCount} processes running`],
+        };
+        const [title, desc] = text[metric] ?? text.cpu!;
+        notify.info(title, desc);
+        openSystemTab("overview");
+        return { ok: true, message: title };
       },
     },
     {
@@ -117,6 +198,17 @@ export function setupActions(): void {
       handler: () => {
         useMediaStore.getState().pauseAll();
         return { ok: true, message: "Paused all media" };
+      },
+    },
+    {
+      id: "play-media",
+      title: "Play All Media",
+      description: "Resume every loaded media workspace player.",
+      requiresConfirmation: false,
+      keywords: ["play"],
+      handler: () => {
+        useMediaStore.getState().playAll();
+        return { ok: true };
       },
     },
     {
@@ -149,6 +241,31 @@ export function setupActions(): void {
       keywords: ["command", "palette"],
       handler: () => {
         useNavigationStore.getState().toggleCommandPalette();
+        return { ok: true };
+      },
+    },
+    {
+      id: "set-environment",
+      title: "Set Environment",
+      description: "Switch the ambient environment preset.",
+      requiresConfirmation: false,
+      keywords: ["environment", "theme"],
+      handler: ({ args }) => {
+        const env = args.environment as EnvironmentPreset | undefined;
+        if (!env) return { ok: false };
+        useSettingsStore.getState().setAppearance({ environment: env });
+        notify.neutral(`Environment · ${env.toUpperCase()}`);
+        return { ok: true };
+      },
+    },
+    {
+      id: "replay-onboarding",
+      title: "Replay Onboarding",
+      description: "Show the first-run experience again.",
+      requiresConfirmation: false,
+      keywords: ["onboarding", "setup"],
+      handler: () => {
+        useSettingsStore.getState().setProfile({ onboardingComplete: false });
         return { ok: true };
       },
     },

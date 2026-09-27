@@ -2,16 +2,23 @@
 
 export type ActionId =
   | "navigate"
+  | "open-settings"
   | "launch-game"
+  | "show-game"
+  | "launch-app"
   | "enter-mode"
   | "exit-mode"
   | "open-storage"
   | "analyze-storage"
   | "show-processes"
+  | "system-query"
   | "pause-media"
+  | "play-media"
   | "mute-media"
   | "privacy-mode"
-  | "toggle-command-palette";
+  | "toggle-command-palette"
+  | "set-environment"
+  | "replay-onboarding";
 
 export interface ActionContext {
   /** Free-form arguments parsed from the command (e.g. { screen: "gaming" }). */

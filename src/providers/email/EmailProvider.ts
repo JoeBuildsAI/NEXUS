@@ -1,4 +1,4 @@
-import type { EmailAccount, InboxSummary, Message } from "@/core/types";
+import type { EmailAccount, InboxSummary, Message, Subscription } from "@/core/types";
 
 /**
  * Abstraction over communications sources. Real adapters (Gmail, Microsoft
@@ -15,4 +15,6 @@ export interface EmailProvider {
   archive(messageId: string): Promise<void>;
   delete(messageId: string): Promise<void>;
   unsubscribe(messageId: string): Promise<void>;
+  getSubscriptions(): Promise<readonly Subscription[]>;
+  unsubscribeSender(subscriptionId: string): Promise<void>;
 }

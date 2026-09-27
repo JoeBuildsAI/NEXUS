@@ -27,7 +27,7 @@ export function MediaSettingsSection() {
 
   return (
     <SettingsSection title="Media" description="Authorized folders, playback, and privacy of your library.">
-      <div className="px-5 py-4">
+      <div className="py-4">
         <p className="text-sm text-white/85">Authorized folders</p>
         <p className="mt-0.5 text-xs text-white/40">
           NEXUS only reads media from folders you explicitly authorize. Removable

@@ -10,10 +10,14 @@ export type StorageCategory =
   | "temporary"
   | "other";
 
+/** How trustworthy a category figure is. Never present estimates as facts. */
+export type AnalysisConfidence = "known" | "estimated" | "not-analyzed";
+
 export interface StorageCategoryUsage {
   readonly category: StorageCategory;
   readonly bytes: number;
   readonly itemCount: number;
+  readonly confidence: AnalysisConfidence;
 }
 
 export interface StorageAnalysis {

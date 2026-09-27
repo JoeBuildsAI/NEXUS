@@ -1,5 +1,4 @@
 import type { Message, MessageCategory } from "@/core/types";
-import { Panel } from "@/components/ui";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -20,15 +19,15 @@ interface Props {
 
 export function MessageList({ messages, selectedId, onSelect }: Props) {
   return (
-    <Panel className="h-full overflow-hidden">
-      <div className="h-full divide-y divide-white/[0.03] overflow-y-auto">
+    <div className="overflow-hidden rounded-xl">
+      <div className="divide-y divide-white/[0.04]">
         {messages.map((m) => (
           <button
             key={m.id}
             onClick={() => onSelect(m)}
             className={cn(
-              "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors",
-              selectedId === m.id ? "bg-accent/[0.08]" : "hover:bg-white/[0.02]",
+              "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
+              selectedId === m.id ? "bg-accent/[0.08]" : "hover:bg-white/[0.03]",
             )}
           >
             <span
@@ -64,6 +63,6 @@ export function MessageList({ messages, selectedId, onSelect }: Props) {
           </button>
         ))}
       </div>
-    </Panel>
+    </div>
   );
 }

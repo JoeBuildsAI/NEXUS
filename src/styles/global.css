@@ -56,14 +56,18 @@
 
 @layer components {
   /* Glass surface primitive */
+  :root {
+    --glass-alpha: 0.8;
+  }
+
   .glass {
     background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      rgba(255, 255, 255, 0.02) 100%
+      rgba(255, 255, 255, calc(0.06 * var(--glass-alpha))) 0%,
+      rgba(255, 255, 255, calc(0.025 * var(--glass-alpha))) 100%
     );
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(calc(24px * var(--glass-alpha))) saturate(140%);
+    -webkit-backdrop-filter: blur(calc(24px * var(--glass-alpha))) saturate(140%);
     border: 1px solid rgba(255, 255, 255, 0.07);
     box-shadow:
       0 20px 60px -20px rgba(0, 0, 0, 0.7),
@@ -73,11 +77,11 @@
   .glass-strong {
     background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.03) 100%
+      rgba(18, 23, 31, calc(0.55 + 0.35 * var(--glass-alpha))) 0%,
+      rgba(10, 13, 18, calc(0.6 + 0.35 * var(--glass-alpha))) 100%
     );
-    backdrop-filter: blur(32px) saturate(160%);
-    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    backdrop-filter: blur(calc(36px * var(--glass-alpha))) saturate(160%);
+    -webkit-backdrop-filter: blur(calc(36px * var(--glass-alpha))) saturate(160%);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
@@ -111,6 +115,34 @@
   .mask-fade-b {
     -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
     mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+
+  .nx-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes nx-drift-1 {
+    from { transform: translate3d(-6%, -4%, 0) scale(1); }
+    to { transform: translate3d(8%, 6%, 0) scale(1.12); }
+  }
+  @keyframes nx-drift-2 {
+    from { transform: translate3d(5%, 6%, 0) scale(1.08); }
+    to { transform: translate3d(-7%, -5%, 0) scale(0.96); }
+  }
+  @keyframes nx-drift-3 {
+    from { transform: translate3d(-4%, 7%, 0) scale(0.95); }
+    to { transform: translate3d(6%, -6%, 0) scale(1.1); }
+  }
+
+  .text-glow {
+    text-shadow: 0 0 32px rgba(94, 208, 230, 0.35);
+  }
+
+  .hairline-t {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    height: 1px;
   }
 
   /* Respect user preference for reduced motion globally when class present */

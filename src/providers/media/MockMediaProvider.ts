@@ -1,6 +1,8 @@
 import type { AuthorizedRoot, MediaCollection, MediaItem } from "@/core/types";
 import { DEMO_COLLECTIONS, DEMO_MEDIA } from "@/core/demo/media";
 import type { MediaProvider } from "./MediaProvider";
+import { ProviderOfflineError } from "@/core/errors";
+import { useDevStore } from "@/state/devStore";
 
 export class MockMediaProvider implements MediaProvider {
   readonly id = "mock-media";
@@ -8,6 +10,9 @@ export class MockMediaProvider implements MediaProvider {
   private roots: AuthorizedRoot[] = [];
 
   async getItems(): Promise<readonly MediaItem[]> {
+    if (!useDevStore.getState().mediaConnected) {
+      throw new ProviderOfflineError("Media", "Media drive disconnected (simulated)");
+    }
     return this.items;
   }
 

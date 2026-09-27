@@ -42,6 +42,8 @@ export interface WorkspaceLayout {
   readonly name: string;
   readonly columns: number;
   readonly rows: number;
+  /** Layout preset id (e.g. "3x2", "focus"). Optional for older saves. */
+  readonly layout?: string;
   readonly slots: readonly (string | null)[];
   readonly savedAt: number;
 }

@@ -43,21 +43,35 @@ export const DEMO_DRIVES: readonly DriveInfo[] = [
  * Deterministic-ish demo telemetry with gentle animated drift so the UI feels
  * alive without pretending to be real measurements.
  */
-export function demoTelemetry(tick: number): TelemetrySnapshot {
+export interface DemoOverrides {
+  readonly highCpu?: boolean;
+  readonly highRam?: boolean;
+  readonly storagePressure?: boolean;
+}
+
+export function demoTelemetry(tick: number, ov: DemoOverrides = {}): TelemetrySnapshot {
   const wave = (period: number, phase = 0) =>
     (Math.sin((tick / period) * Math.PI * 2 + phase) + 1) / 2;
 
-  const cpu = Math.round(5 + wave(30) * 22 + wave(7, 1) * 8);
+  const cpu = ov.highCpu
+    ? Math.round(88 + wave(6) * 10)
+    : Math.round(5 + wave(30) * 22 + wave(7, 1) * 8);
   const gpuUse = Math.round(2 + wave(40, 2) * 18);
-  const memPercent = Math.round(29 + wave(90) * 8);
+  const memPercent = ov.highRam ? Math.round(87 + wave(20) * 6) : Math.round(29 + wave(90) * 8);
   const totalMem = 32 * GB;
+
+  const drives = ov.storagePressure
+    ? DEMO_DRIVES.map((d) => (d.mountPoint === "C:\\" ? { ...d, freeBytes: 62 * GB } : d))
+    : DEMO_DRIVES;
 
   const health: HealthStatus =
     memPercent > 85
       ? "high-memory"
-      : cpu > 90
-        ? "attention"
-        : "nominal";
+      : ov.storagePressure
+        ? "storage-pressure"
+        : cpu > 90
+          ? "attention"
+          : "nominal";
 
   return {
     timestamp: Date.now(),
@@ -82,7 +96,7 @@ export function demoTelemetry(tick: number): TelemetrySnapshot {
       totalBytes: totalMem,
       usagePercent: memPercent,
     },
-    storage: DEMO_DRIVES,
+    storage: drives,
     network: {
       downBytesPerSec: Math.round(wave(12) * 4_500_000),
       upBytesPerSec: Math.round(wave(9, 2) * 900_000),
@@ -90,6 +104,7 @@ export function demoTelemetry(tick: number): TelemetrySnapshot {
       ssidOrInterface: "Ethernet",
     },
     uptimeSeconds: 3 * 3600 + 42 * 60 + (tick % 60),
+    processCount: 184 + Math.round(wave(20) * 12),
     health,
   };
 }

@@ -10,6 +10,7 @@ import {
   DEMO_STARTUP,
   demoTelemetry,
 } from "@/core/demo/system";
+import { useDevStore } from "@/state/devStore";
 import type { SystemProvider } from "./SystemProvider";
 
 export class MockSystemProvider implements SystemProvider {
@@ -17,8 +18,14 @@ export class MockSystemProvider implements SystemProvider {
   private tick = Math.floor(Math.random() * 100);
 
   async getTelemetry(): Promise<TelemetrySnapshot> {
+    const dev = useDevStore.getState();
+    if (!dev.telemetryAvailable) throw new Error("Telemetry unavailable (simulated)");
     this.tick += 1;
-    return demoTelemetry(this.tick);
+    return demoTelemetry(this.tick, {
+      highCpu: dev.highCpu,
+      highRam: dev.highRam,
+      storagePressure: dev.storagePressure,
+    });
   }
 
   async getDrives(): Promise<readonly DriveInfo[]> {

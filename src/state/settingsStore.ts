@@ -1,14 +1,24 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type PrivacyAction = "home" | "minimize";
+export type PrivacyAction = "home" | "minimize" | "tray";
+export type EnvironmentPreset = "nexus" | "void" | "aurora" | "neural" | "minimal";
+export type BackgroundPerformance = "full" | "balanced" | "minimal";
+
+export interface ProfileSettings {
+  name: string;
+  onboardingComplete: boolean;
+}
 
 export interface AppearanceSettings {
+  environment: EnvironmentPreset;
+  backgroundPerformance: BackgroundPerformance;
   backgroundIntensity: number; // 0-100
   glassIntensity: number; // 0-100
   animationsEnabled: boolean;
   telemetryAnimation: boolean;
   reducedMotion: boolean;
+  cursorLighting: boolean;
 }
 
 export interface StartupSettings {
@@ -35,6 +45,7 @@ export interface PrivacySettings {
   hotkey: string;
   action: PrivacyAction;
   stopPlaybackOnTrigger: boolean;
+  clearWorkspaceOnTrigger: boolean;
 }
 
 export interface SystemSettings {
@@ -49,7 +60,15 @@ export interface AISettings {
   localCommandMode: boolean;
 }
 
+export interface ShortcutSettings {
+  commandPalette: string;
+  privacy: string;
+  screenPrefix: "ctrl" | "alt";
+  screenShortcutsEnabled: boolean;
+}
+
 interface SettingsState {
+  profile: ProfileSettings;
   appearance: AppearanceSettings;
   startup: StartupSettings;
   gaming: GamingSettings;
@@ -57,6 +76,10 @@ interface SettingsState {
   privacy: PrivacySettings;
   system: SystemSettings;
   ai: AISettings;
+  shortcuts: ShortcutSettings;
+  /** Developer panel visibility (dev builds only). */
+  devPanelOpen: boolean;
+  setProfile: (patch: Partial<ProfileSettings>) => void;
   setAppearance: (patch: Partial<AppearanceSettings>) => void;
   setStartup: (patch: Partial<StartupSettings>) => void;
   setGaming: (patch: Partial<GamingSettings>) => void;
@@ -64,18 +87,26 @@ interface SettingsState {
   setPrivacy: (patch: Partial<PrivacySettings>) => void;
   setSystem: (patch: Partial<SystemSettings>) => void;
   setAI: (patch: Partial<AISettings>) => void;
+  setShortcuts: (patch: Partial<ShortcutSettings>) => void;
+  setDevPanelOpen: (open: boolean) => void;
 }
+
+export const DEFAULT_APPEARANCE: AppearanceSettings = {
+  environment: "nexus",
+  backgroundPerformance: "balanced",
+  backgroundIntensity: 70,
+  glassIntensity: 80,
+  animationsEnabled: true,
+  telemetryAnimation: true,
+  reducedMotion: false,
+  cursorLighting: true,
+};
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      appearance: {
-        backgroundIntensity: 70,
-        glassIntensity: 80,
-        animationsEnabled: true,
-        telemetryAnimation: true,
-        reducedMotion: false,
-      },
+      profile: { name: "Joseph", onboardingComplete: false },
+      appearance: DEFAULT_APPEARANCE,
       startup: {
         launchOnLogin: false,
         startMinimized: false,
@@ -96,6 +127,7 @@ export const useSettingsStore = create<SettingsState>()(
         hotkey: "CommandOrControl+Shift+`",
         action: "home",
         stopPlaybackOnTrigger: true,
+        clearWorkspaceOnTrigger: false,
       },
       system: {
         safety: "observe",
@@ -106,6 +138,14 @@ export const useSettingsStore = create<SettingsState>()(
         provider: "local",
         localCommandMode: true,
       },
+      shortcuts: {
+        commandPalette: "Ctrl+Space",
+        privacy: "Ctrl+Shift+`",
+        screenPrefix: "ctrl",
+        screenShortcutsEnabled: true,
+      },
+      devPanelOpen: false,
+      setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       setAppearance: (patch) =>
         set((s) => ({ appearance: { ...s.appearance, ...patch } })),
       setStartup: (patch) => set((s) => ({ startup: { ...s.startup, ...patch } })),
@@ -114,7 +154,34 @@ export const useSettingsStore = create<SettingsState>()(
       setPrivacy: (patch) => set((s) => ({ privacy: { ...s.privacy, ...patch } })),
       setSystem: (patch) => set((s) => ({ system: { ...s.system, ...patch } })),
       setAI: (patch) => set((s) => ({ ai: { ...s.ai, ...patch } })),
+      setShortcuts: (patch) => set((s) => ({ shortcuts: { ...s.shortcuts, ...patch } })),
+      setDevPanelOpen: (devPanelOpen) => set({ devPanelOpen }),
     }),
-    { name: "nexus-settings" },
+    {
+      name: "nexus-settings",
+      version: 2,
+      partialize: (s) => {
+        // Never persist transient dev panel visibility.
+        const { devPanelOpen: _d, ...rest } = s;
+        return rest as SettingsState;
+      },
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<SettingsState>;
+        return {
+          ...current,
+          ...p,
+          profile: { ...current.profile, ...p.profile },
+          appearance: { ...current.appearance, ...p.appearance },
+          startup: { ...current.startup, ...p.startup },
+          gaming: { ...current.gaming, ...p.gaming },
+          media: { ...current.media, ...p.media },
+          privacy: { ...current.privacy, ...p.privacy },
+          system: { ...current.system, ...p.system },
+          ai: { ...current.ai, ...p.ai },
+          shortcuts: { ...current.shortcuts, ...p.shortcuts },
+          devPanelOpen: false,
+        };
+      },
+    },
   ),
 );

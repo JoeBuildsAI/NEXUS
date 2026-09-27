@@ -22,6 +22,7 @@ interface BootSequenceProps {
 export function BootSequence({ onComplete }: BootSequenceProps) {
   const startupAnimation = useSettingsStore((s) => s.startup.startupAnimation);
   const reducedMotion = useSettingsStore((s) => s.appearance.reducedMotion);
+  const userName = useSettingsStore((s) => s.profile.name) || USER_NAME;
   const [phase, setPhase] = useState<"init" | "welcome" | "done">("init");
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -116,7 +117,7 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
               transition={{ duration: 0.8, ease: "easeOut" }}
               style={{ textShadow: "0 0 40px rgba(94,208,230,0.4)" }}
             >
-              {USER_NAME}
+              {userName.toUpperCase()}
             </motion.h1>
           </motion.div>
         )}

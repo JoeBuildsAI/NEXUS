@@ -53,6 +53,7 @@ pub struct TelemetrySnapshot {
     storage: Vec<DriveInfo>,
     network: NetworkTelemetry,
     uptime_seconds: u64,
+    process_count: usize,
     health: String,
 }
 
@@ -104,6 +105,8 @@ pub fn get_telemetry(state: State<AppState>) -> Result<TelemetrySnapshot, String
     let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
     sys.refresh_cpu_usage();
     sys.refresh_memory();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    let process_count = sys.processes().len();
 
     let cpu_usage = sys.global_cpu_usage().round() as u32;
     let per_core: Vec<u32> = sys
@@ -192,6 +195,7 @@ pub fn get_telemetry(state: State<AppState>) -> Result<TelemetrySnapshot, String
             ssid_or_interface: iface,
         },
         uptime_seconds: System::uptime(),
+        process_count,
         health: health.to_string(),
     })
 }

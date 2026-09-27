@@ -31,6 +31,17 @@ export interface Message {
   readonly canUnsubscribe: boolean;
 }
 
+export interface Subscription {
+  readonly id: string;
+  readonly sender: string;
+  readonly senderAddress: string;
+  readonly category: "newsletter" | "subscription" | "promotional";
+  /** Approximate emails per week. */
+  readonly frequencyPerWeek: number;
+  readonly lastOpened: number | null;
+  readonly status: "active" | "unsubscribed";
+}
+
 export interface InboxSummary {
   readonly total: number;
   readonly unread: number;

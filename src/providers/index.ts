@@ -12,6 +12,9 @@ import type { EmailProvider } from "./email/EmailProvider";
 import { MockEmailProvider } from "./email/MockEmailProvider";
 import type { AssistantProvider } from "./assistant/AssistantProvider";
 import { LocalCommandProvider } from "./assistant/LocalCommandProvider";
+import type { AppProvider } from "./apps/AppProvider";
+import { MockAppProvider } from "./apps/MockAppProvider";
+import { TauriAppProvider } from "./apps/TauriAppProvider";
 
 /**
  * Central provider factory. Selecting real vs. mock is a pure configuration
@@ -32,6 +35,7 @@ export interface Providers {
   readonly steam: SteamProvider;
   readonly media: MediaProvider;
   readonly email: EmailProvider;
+  readonly apps: AppProvider;
   readonly assistant: AssistantProvider;
 }
 
@@ -41,34 +45,50 @@ export function getProviders(): Providers {
   if (cached) return cached;
   const canNative = config.isTauri && !config.demoMode;
 
+  const system = pick(
+    config.providers.system,
+    () => new MockSystemProvider(),
+    () => new TauriSystemProvider(),
+    // Real telemetry is safe to use whenever a Tauri backend is present, even
+    // in demo mode. The provider itself falls back to mock per-capability.
+    config.isTauri,
+  );
+  const steam = pick(
+    config.providers.steam,
+    () => new MockSteamProvider(),
+    () => new RealSteamProvider(),
+    false, // Steam integration not available on dev laptop.
+  );
+  const media = pick(
+    config.providers.media,
+    () => new MockMediaProvider(),
+    () => new LocalMediaProvider(),
+    canNative,
+  );
+  const email = pick(
+    config.providers.email,
+    () => new MockEmailProvider(),
+    () => new MockEmailProvider(), // Real email adapters come later.
+    false,
+  );
+  // Real app discovery (Start Menu) is safe and useful whenever Tauri is present.
+  const apps: AppProvider = config.isTauri ? new TauriAppProvider() : new MockAppProvider();
+
   cached = {
-    system: pick(
-      config.providers.system,
-      () => new MockSystemProvider(),
-      () => new TauriSystemProvider(),
-      // Real telemetry is safe to use whenever a Tauri backend is present, even
-      // in demo mode. The provider itself falls back to mock per-capability.
-      config.isTauri,
-    ),
-    steam: pick(
-      config.providers.steam,
-      () => new MockSteamProvider(),
-      () => new RealSteamProvider(),
-      false, // Steam integration not available on dev laptop.
-    ),
-    media: pick(
-      config.providers.media,
-      () => new MockMediaProvider(),
-      () => new LocalMediaProvider(),
-      canNative,
-    ),
-    email: pick(
-      config.providers.email,
-      () => new MockEmailProvider(),
-      () => new MockEmailProvider(), // Real email adapters come later.
-      false,
-    ),
-    assistant: new LocalCommandProvider(),
+    system,
+    steam,
+    media,
+    email,
+    apps,
+    assistant: new LocalCommandProvider({
+      getApps: () => apps.getApps(),
+      getGames: () => steam.getGames(),
+    }),
   };
   return cached;
+}
+
+/** Test-only: reset the cached providers. */
+export function __resetProviders(): void {
+  cached = null;
 }

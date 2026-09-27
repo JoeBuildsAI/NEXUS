@@ -20,8 +20,10 @@ export function SystemScreen() {
 
   return (
     <ScreenShell
+      eyebrow="Windows"
       title="System Center"
       subtitle="Telemetry, processes, storage and startup"
+      wide
       actions={<Tabs tabs={TABS} value={tab} onChange={setTab} />}
     >
       {tab === "overview" && <SystemOverview />}
