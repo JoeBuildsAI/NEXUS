@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Play } from "lucide-react";
+import { ArrowUpRight, Play, X } from "lucide-react";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useAsync } from "@/hooks/useAsync";
@@ -10,8 +10,9 @@ import { actionRegistry } from "@/core/actions/registry";
 import type { ActionId } from "@/core/actions/types";
 import { completionPercent, type GameDetails } from "@/core/types";
 import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
-import { isOffline } from "@/core/errors";
-import { DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
+import { useLibraryStore } from "@/state/libraryStore";
+import { useCleanupStore } from "@/state/cleanupStore";
+import { useInsightPrefsStore } from "@/state/insightPrefsStore";
 import { cn } from "@/lib/utils";
 
 /* ---------- section label ---------- */
@@ -34,14 +35,20 @@ export function ContinuePlaying() {
   const navigate = useNavigationStore((s) => s.navigate);
   const selectGame = useNavigationStore((s) => s.selectGame);
   const [imgFailed, setImgFailed] = useState(false);
-  const { data, error } = useAsync<GameDetails | null>(async () => {
-    const { steam } = getProviders();
-    const games = await steam.getGames();
-    const last = [...games].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0];
-    return last ? steam.getGameDetails(last.id) : null;
+  const games = useLibraryStore((s) => s.games);
+  const details = useLibraryStore((s) => s.details);
+  const offline = useLibraryStore((s) => s.offline);
+  const loadedAt = useLibraryStore((s) => s.loadedAt);
+  const last = useMemo(() => [...games].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0], [games]);
+  useEffect(() => {
+    void useLibraryStore.getState().load();
   }, []);
+  useEffect(() => {
+    if (last) void useLibraryStore.getState().ensureDetails([last.id]);
+  }, [last]);
+  const data: GameDetails | null = last ? details[last.id]?.value ?? useLibraryStore.getState().withDetails().find((g) => g.id === last.id) ?? null : null;
 
-  if (error && isOffline(error)) {
+  if (offline) {
     return (
       <div>
         <SectionLabel>Continue playing</SectionLabel>
@@ -50,7 +57,10 @@ export function ContinuePlaying() {
       </div>
     );
   }
-  if (!data) return <div className="h-[220px] animate-pulse rounded-md bg-white/[0.02]" />;
+  if (!data) {
+    if (loadedAt && games.length === 0) return <div><SectionLabel>Continue playing</SectionLabel><p className="text-sm text-white/35">No installed games yet.</p></div>;
+    return <div className="h-[220px] animate-pulse rounded-md bg-white/[0.02]" />;
+  }
 
   const pct = completionPercent(data.achievements);
   const hasArt = !!data.heroUrl && !imgFailed;
@@ -126,13 +136,15 @@ export function StorageSurface() {
   const setTab = useNavigationStore((s) => s.setSystemTab);
   const storage = useTelemetryStore((s) => s.snapshot?.storage);
   const drives = useMemo(() => storage?.filter((d) => d.kind === "fixed") ?? [], [storage]);
-  const reviewable = DEMO_CLEANUP_CANDIDATES.filter((c) => c.risk !== "destructive").reduce((s, c) => s + c.bytes, 0);
+  const candidates = useCleanupStore((s) => s.candidates);
+  const real = useCleanupStore((s) => s.real);
+  const reviewable = useMemo(() => (candidates ?? []).filter((c) => c.risk !== "destructive").reduce((s, c) => s + c.bytes, 0), [candidates]);
   const go = () => { navigate("system"); setTab("storage"); };
   return (
     <div>
       <SectionLabel action="Analyze" onAction={go}>Storage</SectionLabel>
       <button onClick={go} className="block w-full text-left">
-        <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
+        <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{candidates ? formatBytes(reviewable, 0) : "—"}<span className="ml-3 font-sans text-base font-normal text-white/40">{candidates ? "reviewable" : "discovering"}{!real && candidates ? " · demo" : ""}</span></p>
         <div className="mt-4 space-y-2.5">
           {drives.slice(0, 3).map((d) => {
             const used = d.totalBytes - d.freeBytes;
@@ -156,12 +168,14 @@ const TONE_DOT = { neutral: "bg-white/25", accent: "bg-white/70", attention: "bg
 
 export function InsightsSurface() {
   const insights = useInsights();
+  const dismiss = useInsightPrefsStore((s) => s.dismiss);
+  if (insights.length === 0) return null;
   return (
     <div>
       <SectionLabel>NEXUS</SectionLabel>
       <ul className="space-y-3">
         {insights.slice(0, 4).map((ins) => (
-          <li key={ins.id} className="flex items-baseline gap-3 text-[14px]">
+          <li key={ins.id} className="group flex items-baseline gap-3 text-[14px]">
             <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", TONE_DOT[ins.tone])} />
             <p className="flex-1 leading-relaxed text-white/60">{ins.text}</p>
             {ins.action && (
@@ -169,6 +183,7 @@ export function InsightsSurface() {
                 {ins.action.label}
               </button>
             )}
+            <button onClick={() => dismiss(ins.id)} className="shrink-0 text-white/20 opacity-0 transition-opacity hover:text-white group-hover:opacity-100" aria-label="Dismiss suggestion"><X size={12} /></button>
           </li>
         ))}
       </ul>

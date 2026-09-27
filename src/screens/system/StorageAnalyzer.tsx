@@ -5,12 +5,13 @@ import { Button } from "@/components/ui";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useModeStore } from "@/state/modeStore";
 import { DEMO_DRIVES } from "@/core/demo/system";
-import { demoStorageAnalysis, DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
+import { demoStorageAnalysis } from "@/core/demo/storage";
 import { eligibleDrivesForScan } from "@/core/storage/storageService";
 import type { AnalysisConfidence, CleanupRisk, StorageAnalysis, StorageCategory } from "@/core/types";
 import { requestConfirm } from "@/state/confirmStore";
 import { notify } from "@/state/toastStore";
-import { native, type CleanupReportItem, type NativeCleanupCandidate } from "@/providers/system/nativeBridge";
+import { native } from "@/providers/system/nativeBridge";
+import { useCleanupStore, type CleanupCandidateView } from "@/state/cleanupStore";
 import { getProviders } from "@/providers";
 import { config } from "@/core/config";
 import { formatBytes } from "@/lib/utils";
@@ -33,11 +34,7 @@ const RISK: Record<CleanupRisk, { label: string; cls: string }> = {
   destructive: { label: "USER FILES", cls: "text-status-critical/90" },
 };
 
-interface Candidate {
-  id: string; label: string; description: string; bytes: number; fileCount: number | null;
-  risk: CleanupRisk; requiresElevation: boolean; discovery: string | null; execution: string | null; approved: boolean;
-}
-const fromNative = (c: NativeCleanupCandidate): Candidate => ({ id: c.rule.id, label: c.rule.label, description: c.rule.description, bytes: c.bytes, fileCount: c.fileCount, risk: c.rule.risk, requiresElevation: c.rule.requiresElevation, discovery: c.rule.discovery, execution: c.rule.execution, approved: false });
+type Candidate = CleanupCandidateView & { approved: boolean };
 
 export function StorageAnalyzer() {
   const liveDrives = useTelemetryStore((s) => s.snapshot?.storage);
@@ -50,21 +47,16 @@ export function StorageAnalyzer() {
   const [analyzing, setAnalyzing] = useState(false);
   const [progressCat, setProgressCat] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, StorageAnalysis>>({});
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
-  const [report, setReport] = useState<CleanupReportItem[] | null>(null);
+  const storeCandidates = useCleanupStore((s) => s.candidates);
+  const report = useCleanupStore((s) => s.lastReport);
+  const executeRules = useCleanupStore((s) => s.execute);
+  const [approvedIds, setApprovedIds] = useState<string[]>([]);
   const [showRules, setShowRules] = useState(false);
+  const candidates: Candidate[] | null = useMemo(() => storeCandidates?.map((c) => ({ ...c, approved: approvedIds.includes(c.id) })) ?? null, [storeCandidates, approvedIds]);
 
   useEffect(() => { if (!selected && eligible[0]) setSelected(eligible[0].mountPoint); }, [eligible, selected]);
 
-  const discover = async () => {
-    if (config.isTauri) {
-      const list = await native.cleanupDiscover();
-      setCandidates((list ?? []).filter((c) => c.accessible || c.rule.id === "recycle-bin").map(fromNative));
-    } else {
-      setCandidates(DEMO_CLEANUP_CANDIDATES.map((c) => ({ id: c.id, label: c.label, description: c.description, bytes: c.bytes, fileCount: null, risk: c.risk, requiresElevation: false, discovery: null, execution: null, approved: false })));
-    }
-  };
-  useEffect(() => { void discover(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void useCleanupStore.getState().discover(); }, []);
 
   const analysis: StorageAnalysis | null = drive ? analyses[drive.mountPoint] ?? demoStorageAnalysis(drive.mountPoint, drive.totalBytes, drive.freeBytes) : null;
   const isReal = drive ? !!analyses[drive.mountPoint] : false;
@@ -92,29 +84,33 @@ export function StorageAnalyzer() {
     setAnalyzing(false);
   };
 
-  const toggle = (id: string) => setCandidates((cs) => cs?.map((c) => (c.id === id ? { ...c, approved: !c.approved } : c)) ?? null);
+  const toggle = (id: string) => setApprovedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const approved = (candidates ?? []).filter((c) => c.approved);
   const reclaimable = approved.reduce((s, c) => s + c.bytes, 0);
   const reviewable = (candidates ?? []).filter((c) => c.risk !== "destructive").reduce((s, c) => s + c.bytes, 0);
 
   const dryRun = async () => {
-    const r = await native.cleanupExecute(approved.map((c) => c.id), true);
-    setReport(r);
+    const r = await executeRules(approved.map((c) => c.id), true);
     notify.info("Dry run complete", `${formatBytes(r.reduce((s, x) => s + x.freedBytes, 0))} would be freed. Nothing was deleted.`);
   };
   const execute = () => {
     if (approved.length === 0) return;
     const review = approved.filter((c) => c.risk !== "safe");
     requestConfirm({
-      title: "Execute cleanup?",
-      message: `Reclaim about ${formatBytes(reclaimable)} across ${approved.length} rule${approved.length === 1 ? "" : "s"}.${review.length ? ` ${review.length} marked REVIEW — the Recycle Bin is the last chance to restore those items.` : ""} Only files each rule matches are removed; documents, media and games are never touched. Removable drives are excluded.`,
-      confirmLabel: "Execute",
+      title: `Remove ${formatBytes(reclaimable)} of temporary data?`,
+      message: [
+        ...approved.map((c) => `${c.label} — ${formatBytes(c.bytes)}${c.risk !== "safe" ? " (review)" : ""}`),
+        "",
+        "No user documents, media or games are selected. Only files each rule matches are removed; removable drives are excluded." + (review.length ? " The Recycle Bin is the last chance to restore those items." : ""),
+      ].join("\n"),
+      confirmLabel: "Clean",
+      cancelLabel: "Review",
       danger: true,
       onConfirm: async () => {
-        const r = await native.cleanupExecute(approved.map((c) => c.id), false);
-        setReport(r);
-        notify.success(`Reclaimed ${formatBytes(r.reduce((s, x) => s + x.freedBytes, 0))}`, `${r.reduce((s, x) => s + x.removed, 0)} items removed · ${r.reduce((s, x) => s + x.skipped, 0)} skipped`);
-        await discover();
+        const r = await executeRules(approved.map((c) => c.id), false);
+        const freed = r.reduce((s, x) => s + x.freedBytes, 0);
+        notify.success(`${formatBytes(freed)} recovered`, `${r.reduce((s, x) => s + x.removed, 0)} items removed${r.reduce((s, x) => s + x.skipped, 0) ? ` · ${r.reduce((s, x) => s + x.skipped, 0)} skipped (locked or in use)` : ""}`);
+        setApprovedIds([]);
       },
     });
   };

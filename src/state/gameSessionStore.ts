@@ -63,10 +63,14 @@ export const useGameSessionStore = create<GameSessionState>((set, get) => ({
           stop();
         }
       } else if (phase === "active" && !running) {
+        const started = get().startedAt ?? Date.now();
+        const mins = Math.max(1, Math.round((Date.now() - started) / 60_000));
         set({ phase: "exited" });
         useModeStore.getState().setGameRunning(false);
         stop();
-        notify.neutral("Game session ended", `${title} closed. NEXUS restored normal behavior.`);
+        notify.neutral("Session complete", `${title} · ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`}`);
+        // One achievement refresh after the session — never during it, never repeatedly.
+        void import("@/state/libraryStore").then(({ useLibraryStore }) => useLibraryStore.getState().refreshDetails(gameId));
         setTimeout(() => set({ phase: "idle", gameId: null, title: null, startedAt: null }), 1500);
       }
     };

@@ -16,6 +16,7 @@ import { useNavigationStore } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
+import { useCleanupStore } from "@/state/cleanupStore";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { setupActions } from "@/core/actions/setup";
 import { getProviders } from "@/providers";
@@ -52,6 +53,9 @@ export function App() {
     void p.media.getAuthorizedRoots().catch(() => undefined);
     // Crash recovery: restore anything a previous Gaming Mode session changed.
     void useModeStore.getState().recoverStaleSession();
+    // Progressive, non-blocking: cleanup discovery well after the shell is interactive.
+    const t = setTimeout(() => void useCleanupStore.getState().discover(), 6000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {

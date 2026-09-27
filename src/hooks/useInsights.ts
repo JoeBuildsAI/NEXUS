@@ -6,13 +6,15 @@ import { useProcessPrefsStore } from "@/state/processPrefsStore";
 import { useDevStore } from "@/state/devStore";
 import { useGamePrefsStore } from "@/state/gamePrefsStore";
 import { useGameSessionStore } from "@/state/gameSessionStore";
+import { useLibraryStore } from "@/state/libraryStore";
+import { useCleanupStore } from "@/state/cleanupStore";
+import { useInsightPrefsStore } from "@/state/insightPrefsStore";
 import { getProviders } from "@/providers";
-import { DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
-import type { GameDetails, InboxSummary } from "@/core/types";
+import type { InboxSummary } from "@/core/types";
 
 /**
  * Assistant presence: deterministic insights derived from live provider data.
- * Refreshes when telemetry health changes, mode changes, or dev sim toggles.
+ * Uses the cached library (no per-game fetch storm) and real cleanup discovery.
  */
 export function useInsights(): Insight[] {
   const health = useTelemetryStore((s) => s.snapshot?.health);
@@ -23,51 +25,47 @@ export function useInsights(): Insight[] {
   const mediaConnected = useDevStore((s) => s.mediaConnected);
   const emailPulse = useDevStore((s) => s.emailPulse);
   const achievementPulse = useDevStore((s) => s.achievementPulse);
-  const [games, setGames] = useState<readonly GameDetails[]>([]);
+  const libraryDetails = useLibraryStore((s) => s.details);
+  const libraryGames = useLibraryStore((s) => s.games);
+  const libraryOffline = useLibraryStore((s) => s.offline);
+  const candidates = useCleanupStore((s) => s.candidates);
+  const dismissed = useInsightPrefsStore((s) => s.dismissed);
+  const historyEnabled = useInsightPrefsStore((s) => s.enabled);
   const [inbox, setInbox] = useState<InboxSummary | null>(null);
 
   useEffect(() => {
-    const { steam, email } = getProviders();
     let cancelled = false;
-    (async () => {
-      try {
-        const list = await steam.getGames();
-        const details = await Promise.all(list.map((g) => steam.getGameDetails(g.id)));
-        if (!cancelled) setGames(details.filter((d): d is GameDetails => d != null));
-      } catch {
-        if (!cancelled) setGames([]);
-      }
-      try {
-        const s = await email.getSummary(Date.now() - 3 * 24 * 3600 * 1000);
-        if (!cancelled) setInbox(s);
-      } catch {
-        if (!cancelled) setInbox(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [steamConnected, emailPulse, achievementPulse]);
+    getProviders().email.getSummary(Date.now() - 3 * 24 * 3600 * 1000).then((s) => !cancelled && setInbox(s)).catch(() => !cancelled && setInbox(null));
+    return () => { cancelled = true; };
+  }, [emailPulse]);
 
+  useEffect(() => {
+    void useLibraryStore.getState().load();
+  }, [steamConnected, achievementPulse]);
+
+  const games = useMemo(
+    () => libraryGames.map((g) => libraryDetails[g.id]?.value ?? { ...g, achievements: { gameId: g.id, unlocked: 0, total: 0, achievements: [], status: "not-configured" as const }, summary: "", developer: "", publisher: "" }),
+    [libraryDetails, libraryGames],
+  );
   const approvedAppCount = Object.values(prefs).filter((p) => p === "close").length;
   const tracked = useGamePrefsStore((s) => s.tracked[0] ?? null);
   const sessionTitle = useGameSessionStore((s) => (s.phase === "active" ? s.title : null));
 
-  return useMemo(
-    () =>
-      generateInsights({
-        telemetry: snapshot,
-        games,
-        inbox,
-        cleanup: DEMO_CLEANUP_CANDIDATES,
-        approvedAppCount,
-        mode,
-        steamConnected,
-        mediaConnected,
-        tracked,
-        gameSession: sessionTitle ? { title: sessionTitle } : null,
-      }),
+  return useMemo(() => {
+    if (!historyEnabled) return [];
+    const all = generateInsights({
+      telemetry: snapshot,
+      games,
+      inbox,
+      cleanup: (candidates ?? []).map((c) => ({ id: c.id, label: c.label, description: c.description, bytes: c.bytes, risk: c.risk, category: "temporary" as const, approved: false })),
+      approvedAppCount,
+      mode,
+      steamConnected: steamConnected && !libraryOffline,
+      mediaConnected,
+      tracked,
+      gameSession: sessionTitle ? { title: sessionTitle } : null,
+    });
+    return all.filter((i) => !dismissed.includes(i.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, approvedAppCount, mode, steamConnected, mediaConnected, tracked, sessionTitle],
-  );
+  }, [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, candidates, approvedAppCount, mode, steamConnected, libraryOffline, mediaConnected, tracked, sessionTitle, dismissed, historyEnabled]);
 }

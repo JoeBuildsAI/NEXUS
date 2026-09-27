@@ -1,26 +1,61 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Play, Target } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Search, Target } from "lucide-react";
 import { GameCard } from "./GameCard";
 import { HeroArt } from "./HeroArt";
-import { useAsync } from "@/hooks/useAsync";
-import { getProviders } from "@/providers";
+import { useLibraryStore } from "@/state/libraryStore";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useDevStore } from "@/state/devStore";
 import { useGamePrefsStore } from "@/state/gamePrefsStore";
+import { useGameSessionStore } from "@/state/gameSessionStore";
 import { actionRegistry } from "@/core/actions/registry";
 import { completionPercent, type Game, type GameDetails } from "@/core/types";
 import { bucketFor, libraryTotals } from "@/core/gaming/completion";
-import { isOffline } from "@/core/errors";
-import { formatPlaytime, formatRelativeTime } from "@/lib/utils";
+import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { Button, ContextMenu } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { gameContextItems } from "./gameContextItems";
 import { cn } from "@/lib/utils";
 
-interface Row {
-  title: string;
-  games: GameDetails[];
+type SortKey = "recent" | "name" | "playtime" | "completion" | "size";
+type FilterKey = "all" | "installed" | "completed" | "near" | "in-progress" | "no-achievements";
+
+const SORTS: { id: SortKey; label: string }[] = [
+  { id: "recent", label: "Recent" },
+  { id: "name", label: "Name" },
+  { id: "playtime", label: "Playtime" },
+  { id: "completion", label: "Completion" },
+  { id: "size", label: "Size" },
+];
+const FILTERS: { id: FilterKey; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "installed", label: "Installed" },
+  { id: "completed", label: "Completed" },
+  { id: "near", label: "Near completion" },
+  { id: "in-progress", label: "In progress" },
+  { id: "no-achievements", label: "No achievements" },
+];
+const PAGE = 48;
+
+function sortGames(games: GameDetails[], key: SortKey): GameDetails[] {
+  const c = [...games];
+  switch (key) {
+    case "name": return c.sort((a, b) => a.title.localeCompare(b.title));
+    case "playtime": return c.sort((a, b) => b.playtimeMinutes - a.playtimeMinutes);
+    case "completion": return c.sort((a, b) => completionPercent(b.achievements) - completionPercent(a.achievements));
+    case "size": return c.sort((a, b) => (b.installSizeBytes ?? 0) - (a.installSizeBytes ?? 0));
+    default: return c.sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0) || a.title.localeCompare(b.title));
+  }
+}
+function filterGames(games: GameDetails[], key: FilterKey): GameDetails[] {
+  switch (key) {
+    case "installed": return games.filter((g) => g.installed);
+    case "completed": return games.filter((g) => bucketFor(g) === "completed");
+    case "near": return games.filter((g) => bucketFor(g) === "near");
+    case "in-progress": return games.filter((g) => ["in-progress", "not-started"].includes(bucketFor(g)));
+    case "no-achievements": return games.filter((g) => g.achievements.total === 0 && (g.achievements.status === "no-achievements" || g.achievements.status === "ok"));
+    default: return games;
+  }
 }
 
 export function GameLibrary() {
@@ -29,48 +64,81 @@ export function GameLibrary() {
   const setSection = useNavigationStore((s) => s.setSettingsSection);
   const steamConnected = useDevStore((s) => s.steamConnected);
   const tracked = useGamePrefsStore((s) => s.tracked);
-  const { data, loading, error } = useAsync<{ games: GameDetails[]; mode: "real" | "demo" }>(async () => {
-    const { steam } = getProviders();
-    const games = await steam.getGames();
-    const details = await Promise.all(games.map((g) => steam.getGameDetails(g.id)));
-    const withMode = steam as { mode?: () => Promise<"real" | "demo"> };
-    const mode = typeof withMode.mode === "function" ? await withMode.mode() : "demo";
-    return { games: details.filter((d): d is GameDetails => d != null), mode };
+  const session = useGameSessionStore();
+  const games = useLibraryStore((s) => s.games);
+  const details = useLibraryStore((s) => s.details);
+  const loading = useLibraryStore((s) => s.loading);
+  const loadedAt = useLibraryStore((s) => s.loadedAt);
+  const offline = useLibraryStore((s) => s.offline);
+  const mode = useLibraryStore((s) => s.mode);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [page, setPage] = useState(1);
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void useLibraryStore.getState().load({ force: true });
   }, [steamConnected]);
 
-  const games = useMemo(() => data?.games ?? [], [data]);
-  const featured = useMemo(() => [...games].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0], [games]);
-  const rows = useMemo<Row[]>(() => {
-    const byRecent = [...games].filter((g) => g.lastPlayed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0));
-    return [
-      { title: "Recently played", games: byRecent },
-      { title: "Installed", games: games.filter((g) => g.installed) },
-      { title: "Near completion", games: games.filter((g) => bucketFor(g) === "near").sort((a, b) => completionPercent(b.achievements) - completionPercent(a.achievements)) },
-      { title: "Not installed", games: games.filter((g) => !g.installed) },
-    ];
-  }, [games]);
-  const totals = useMemo(() => libraryTotals(games), [games]);
-  const trackedTop = tracked[0];
+  const all = useMemo(() => useLibraryStore.getState().withDetails(), [games, details]); // eslint-disable-line react-hooks/exhaustive-deps
+  const featured = useMemo(() => [...all].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0], [all]);
+  const recent = useMemo(() => [...all].filter((g) => g.lastPlayed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0)).slice(0, 12), [all]);
 
-  if (error && isOffline(error)) {
-    return (
-      <EmptyState eyebrow="Steam" title="Not connected" body="NEXUS will detect Steam automatically when available." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Configure</Button>} />
-    );
+  // Progressive detail fetch: featured + recent first; whole library only when small.
+  const gameIds = useMemo(() => games.map((g) => g.id), [games]);
+  useEffect(() => {
+    if (gameIds.length === 0) return;
+    const store = useLibraryStore.getState();
+    const priority = [featured?.id, ...recent.map((g) => g.id)].filter((x): x is string => !!x);
+    void store.ensureDetails(priority).then(() => {
+      if (gameIds.length <= 60) void store.ensureDetails(gameIds, { concurrency: 2 });
+    });
+  }, [gameIds, featured?.id, recent]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = q ? all.filter((g) => g.title.toLowerCase().includes(q)) : filterGames(all, filter);
+    return sortGames(base, sort);
+  }, [all, query, filter, sort]);
+  const visible = filtered.slice(0, page * PAGE);
+
+  // Fetch details for what is on screen (large libraries) and load more on scroll.
+  useEffect(() => {
+    void useLibraryStore.getState().ensureDetails(visible.slice(Math.max(0, (page - 1) * PAGE)).map((g) => g.id), { concurrency: 2 });
+  }, [page, visible.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting && visible.length < filtered.length) setPage((p) => p + 1); }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible.length, filtered.length]);
+  useEffect(() => setPage(1), [query, filter, sort]);
+
+  const totals = useMemo(() => libraryTotals(all), [all]);
+  const trackedTop = tracked[0];
+  const large = games.length > 24;
+
+  if (offline) {
+    return <EmptyState eyebrow="Steam" title="Not connected" body="NEXUS will detect Steam automatically when available." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Configure</Button>} />;
   }
-  if (loading && !data) return <LibrarySkeleton />;
+  if ((loading || !loadedAt) && games.length === 0) return <LibrarySkeleton />;
   if (games.length === 0) return <EmptyState eyebrow="Steam" title="No installed games" body="Steam was detected but its libraries contain no installed games." />;
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Featured — artwork owns the top of the screen */}
       {featured && (
         <ContextMenu items={gameContextItems(featured, { select: selectGame })}>
-          <div className="relative h-[min(62vh,640px)] min-h-[440px]">
+          <div className="relative h-[min(58vh,600px)] min-h-[420px]">
             <HeroArt game={featured} />
             <div className="relative mx-auto flex h-full max-w-[1880px] flex-col justify-end px-12 pb-12 2xl:px-16">
               <div className="flex items-end justify-between gap-10">
                 <div className="max-w-3xl">
-                  <p className="text-micro tracking-cinematic text-white/40">{data?.mode === "demo" ? "Demo library · " : ""}{featured.lastPlayed ? `Continue · ${formatRelativeTime(featured.lastPlayed)}` : "Ready"}</p>
+                  <p className="text-micro tracking-cinematic text-white/40">
+                    {mode === "demo" ? "Demo library · " : ""}
+                    {session.phase === "active" && session.gameId === featured.id ? "Session active" : featured.lastPlayed ? `Continue · ${formatRelativeTime(featured.lastPlayed)}` : "Ready"}
+                  </p>
                   <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className={cn("mt-4 font-display font-semibold uppercase tracking-wide text-white", featured.title.length > 14 ? "text-display-lg" : "text-display-xl")}>
                     {featured.title}
                   </motion.h1>
@@ -78,15 +146,17 @@ export function GameLibrary() {
                     {featured.achievements.total > 0 && <span><span className="text-white/90">{featured.achievements.unlocked} / {featured.achievements.total}</span> achievements</span>}
                     {featured.achievements.total > 0 && <span><span className="text-white/90">{completionPercent(featured.achievements)}%</span> complete</span>}
                     {featured.playtimeMinutes > 0 && <span><span className="text-white/90">{formatPlaytime(featured.playtimeMinutes)}</span> played</span>}
+                    {featured.installSizeBytes != null && <span><span className="text-white/90">{formatBytes(featured.installSizeBytes, 0)}</span> on disk</span>}
                   </div>
                   <div className="mt-8 flex items-center gap-3">
                     <Button variant="primary" size="lg" onClick={() => void actionRegistry.execute("launch-game", { args: { gameId: featured.id } })}>
-                      <Play size={16} fill="currentColor" /> Continue
+                      <Play size={16} fill="currentColor" /> {session.phase === "active" && session.gameId === featured.id ? "Running" : "Continue"}
                     </Button>
                     <Button variant="ghost" size="lg" onClick={() => selectGame(featured.id)}>Details</Button>
                   </div>
                 </div>
                 <div className="hidden shrink-0 flex-col items-end gap-1 font-mono text-[12px] tabular text-white/40 lg:flex">
+                  <Stat n={totals.games} label="games" />
                   <Stat n={totals.installed} label="installed" />
                   {totals.hours > 0 && <Stat n={`${totals.hours}h`} label="played" />}
                   {totals.total > 0 && <Stat n={`${totals.unlocked}/${totals.total}`} label="achievements" />}
@@ -108,17 +178,53 @@ export function GameLibrary() {
         )}
 
         <div className="space-y-14">
-          {rows.filter((r) => r.games.length > 0).map((row) => (
-            <GameRow key={row.title} title={row.title} games={row.games} onSelect={(g) => selectGame(g.id)} />
-          ))}
+          {recent.length > 0 && !query && filter === "all" && <GameRow title="Recently played" games={recent} onSelect={(g) => selectGame(g.id)} />}
 
-          {totals.total > 0 && (
+          {/* Library controls */}
+          <section>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-5 text-[13px]">
+                {FILTERS.map((f) => (
+                  <button key={f.id} onClick={() => { setFilter(f.id); setQuery(""); }} className={cn("relative pb-1 transition-colors", filter === f.id && !query ? "text-white" : "text-white/35 hover:text-white/70")}>
+                    {f.label}{filter === f.id && !query && <span className="absolute inset-x-0 -bottom-px h-px bg-white" />}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 text-micro">
+                  {SORTS.map((s) => (
+                    <button key={s.id} onClick={() => setSort(s.id)} className={cn("transition-colors", sort === s.id ? "text-white" : "text-white/30 hover:text-white/60")}>{s.label}</button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Search size={13} className="text-white/30" />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search library" className="h-8 w-40 border-b border-white/10 bg-transparent text-sm text-white/85 placeholder:text-white/25 focus:border-white/50 focus:outline-none" />
+                </div>
+              </div>
+            </div>
+            <p className="label mb-4">{query ? `Results · ${filtered.length}` : `${FILTERS.find((f) => f.id === filter)?.label} · ${filtered.length}`}</p>
+            {filtered.length === 0 ? (
+              <p className="py-10 text-sm text-white/35">Nothing matches.</p>
+            ) : (
+              <div className={cn("grid gap-4", large ? "grid-cols-[repeat(auto-fill,minmax(150px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(172px,1fr))]" : "grid-cols-[repeat(auto-fill,minmax(172px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(196px,1fr))]")}>
+                {visible.map((g) => (
+                  <ContextMenu key={g.id} items={gameContextItems(g, { select: selectGame })}>
+                    <GameCard game={g} completion={g.achievements.total ? completionPercent(g.achievements) : undefined} onClick={() => selectGame(g.id)} />
+                  </ContextMenu>
+                ))}
+              </div>
+            )}
+            <div ref={sentinel} className="h-px" />
+            {visible.length < filtered.length && <p className="mt-6 text-micro text-white/30">{visible.length} of {filtered.length} · scroll for more</p>}
+          </section>
+
+          {totals.total > 0 && !large && (
             <section>
               <p className="label mb-6">Completion</p>
               <div className="grid grid-cols-1 gap-x-16 gap-y-10 lg:grid-cols-3">
-                <CompletionColumn title="Completed" games={games.filter((g) => bucketFor(g) === "completed")} onSelect={(g) => selectGame(g.id)} />
-                <CompletionColumn title="Near completion" games={games.filter((g) => bucketFor(g) === "near")} onSelect={(g) => selectGame(g.id)} />
-                <CompletionColumn title="In progress" games={games.filter((g) => ["in-progress", "not-started"].includes(bucketFor(g)))} onSelect={(g) => selectGame(g.id)} />
+                <CompletionColumn title="Completed" games={all.filter((g) => bucketFor(g) === "completed")} onSelect={(g) => selectGame(g.id)} />
+                <CompletionColumn title="Near completion" games={all.filter((g) => bucketFor(g) === "near")} onSelect={(g) => selectGame(g.id)} />
+                <CompletionColumn title="In progress" games={all.filter((g) => ["in-progress", "not-started"].includes(bucketFor(g)))} onSelect={(g) => selectGame(g.id)} />
               </div>
             </section>
           )}
@@ -163,7 +269,7 @@ function CompletionColumn({ title, games, onSelect }: { title: string; games: Ga
         <p className="text-xs text-white/25">—</p>
       ) : (
         <ul className="divide-y divide-white/[0.05]">
-          {games.map((g) => {
+          {games.slice(0, 8).map((g) => {
             const pct = completionPercent(g.achievements);
             return (
               <li key={g.id}>
@@ -189,7 +295,7 @@ function CompletionColumn({ title, games, onSelect }: { title: string; games: Ga
 function LibrarySkeleton() {
   return (
     <div className="mx-auto max-w-[1880px]">
-      <div className="h-[min(62vh,640px)] min-h-[440px] animate-pulse bg-gradient-to-t from-white/[0.02] to-transparent" />
+      <div className="h-[min(58vh,600px)] min-h-[420px] animate-pulse bg-gradient-to-t from-white/[0.02] to-transparent" />
       <div className="mt-8 flex gap-4 px-12">{Array.from({ length: 7 }).map((_, i) => <div key={i} className="aspect-[3/4] w-[172px] animate-pulse rounded-md bg-white/[0.02]" />)}</div>
     </div>
   );

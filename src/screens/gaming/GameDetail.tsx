@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Play, Target, type LucideIcon, KeyRound, WifiOff, ShieldOff, Info } from "lucide-react";
 import { AchievementRow } from "./AchievementRow";
 import { HeroArt } from "./HeroArt";
 import { Button } from "@/components/ui";
-import { useAsync } from "@/hooks/useAsync";
-import { getProviders } from "@/providers";
+import { useLibraryStore } from "@/state/libraryStore";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useGamePrefsStore } from "@/state/gamePrefsStore";
 import { notify } from "@/state/toastStore";
@@ -46,7 +45,21 @@ export function GameDetail({ gameId }: { gameId: string }) {
   const selectGame = useNavigationStore((s) => s.selectGame);
   const navigate = useNavigationStore((s) => s.navigate);
   const setSection = useNavigationStore((s) => s.setSettingsSection);
-  const { data: game, loading, error } = useAsync<GameDetails | null>(() => getProviders().steam.getGameDetails(gameId), [gameId]);
+  const cached = useLibraryStore((s) => s.details[gameId]?.value ?? null);
+  const listed = useLibraryStore((s) => s.games.find((g) => g.id === gameId) ?? null);
+  const offline = useLibraryStore((s) => s.offline);
+  const inflight = useLibraryStore((s) => s.inflight.includes(gameId));
+  const [attempted, setAttempted] = useState(false);
+  useEffect(() => {
+    setAttempted(false);
+    void useLibraryStore.getState().load().then(() => useLibraryStore.getState().ensureDetails([gameId], { maxAge: 5 * 60_000 })).finally(() => setAttempted(true));
+  }, [gameId]);
+  const game = useMemo<GameDetails | null>(
+    () => cached ?? (listed ? { ...listed, achievements: { gameId, unlocked: 0, total: 0, achievements: [], status: "not-configured" }, summary: "", developer: "", publisher: "" } : null),
+    [cached, listed, gameId],
+  );
+  const loading = !game && (inflight || !attempted);
+  const error = offline && !game;
   const [tab, setTab] = useState<Tab>("all");
   const trackedFor = useGamePrefsStore((s) => s.trackedFor(gameId));
   const track = useGamePrefsStore((s) => s.track);
@@ -72,6 +85,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
   const list = tab === "all" ? all : tab === "unlocked" ? all.filter((a) => a.unlocked) : all.filter((a) => !a.unlocked);
   const remaining = ach.total - ach.unlocked;
   const statusMeta = status !== "ok" && status !== "demo" ? STATUS_META[status] : null;
+  const complete = hasData && pct === 100;
 
   const toggleTrack = (id: string, name: string) => {
     if (trackedFor?.achievementId === id) { untrack(id); notify.neutral("Stopped tracking", name); }
@@ -83,6 +97,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
       {/* Hero */}
       <div className="relative h-[min(64vh,680px)] min-h-[460px]">
         <HeroArt game={game} />
+        {complete && <CompletionAura />}
         <div className="relative mx-auto flex h-full max-w-[1560px] flex-col justify-between px-12 py-6 2xl:px-16">
           <Button variant="ghost" size="sm" className="-ml-3 w-fit text-white/50" onClick={() => selectGame(null)}><ArrowLeft size={14} /> Library</Button>
           <div className="max-w-4xl pb-6">
@@ -100,6 +115,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
               {hasData && <span><span className="text-white/90">{ach.unlocked} / {ach.total}</span> achievements</span>}
             </div>
             <div className="mt-8 flex items-center gap-3">
+              {complete && <span className="mr-2 flex items-center gap-2 text-micro tracking-cinematic text-ember"><span className="h-1 w-1 rounded-full bg-ember" /> Complete</span>}
               <Button variant="primary" size="lg" disabled={!game.installed} onClick={() => void actionRegistry.execute("launch-game", { args: { gameId } })}>
                 <Play size={16} fill="currentColor" /> {game.installed ? "Play" : "Not installed"}
               </Button>
@@ -188,5 +204,19 @@ export function GameDetail({ gameId }: { gameId: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** 100% completion: a single slow breath of warm light behind the hero. Premium, not confetti. */
+function CompletionAura() {
+  return (
+    <motion.div
+      aria-hidden
+      className="pointer-events-none absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 0.55, 0.35] }}
+      transition={{ duration: 3.2, ease: [0.22, 1, 0.36, 1], times: [0, 0.55, 1] }}
+      style={{ background: "radial-gradient(60% 50% at 30% 75%, rgba(217,160,102,0.22) 0%, transparent 70%)" }}
+    />
   );
 }
