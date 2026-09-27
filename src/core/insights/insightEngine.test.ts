@@ -48,3 +48,21 @@ describe("insight engine", () => {
     expect(out.map((i) => i.id)).toContain("nominal");
   });
 });
+
+describe("contextual suggestions (Phase 5)", () => {
+  const base = { telemetry: null, games: [], inbox: null, cleanup: [], approvedAppCount: 0, mode: "normal" as const, steamConnected: true, mediaConnected: true };
+  it("points at achievement sync when Steam is detected without an API key", () => {
+    const out = generateInsights({ ...base, steamDetectedNoApi: true });
+    expect(out.find((i) => i.id === "steam-api")?.action?.args).toEqual({ section: "integrations" });
+  });
+  it("reports disconnected media sources without naming them", () => {
+    const out = generateInsights({ ...base, mediaDisconnectedRoots: 2 });
+    const text = out.find((i) => i.id === "media-disconnected")!.text;
+    expect(text).toMatch(/2 media sources are currently disconnected/);
+    expect(text).not.toContain(":" + String.fromCharCode(92));
+  });
+  it("suggests near-complete games only when nothing is tracked", () => {
+    expect(generateInsights({ ...base, nearCompletion: 3 }).some((i) => i.id === "near-completion")).toBe(true);
+    expect(generateInsights({ ...base, nearCompletion: 3, tracked: { gameId: "g", gameTitle: "G", name: "A" } }).some((i) => i.id === "near-completion")).toBe(false);
+  });
+});

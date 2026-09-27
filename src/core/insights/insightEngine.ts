@@ -23,6 +23,12 @@ export interface InsightInputs {
   readonly mediaConnected: boolean;
   readonly tracked?: { gameId: string; gameTitle: string; name: string } | null;
   readonly gameSession?: { title: string } | null;
+  /** Steam detected on this machine but the Web API (achievements) is not configured. */
+  readonly steamDetectedNoApi?: boolean;
+  /** Authorized media roots that are currently unreachable. */
+  readonly mediaDisconnectedRoots?: number;
+  /** Games at or above 90% completion (excluding 100%). */
+  readonly nearCompletion?: number;
 }
 
 const GB = 1024 ** 3;
@@ -112,6 +118,15 @@ export function generateInsights(i: InsightInputs): Insight[] {
 
   if (!i.steamConnected) {
     out.push({ id: "steam", text: "Steam is not connected. Gaming uses the demo library.", tone: "neutral", action: { label: "Integrations", actionId: "open-settings", args: { section: "integrations" } }, priority: 10 });
+  }
+  if (i.steamDetectedNoApi) {
+    out.push({ id: "steam-api", text: "Steam is detected but achievement sync isn't configured.", tone: "neutral", action: { label: "Configure", actionId: "open-settings", args: { section: "integrations" } }, priority: 25 });
+  }
+  if (i.mediaDisconnectedRoots) {
+    out.push({ id: "media-disconnected", text: `${i.mediaDisconnectedRoots === 1 ? "Your media source is" : `${i.mediaDisconnectedRoots} media sources are`} currently disconnected.`, tone: "attention", action: { label: "Media", actionId: "open-settings", args: { section: "media" } }, priority: 45 });
+  }
+  if (i.nearCompletion && i.nearCompletion > 0 && !i.tracked) {
+    out.push({ id: "near-completion", text: `You have ${i.nearCompletion} game${i.nearCompletion === 1 ? "" : "s"} above 90% completion.`, tone: "neutral", action: { label: "Gaming", actionId: "navigate", args: { screen: "gaming" } }, priority: 35 });
   }
 
   if (out.length === 0) {

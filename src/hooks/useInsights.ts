@@ -10,6 +10,7 @@ import { useLibraryStore } from "@/state/libraryStore";
 import { useCleanupStore } from "@/state/cleanupStore";
 import { useInsightPrefsStore } from "@/state/insightPrefsStore";
 import { getProviders } from "@/providers";
+import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
 import type { InboxSummary } from "@/core/types";
 
 /**
@@ -32,6 +33,8 @@ export function useInsights(): Insight[] {
   const dismissed = useInsightPrefsStore((s) => s.dismissed);
   const historyEnabled = useInsightPrefsStore((s) => s.enabled);
   const [inbox, setInbox] = useState<InboxSummary | null>(null);
+  const [steamStatus, setSteamStatus] = useState<{ detected: boolean; apiConfigured: boolean } | null>(null);
+  const mediaRoots = useMediaLibraryStore((s) => s.roots);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +44,9 @@ export function useInsights(): Insight[] {
 
   useEffect(() => {
     void useLibraryStore.getState().load();
+    let cancelled = false;
+    getProviders().steam.getStatus?.().then((s) => !cancelled && s && setSteamStatus({ detected: s.detected, apiConfigured: s.apiConfigured })).catch(() => undefined);
+    return () => { cancelled = true; };
   }, [steamConnected, achievementPulse]);
 
   const games = useMemo(
@@ -64,8 +70,11 @@ export function useInsights(): Insight[] {
       mediaConnected,
       tracked,
       gameSession: sessionTitle ? { title: sessionTitle } : null,
+      steamDetectedNoApi: !!steamStatus?.detected && !steamStatus.apiConfigured,
+      mediaDisconnectedRoots: mediaRoots.filter((r) => r.exists === false).length,
+      nearCompletion: games.filter((g) => g.achievements.total > 0 && g.achievements.unlocked < g.achievements.total && g.achievements.unlocked / g.achievements.total >= 0.9).length,
     });
     return all.filter((i) => !dismissed.includes(i.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, candidates, approvedAppCount, mode, steamConnected, libraryOffline, mediaConnected, tracked, sessionTitle, dismissed, historyEnabled]);
+  }, [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, candidates, approvedAppCount, mode, steamConnected, libraryOffline, mediaConnected, tracked, sessionTitle, dismissed, historyEnabled, steamStatus, mediaRoots]);
 }
