@@ -91,9 +91,9 @@ if (!quick) {
   await p2.goto("http://localhost:1420/", { waitUntil: "domcontentloaded" });
   await p2.waitForTimeout(1700); await shot("boot", p2);
   await p2.waitForTimeout(2500); await shot("onboarding", p2);
-  await p2.getByRole("button", { name: /Begin/ }).click(); await p2.waitForTimeout(1200);
-  await p2.getByRole("button", { name: /Continue/ }).click(); await p2.waitForTimeout(2600); await shot("onboarding-scan", p2);
-  await p2.getByRole("button", { name: /Skip for now/ }).click(); await p2.waitForTimeout(600); await shot("onboarding-personalize", p2);
+  await p2.getByRole("button", { name: /Begin/ }).click(); await p2.waitForTimeout(2600); await shot("onboarding-scan", p2);
+  await p2.getByRole("button", { name: /^Continue/ }).click(); await p2.waitForTimeout(600); await shot("onboarding-personalize", p2);
+  await p2.getByRole("button", { name: /^Continue/ }).click(); await p2.waitForTimeout(700); await shot("onboarding-ready", p2);
 }
 
 console.log(errors.length ? `\nERRORS:\n${errors.join("\n")}` : "\nno page errors");

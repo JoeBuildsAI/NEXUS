@@ -9,12 +9,18 @@ import { EnvironmentScanList } from "./EnvironmentScan";
 import { useEnvironmentScan } from "@/hooks/useEnvironmentScan";
 import { cn } from "@/lib/utils";
 
-const PILLARS = ["YOUR ENVIRONMENT", "YOUR GAMES", "YOUR SYSTEM", "YOUR RULES"];
+/** What NEXUS can and cannot do — short, no legal wall. */
+const PERMISSIONS: { area: string; can: string; cannot: string }[] = [
+  { area: "System", can: "Read hardware, process and telemetry information", cannot: "Never terminates or reconfigures anything unless you enable it" },
+  { area: "Gaming", can: "Launch discovered Steam games; manage only apps you approve", cannot: "Never force-kills; power plan changes are recorded and reversed" },
+  { area: "Media", can: "Read only folders you select, on this machine", cannot: "Never scans drives; filenames never leave Media" },
+  { area: "Storage", can: "Analyze fixed drives; clean known temporary locations after approval", cannot: "Never removable media, documents, games or applications" },
+];
 
 /**
- * First-run experience: welcome → pillars → environment discovery (local only,
- * never scans removable media) → configure shortcuts → personalize → INITIALIZE.
- * Replayable from Settings → General.
+ * First-run experience: WELCOME → ENVIRONMENT (local discovery, never scans
+ * removable media) → PERSONALIZE → READY (permission model + optional setup).
+ * Four steps, replayable from Settings → General.
  */
 export function Onboarding() {
   const profile = useSettingsStore((s) => s.profile);
@@ -27,7 +33,7 @@ export function Onboarding() {
   const setSection = useNavigationStore((s) => s.setSettingsSection);
   const [step, setStep] = useState(0);
   const [name, setName] = useState(profile.name || "");
-  const scan = useEnvironmentScan(step === 2);
+  const scan = useEnvironmentScan(step === 1);
 
   if (profile.onboardingComplete) return null;
 
@@ -52,31 +58,18 @@ export function Onboarding() {
 
           {step === 1 && (
             <motion.div key="s1" {...fade} className="text-center">
-              <div className="space-y-4">
-                {PILLARS.map((p, i) => (
-                  <motion.p key={p} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.18 }} className="font-display text-display-md font-semibold tracking-cinematic text-white/90">{p}</motion.p>
-                ))}
-              </div>
-              <Button variant="primary" size="lg" className="mt-12" onClick={() => setStep(2)}>Continue <ArrowRight size={16} /></Button>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div key="s2" {...fade} className="text-center">
               <p className="text-micro tracking-cinematic text-white/35">{scan.done ? "Environment" : "Scanning environment"}</p>
               <h2 className="mt-3 font-display text-display-md font-semibold tracking-wide text-white">{scan.done ? "Here's what NEXUS found" : "Discovering your machine"}</h2>
               <p className="mx-auto mt-3 max-w-md text-[13px] text-white/40">Local detection only. Removable drives are never scanned — media is authorized by you, folder by folder.</p>
               <div className="mt-8"><EnvironmentScanList lines={scan.lines} /></div>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: scan.done ? 1 : 0 }} className="mt-10 flex flex-wrap items-center justify-center gap-2">
-                <Button variant="outline" onClick={() => goConfigure("integrations")}><Gamepad2 size={15} /> Configure gaming</Button>
-                <Button variant="outline" onClick={() => goConfigure("media")}><FolderPlus size={15} /> Configure media</Button>
-                <Button variant="primary" onClick={() => setStep(3)}>Skip for now <ArrowRight size={15} /></Button>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: scan.done ? 1 : 0 }} className="mt-10 flex justify-center">
+                <Button variant="primary" size="lg" onClick={() => setStep(2)}>Continue <ArrowRight size={15} /></Button>
               </motion.div>
             </motion.div>
           )}
 
-          {step === 3 && (
-            <motion.div key="s3" {...fade}>
+          {step === 2 && (
+            <motion.div key="s2" {...fade}>
               <p className="text-micro tracking-cinematic text-white/35">Personalize</p>
               <h2 className="mt-3 font-display text-display-md font-semibold tracking-wide text-white">Make it yours</h2>
 
@@ -108,8 +101,34 @@ export function Onboarding() {
               </div>
 
               <div className="mt-10 flex items-center justify-between">
-                <button onClick={() => setStep(2)} className="text-[13px] text-white/35 hover:text-white/70">Back</button>
-                <Button variant="primary" size="lg" onClick={() => finish()}>Initialize NEXUS <ArrowRight size={16} /></Button>
+                <button onClick={() => setStep(1)} className="text-[13px] text-white/35 hover:text-white/70">Back</button>
+                <Button variant="primary" size="lg" onClick={() => setStep(3)}>Continue <ArrowRight size={16} /></Button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div key="s3" {...fade}>
+              <p className="text-micro tracking-cinematic text-white/35">Ready</p>
+              <h2 className="mt-3 font-display text-display-md font-semibold tracking-wide text-white">What NEXUS can do</h2>
+              <div className="mt-8 divide-y divide-white/[0.06]">
+                {PERMISSIONS.map((p, i) => (
+                  <motion.div key={p.area} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.08 }} className="grid grid-cols-[110px_1fr] gap-6 py-4">
+                    <span className="font-display text-[12px] font-semibold uppercase tracking-[0.22em] text-white/70">{p.area}</span>
+                    <span>
+                      <span className="block text-[14px] text-white/85">{p.can}</span>
+                      <span className="mt-1 block text-[12.5px] text-white/38">{p.cannot}</span>
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+              <p className="mt-6 text-[12.5px] text-white/35">Optional — achievements need a Steam Web API key; the private library needs a folder you choose. Both can wait.</p>
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => goConfigure("integrations")}><Gamepad2 size={14} /> Steam achievements</Button>
+                  <Button variant="ghost" size="sm" onClick={() => goConfigure("media")}><FolderPlus size={14} /> Authorize media</Button>
+                </div>
+                <Button variant="primary" size="lg" onClick={() => finish()}>Enter NEXUS <ArrowRight size={16} /></Button>
               </div>
             </motion.div>
           )}
