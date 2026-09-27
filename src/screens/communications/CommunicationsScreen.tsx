@@ -62,7 +62,7 @@ export function CommunicationsScreen() {
         <div className="flex items-end gap-10">
           <div>
             <p className="text-micro tracking-cinematic text-white/35">Communications</p>
-            <h1 className="mt-3 font-display text-display-lg font-semibold tabular text-white">{unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></h1>
+            <h1 className="mt-3 font-sans text-display-lg font-semibold tabular tracking-tight text-white">{unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></h1>
           </div>
           <Tabs tabs={TABS} value={filter} onChange={setFilter} className="pb-2" />
         </div>

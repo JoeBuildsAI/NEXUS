@@ -60,7 +60,7 @@ export function SubscriptionsPanel() {
 function Metric({ n, label, dim }: { n: number; label: string; dim?: boolean }) {
   return (
     <div>
-      <p className={cn("font-display text-display-lg font-semibold tabular", dim ? "text-white/40" : "text-white")}>{n}</p>
+      <p className={cn("font-sans text-display-lg font-semibold tabular tracking-tight", dim ? "text-white/40" : "text-white")}>{n}</p>
       <p className="label mt-2">{label}</p>
     </div>
   );

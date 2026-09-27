@@ -24,7 +24,7 @@ Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchai
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer;
 `cargo test --lib` runs the Rust unit tests (steam/media/storage/system fixtures).
 
-Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.1.0_x64-setup.exe`
+Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.2.0_x64-setup.exe`
 (NSIS, per-user, unsigned; ~3 min release compile).
 
 Adding a Tauri feature to `Cargo.toml` (e.g. `protocol-asset`) must be paired
@@ -42,6 +42,18 @@ If port 1420 is stuck between runs, kill the listening PID:
 - Demo/mock data lives in `src/core/demo/*` behind providers.
 - Design system primitives live in `src/components/ui`.
 - Do not add emojis to files. Do not add/remove comments unless relevant.
+
+## Design system (NEXUS BLACK)
+- Black is the interface: environment bottoms out at #000; hierarchy comes from
+  type scale, spacing, luminance and artwork — not bordered cards. Radii 3/6/10px.
+- Tokens live in `tailwind.config.js` (`void`, `surface`, `accent` = platinum,
+  `text-micro`, `text-display-*`) and `src/styles/global.css` (`.label`, `.rule`,
+  `.glass-strong`, scrollbars, focus ring). `cn()` in `src/lib/utils.ts` knows the
+  custom font sizes — add any new `text-*` size token there too.
+- Large numerals use Inter (`font-sans … tabular tracking-tight`); headings use
+  Space Grotesk; telemetry uses JetBrains Mono.
+- Visual audit: `node scripts/screenshots.mjs 1920x1080` (add `--quick` to skip
+  mode/onboarding/empty-state flows); `node scripts/unused.mjs` lists dead modules.
 
 ## Native/provider boundaries
 - Steam: discovery reads only registry-located Steam paths + manifests; launch

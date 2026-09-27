@@ -143,11 +143,11 @@ export function StorageAnalyzer() {
           <div className="flex flex-wrap items-end justify-between gap-8">
             <div className="flex gap-16">
               <div>
-                <p className="font-display text-display-xl font-semibold tabular text-white">{formatBytes(analysis.usedBytes, analysis.usedBytes >= 1024 ** 4 ? 2 : 0)}</p>
+                <p className="font-sans text-display-xl font-semibold tabular tracking-tight text-white">{formatBytes(analysis.usedBytes, analysis.usedBytes >= 1024 ** 4 ? 2 : 0)}</p>
                 <p className="label mt-2">Used</p>
               </div>
               <div>
-                <p className="font-display text-display-xl font-semibold tabular text-white/45">{formatBytes(analysis.freeBytes, 0)}</p>
+                <p className="font-sans text-display-xl font-semibold tabular tracking-tight text-white/45">{formatBytes(analysis.freeBytes, 0)}</p>
                 <p className="label mt-2">Available</p>
               </div>
             </div>
@@ -182,7 +182,7 @@ export function StorageAnalyzer() {
 
         {/* Cleanup */}
         <div>
-          <p className="font-display text-display-lg font-semibold tabular text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
+          <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
           <p className="mt-2 text-[13px] text-white/40">Discover → propose → approve → execute → report.</p>
 
           <div className="mt-8 divide-y divide-white/[0.05]">

@@ -91,7 +91,7 @@ export function ModePreviewDialog() {
     <AnimatePresence>
       {preview && (
         <motion.div className="fixed inset-0 z-[210] flex items-center justify-center p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={cancel} />
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-xl" onClick={cancel} />
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -110,7 +110,7 @@ export function ModePreviewDialog() {
                 <div key={s.id} className="flex items-baseline justify-between gap-6 py-3">
                   <div className="min-w-0">
                     <p className="text-[14px] text-white/85">{s.label}</p>
-                    <p className="mt-0.5 truncate text-xs text-white/40">{s.detail}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-white/40">{s.detail}</p>
                   </div>
                   <span className={cn("shrink-0 font-mono text-[11px] tracking-wide2", s.live ? "text-white/70" : "text-white/30")}>{s.live ? "WILL APPLY" : "RECORD ONLY"}</span>
                 </div>

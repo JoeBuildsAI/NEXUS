@@ -123,6 +123,25 @@ pub fn collect() -> HardwareInventory {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Exercises the real WMI/registry path on this machine: must not panic and
+    /// must report the CPU; GPU capability flags must stay honest (unsupported).
+    #[test]
+    fn collects_inventory_without_inventing_gpu_metrics() {
+        let inv = collect();
+        assert!(!inv.cpu_name.is_empty());
+        assert!(inv.logical_cores >= 1);
+        assert!(inv.total_memory_bytes > 0);
+        for g in &inv.gpus {
+            assert!(!g.utilization_supported && !g.temperature_supported && !g.memory_supported);
+            assert!(g.name.as_deref().map(|n| !n.is_empty()).unwrap_or(false));
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_hardware(cache: tauri::State<HardwareCache>, refresh: Option<bool>) -> Result<HardwareInventory, String> {
     let mut guard = cache.0.lock().map_err(|e| e.to_string())?;

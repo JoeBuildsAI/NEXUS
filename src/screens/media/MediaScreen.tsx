@@ -61,11 +61,11 @@ export function MediaScreen() {
         </div>
       </div>
 
-      <div className="mx-auto min-h-0 w-full max-w-[1880px] flex-1 overflow-y-auto px-12 pb-12 2xl:px-16">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1880px] flex-1 flex-col overflow-y-auto px-12 pb-10 2xl:px-16">
         {offline ? (
           <EmptyState eyebrow="Media" title="Source disconnected" body="The authorized location is not reachable. Reconnect the drive or authorize a different folder. Your index and workspace are preserved." action={<div className="flex gap-2"><Button variant="outline" size="sm" onClick={reload}>Retry</Button><Button variant="ghost" size="sm" onClick={() => { navigate("settings"); setSection("media"); }}>Media settings</Button></div>} />
         ) : tab === "workspace" ? (
-          <div className="h-full min-h-[520px]">
+          <div className="min-h-[520px] flex-1">
             {mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0 ? (
               <EmptyState eyebrow="Media" title="No media location" body="Choose a private folder to enable your local library. NEXUS indexes only that location, on this machine." action={<Button variant="primary" onClick={() => void authorize()}><FolderPlus size={15} /> Add folder</Button>} />
             ) : (

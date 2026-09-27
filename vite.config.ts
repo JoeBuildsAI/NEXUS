@@ -38,6 +38,16 @@ export default defineConfig(async () => ({
     target: "es2021",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rollupOptions: {
+      output: {
+        // Stable vendor chunks: app code changes don't invalidate the framework bundle.
+        manualChunks: {
+          react: ["react", "react-dom"],
+          motion: ["framer-motion"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
   },
   test: {
     globals: true,

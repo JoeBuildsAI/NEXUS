@@ -36,7 +36,7 @@ function Ring({ pct, size = 128 }: { pct: number; size?: number }) {
         <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="white" strokeWidth={1.5} strokeLinecap="round" strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c - (pct / 100) * c }} transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-[34px] font-semibold leading-none tabular text-white">{pct}<span className="text-base text-white/40">%</span></span>
+        <span className="font-sans text-[34px] font-semibold leading-none tabular tracking-tight text-white">{pct}<span className="text-base text-white/40">%</span></span>
       </div>
     </div>
   );
@@ -87,7 +87,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
           <Button variant="ghost" size="sm" className="-ml-3 w-fit text-white/50" onClick={() => selectGame(null)}><ArrowLeft size={14} /> Library</Button>
           <div className="max-w-4xl pb-6">
             <p className="text-micro tracking-cinematic text-white/40">
-              {[game.developer, game.publisher].filter(Boolean).join(" · ") || (game.genres.length ? game.genres.slice(0, 3).join(" · ") : "Steam")}
+              {[...new Set([game.developer, game.publisher].filter(Boolean))].join(" · ") || (game.genres.length ? game.genres.slice(0, 3).join(" · ") : "Steam")}
               {!game.installed && <span className="ml-3 text-status-attention/80">Not installed</span>}
             </p>
             <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }} className="mt-4 font-display text-display-xl font-semibold uppercase tracking-wide text-white">
@@ -131,7 +131,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
                 <div className="flex items-center gap-8">
                   <Ring pct={pct} />
                   <div>
-                    <p className="font-display text-display-sm font-semibold tabular text-white">{ach.unlocked} <span className="text-white/35">/ {ach.total}</span></p>
+                    <p className="font-sans text-display-sm font-semibold tabular tracking-tight text-white">{ach.unlocked} <span className="text-white/35">/ {ach.total}</span></p>
                     <p className="mt-1 text-[13px] text-white/40">{remaining === 0 ? "Fully completed" : `${remaining} remaining`}</p>
                   </div>
                 </div>

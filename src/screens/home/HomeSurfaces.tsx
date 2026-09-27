@@ -106,7 +106,7 @@ export function CommsSurface() {
         <div className="h-14 animate-pulse rounded bg-white/[0.02]" />
       ) : (
         <button onClick={() => navigate("communications")} className="block text-left">
-          <p className="font-display text-display-lg font-semibold tabular text-white">{data.unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></p>
+          <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{data.unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></p>
           <p className="mt-2 text-[13px] text-white/45">
             {data.important > 0 && <span className="text-white/75">{data.important} require attention</span>}
             {data.important > 0 && (data.newsletters > 0 || data.receipts > 0) && <span className="text-white/25"> · </span>}
@@ -132,7 +132,7 @@ export function StorageSurface() {
     <div>
       <SectionLabel action="Analyze" onAction={go}>Storage</SectionLabel>
       <button onClick={go} className="block w-full text-left">
-        <p className="font-display text-display-lg font-semibold tabular text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
+        <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
         <div className="mt-4 space-y-2.5">
           {drives.slice(0, 3).map((d) => {
             const used = d.totalBytes - d.freeBytes;

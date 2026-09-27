@@ -15,7 +15,7 @@ npm run tauri:build
 Artifact (NSIS, per-user install, no admin required):
 
 ```
-src-tauri\target\release\bundle\nsis\NEXUS_0.1.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\NEXUS_0.2.0_x64-setup.exe
 ```
 
 Run it. It installs to the current user's profile and creates a Start Menu

@@ -93,7 +93,7 @@ export function generateInsights(i: InsightInputs): Insight[] {
   if (i.mode !== "gaming" && i.approvedAppCount > 0) {
     out.push({
       id: "gaming-ready",
-      text: `Gaming Mode can suspend ${i.approvedAppCount} approved background application${i.approvedAppCount === 1 ? "" : "s"}.`,
+      text: `Gaming Mode will close ${i.approvedAppCount} approved background application${i.approvedAppCount === 1 ? "" : "s"}.`,
       tone: "neutral",
       action: { label: "Enter", actionId: "enter-mode", args: { mode: "gaming" } },
       priority: 30,
