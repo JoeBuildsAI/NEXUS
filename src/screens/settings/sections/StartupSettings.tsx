@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("startup");
 import { SettingsSection, SettingRow } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
@@ -24,7 +27,7 @@ export function StartupSettingsSection() {
           else await autostart.disable();
         }
       } catch (err) {
-        console.warn("[startup] autostart apply failed", err);
+        log.warn("autostart apply failed", { error: String(err) });
       } finally {
         setApplying(false);
       }

@@ -1,4 +1,7 @@
 import type { Game, GameAchievements, GameDetails, ProviderHealth, SteamStatus } from "@/core/types";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("steam");
 import { DEMO_GAMES } from "@/core/demo/games";
 import { ProviderOfflineError } from "@/core/errors";
 import { useDevStore } from "@/state/devStore";
@@ -57,7 +60,7 @@ export class MockSteamProvider implements SteamProvider {
     this.guard();
     const game = this.all().find((g) => g.id === gameId);
     if (!game) return false;
-    console.info(`[MockSteamProvider] Simulating launch of "${game.title}"`);
+    log.debug("Simulating launch", { title: game.title });
     return true;
   }
 

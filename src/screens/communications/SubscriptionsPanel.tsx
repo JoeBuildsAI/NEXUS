@@ -52,7 +52,7 @@ export function SubscriptionsPanel() {
           );
         })}
       </div>
-      <p className="mt-6 text-[11px] text-white/25">Mock provider — actions update local state. Real providers will issue list-unsubscribe requests.</p>
+      <p className="mt-6 text-[11px] text-white/25">Unsubscribe archives the sender's messages and files future ones under Subscriptions. NEXUS never sends email on your behalf.</p>
     </div>
   );
 }

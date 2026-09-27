@@ -1,4 +1,7 @@
 import type { AppEntry } from "@/core/types";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("apps");
 import type { AppProvider } from "./AppProvider";
 
 const DEMO_APPS: readonly AppEntry[] = [
@@ -23,7 +26,7 @@ export class MockAppProvider implements AppProvider {
   async launch(appId: string) {
     const app = DEMO_APPS.find((a) => a.id === appId);
     if (!app) return { ok: false, message: "Unknown application" };
-    console.info(`[MockAppProvider] Simulating launch of ${app.name}`);
+    log.debug("Simulating launch", { app: app.name });
     return { ok: true, name: app.name };
   }
 }

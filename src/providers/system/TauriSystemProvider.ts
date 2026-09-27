@@ -7,6 +7,9 @@ import type {
 import type { SystemProvider } from "./SystemProvider";
 import { classifyProcess } from "@/core/safety/processClassifier";
 import { MockSystemProvider } from "./MockSystemProvider";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("system");
 
 /**
  * Real Windows telemetry via Tauri/Rust commands. Falls back to the mock
@@ -27,7 +30,7 @@ export class TauriSystemProvider implements SystemProvider {
     try {
       return await this.invoke<TelemetrySnapshot>("get_telemetry");
     } catch (err) {
-      console.warn("[TauriSystemProvider] get_telemetry failed, using fallback", err);
+      log.warn("get_telemetry failed, using fallback", { error: String(err) });
       return this.fallback.getTelemetry();
     }
   }
@@ -36,7 +39,7 @@ export class TauriSystemProvider implements SystemProvider {
     try {
       return await this.invoke<DriveInfo[]>("get_drives");
     } catch (err) {
-      console.warn("[TauriSystemProvider] get_drives failed, using fallback", err);
+      log.warn("get_drives failed, using fallback", { error: String(err) });
       return this.fallback.getDrives();
     }
   }
@@ -52,7 +55,7 @@ export class TauriSystemProvider implements SystemProvider {
         managed: p.managed ?? false,
       }));
     } catch (err) {
-      console.warn("[TauriSystemProvider] get_processes failed, using fallback", err);
+      log.warn("get_processes failed, using fallback", { error: String(err) });
       return this.fallback.getProcesses();
     }
   }
@@ -61,7 +64,7 @@ export class TauriSystemProvider implements SystemProvider {
     try {
       return await this.invoke<StartupApp[]>("get_startup_apps");
     } catch (err) {
-      console.warn("[TauriSystemProvider] get_startup_apps failed, using fallback", err);
+      log.warn("get_startup_apps failed, using fallback", { error: String(err) });
       return this.fallback.getStartupApps();
     }
   }

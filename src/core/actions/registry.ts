@@ -1,4 +1,7 @@
 import type { ActionContext, ActionDefinition, ActionId, ActionResult } from "./types";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("actions");
 
 /**
  * Central registry of application actions.
@@ -14,7 +17,7 @@ export class ActionRegistry {
 
   register(def: ActionDefinition): void {
     if (this.actions.has(def.id)) {
-      console.warn(`[ActionRegistry] Overwriting action "${def.id}"`);
+      log.warn("Overwriting action", { id: def.id });
     }
     this.actions.set(def.id, def);
   }
@@ -57,7 +60,7 @@ export class ActionRegistry {
     try {
       return await def.handler(ctx);
     } catch (err) {
-      console.error(`[ActionRegistry] Action "${id}" threw`, err);
+      log.error("Action threw", { id, error: String(err) });
       return { ok: false, message: `Action failed: ${String(err)}` };
     }
   }

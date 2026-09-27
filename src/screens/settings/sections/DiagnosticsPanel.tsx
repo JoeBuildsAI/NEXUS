@@ -24,7 +24,7 @@ async function collect(): Promise<string> {
   providers.System = { state: config.isTauri ? "available" : "degraded", summary: config.isTauri ? "Live Windows telemetry" : "Demo telemetry", checkedAt: now };
   providers.Steam = (await p.steam.health?.().catch(() => null)) ?? { state: "not-configured", summary: "Demo library", checkedAt: now };
   providers.Media = (await p.media.health?.().catch(() => null)) ?? { state: "not-configured", summary: "Demo library", checkedAt: now };
-  providers.Email = { state: "not-configured", summary: "Mock inbox", checkedAt: now };
+  providers.Email = (await p.email.health?.().catch(() => null)) ?? { state: "not-configured", summary: "Demo inbox", checkedAt: now };
   providers.AI = { state: "available", summary: "Local command engine", checkedAt: now };
   let autostart: boolean | null = null;
   let hotkey: boolean | null = null;
