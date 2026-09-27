@@ -1,6 +1,7 @@
 import type { OperatingMode } from "@/core/types";
 import { actionRegistry } from "./registry";
 import type { ActionDefinition } from "./types";
+import { lifeActions } from "./lifeActions";
 import {
   useNavigationStore,
   type Screen,
@@ -349,8 +350,8 @@ export function setupActions(): void {
     },
   ];
 
-  actionRegistry.registerAll(defs);
-  log.info("Registered actions", { count: defs.length });
+  actionRegistry.registerAll([...defs, ...lifeActions()]);
+  log.info("Registered actions", { count: defs.length + lifeActions().length });
 }
 
 function openSystemTab(tab: SystemTab) {

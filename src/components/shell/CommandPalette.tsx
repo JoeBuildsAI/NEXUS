@@ -18,6 +18,7 @@ const GROUP_LABEL: Record<MatchGroup, string> = {
   media: "Media",
   settings: "Settings",
   mail: "Mail",
+  life: "Life",
 };
 
 const SUGGESTIONS: AssistantMatch[] = [

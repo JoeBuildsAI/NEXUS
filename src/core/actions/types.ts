@@ -24,7 +24,13 @@ export type ActionId =
   | "clear-workspace"
   | "open-diagnostics"
   | "open-mail"
-  | "refresh-mail";
+  | "refresh-mail"
+  | "open-today"
+  | "open-calendar"
+  | "open-life"
+  | "add-task"
+  | "start-workout"
+  | "life-query";
 
 export interface ActionContext {
   /** Free-form arguments parsed from the command (e.g. { screen: "gaming" }). */

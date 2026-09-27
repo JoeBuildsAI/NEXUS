@@ -27,6 +27,30 @@ const RULES: Rule[] = [
   R("navigate", "Open Gaming", ["gaming", "games", "open games", "go to gaming", "game hub", "library"], "navigate", { screen: "gaming" }),
   R("navigate", "Open Media", ["media", "videos", "workspace", "open media", "players"], "navigate", { screen: "media" }),
   R("navigate", "Open System", ["system", "system health", "telemetry", "performance", "health"], "navigate", { screen: "system" }),
+  R("open-today", "Today", ["today", "home", "my day", "what's my day", "whats my day", "what am i doing today", "agenda today"], "life"),
+  R("open-calendar", "Calendar", ["calendar", "open calendar", "schedule"], "life", { view: "day" }),
+  R("open-calendar", "Tomorrow", ["tomorrow", "tomorrow's calendar", "what's tomorrow"], "life", { view: "day", dayOffset: "1" }),
+  R("open-calendar", "This week", ["week", "this week", "weekly", "week view", "what's this week", "weekly planning"], "life", { view: "week" }),
+  R("open-calendar", "Month", ["month", "this month", "month view"], "life", { view: "month" }),
+  R("open-calendar", "Year", ["year", "year view"], "life", { view: "year" }),
+  R("open-calendar", "Agenda", ["agenda", "upcoming events", "what's coming up"], "life", { view: "agenda" }),
+  R("open-life", "Life", ["life", "open life", "life overview"], "life", { section: "overview" }),
+  R("open-life", "Routines", ["routines", "my routines", "morning routine", "evening routine", "skincare", "personal care", "hygiene"], "life", { section: "routines" }),
+  R("open-life", "Fitness", ["fitness", "gym", "workouts", "training", "push workout", "pull workout", "leg day", "workout history"], "life", { section: "fitness" }),
+  R("open-life", "Nutrition", ["nutrition", "macros", "calories", "food library", "nutrition targets"], "life", { section: "nutrition" }),
+  R("open-life", "Meals", ["meals", "meal plan", "meal planner", "what am i eating", "plan meals"], "life", { section: "meals" }),
+  R("open-life", "Groceries", ["groceries", "grocery list", "shopping list", "what do i need to buy", "pantry"], "life", { section: "groceries" }),
+  R("open-life", "Tasks", ["tasks", "todo", "to-do", "my tasks", "task inbox"], "life", { section: "tasks" }),
+  R("start-workout", "Start workout", ["start workout", "start training", "begin workout", "start today's workout"], "life"),
+  R("life-query", "Protein today", ["protein today", "how much protein", "protein"], "life", { metric: "protein" }),
+  R("life-query", "Calories today", ["calories today", "how many calories", "kcal today"], "life", { metric: "calories" }),
+  R("life-query", "What's for dinner", ["dinner", "what's for dinner", "whats for dinner", "what am i eating tonight", "tonight's dinner"], "life", { metric: "dinner" }),
+  R("life-query", "What's for lunch", ["lunch", "what's for lunch"], "life", { metric: "lunch" }),
+  R("life-query", "What's for breakfast", ["breakfast", "what's for breakfast"], "life", { metric: "breakfast" }),
+  R("life-query", "Groceries still needed", ["what groceries do i still need", "groceries left", "still need to buy"], "life", { metric: "groceries" }),
+  R("life-query", "Unfinished routines", ["unfinished routines", "routine items", "what routines are left", "routines left"], "life", { metric: "routines" }),
+  R("life-query", "Today's workout", ["what's my workout", "whats my workout", "today's workout", "workout today"], "life", { metric: "workout" }),
+  R("life-query", "Tomorrow at a glance", ["what's on tomorrow", "tomorrow's plan", "calendar tomorrow"], "life", { metric: "tomorrow" }),
   R("navigate", "Open Communications", ["communications", "comms", "email", "inbox", "mail", "messages"], "navigate", { screen: "communications" }),
   R("open-settings", "Open Settings", ["settings", "preferences", "options", "config"], "navigate", { section: "general" }),
   // Settings sections
@@ -90,7 +114,7 @@ const RULES: Rule[] = [
   R("open-mail", "Inbox Health", ["inbox health", "email health", "mail health", "analyze inbox", "how much mail"], "mail", { surface: "health" }),
   R("open-mail", "Cleanup inbox", ["cleanup inbox", "clean inbox", "clean up email", "delete newsletters", "archive old mail", "bulk delete"], "mail", { surface: "inbox", view: "cleanup" }, "Review first"),
   R("open-mail", "Email rules", ["email rules", "mail rules", "routing rules", "filters", "gmail filters", "outlook rules"], "mail", { surface: "rules" }),
-  R("open-mail", "Today in mail", ["today's mail", "what mattered today", "daily summary", "mail summary", "today"], "mail", { surface: "summary" }),
+  R("open-mail", "Today in mail", ["today's mail", "what mattered today", "daily summary", "mail summary"], "mail", { surface: "summary" }),
   R("refresh-mail", "Refresh Gmail", ["refresh gmail", "sync gmail", "check gmail"], "mail", { provider: "gmail" }),
   R("refresh-mail", "Refresh Outlook", ["refresh outlook", "sync outlook", "check outlook"], "mail", { provider: "outlook" }),
   R("refresh-mail", "Refresh mail", ["refresh mail", "sync mail", "check mail", "refresh email", "check email"], "mail"),
@@ -165,6 +189,12 @@ export class LocalCommandProvider implements AssistantProvider {
         hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : a.source === "app-paths" ? "Registered" : "Installed",
       });
     }
+
+    // "add task X" / "remind me to X" → create a task through the quick-add grammar.
+    const task = /^(?:add task|new task|task|todo|remind me to)\s+(.{2,120})$/.exec(q);
+    if (task) matches.push({ actionId: "add-task", args: { text: task[1]!.trim() }, confidence: 0.97, label: `Add task “${task[1]!.trim()}”`, group: "life", hint: "Today · tomorrow · 3pm · !high · #tag" });
+    const workout = /^(?:start|begin)\s+(.{2,40}?)\s+workout$/.exec(q);
+    if (workout) matches.push({ actionId: "start-workout", args: { name: workout[1]!.trim() }, confidence: 0.96, label: `Start ${workout[1]!.trim()} workout`, group: "life" });
 
     // "messages from X" / "mail from X" / "emails from X" → inbox filtered by sender or search.
     const from = /^(?:messages?|mail|emails?)\s+from\s+(.{2,60})$/.exec(q);

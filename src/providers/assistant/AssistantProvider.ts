@@ -1,6 +1,6 @@
 import type { ActionId } from "@/core/actions/types";
 
-export type MatchGroup = "navigate" | "app" | "game" | "mode" | "system" | "media" | "settings" | "mail";
+export type MatchGroup = "navigate" | "app" | "game" | "mode" | "system" | "media" | "settings" | "mail" | "life";
 
 export interface AssistantMatch {
   readonly actionId: ActionId;

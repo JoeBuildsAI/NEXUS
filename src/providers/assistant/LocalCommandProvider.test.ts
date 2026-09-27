@@ -151,3 +151,26 @@ describe("Communications commands", () => {
     expect(byAddress?.args).toMatchObject({ sender: "alex.chen@gmail.example" });
   });
 });
+
+describe("LIFE commands", () => {
+  it("maps day/calendar/life intents deterministically", async () => {
+    expect((await topMatch("today"))?.actionId).toBe("open-today");
+    expect((await topMatch("tomorrow"))?.args).toMatchObject({ view: "day", dayOffset: "1" });
+    expect((await topMatch("week"))?.args).toMatchObject({ view: "week" });
+    expect((await topMatch("morning routine"))?.args).toMatchObject({ section: "routines" });
+    expect((await topMatch("skincare"))?.args).toMatchObject({ section: "routines" });
+    expect((await topMatch("groceries"))?.args).toMatchObject({ section: "groceries" });
+    expect((await topMatch("start workout"))?.actionId).toBe("start-workout");
+    expect((await topMatch("protein today"))?.args).toMatchObject({ metric: "protein" });
+    expect((await topMatch("what's for dinner"))?.args).toMatchObject({ metric: "dinner" });
+  });
+  it("parses free-form task and workout commands", async () => {
+    const t = await topMatch("add task call dentist tomorrow 3pm !high");
+    expect(t?.actionId).toBe("add-task");
+    expect(t?.args).toMatchObject({ text: "call dentist tomorrow 3pm !high" });
+    expect((await topMatch("remind me to water the plants"))?.args).toMatchObject({ text: "water the plants" });
+    const w = await topMatch("start push workout");
+    expect(w?.actionId).toBe("start-workout");
+    expect(w?.args).toMatchObject({ name: "push" });
+  });
+});
