@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Mail } from "lucide-react";
+import { Mail, Plus } from "lucide-react";
 import { Button } from "@/components/ui";
 import { getProviders } from "@/providers";
 import { native } from "@/providers/system/nativeBridge";
 import type { EmailAutoProvider } from "@/providers/email/EmailAutoProvider";
 import type { RealMailProvider } from "@/providers/email/RealMailProvider";
 import type { EmailConnectionState } from "@/core/types";
+import { useEmailAccountsStore, type MailAccountSlot } from "@/state/emailAccountsStore";
 import { notify } from "@/state/toastStore";
+import { requestConfirm } from "@/state/confirmStore";
 import { config } from "@/core/config";
+import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { activity } from "@/state/activityStore";
 
@@ -21,12 +24,15 @@ const STATE_LABEL: Record<EmailConnectionState, string> = {
 };
 
 /**
- * Outlook / Gmail account panels. NEXUS ships no client credentials: the user
- * registers an app once (Azure / Google Cloud) and pastes the client id here.
- * Everything after that — browser sign-in, PKCE, tokens — runs natively.
+ * Mail accounts. NEXUS ships no client credentials: the user registers an app
+ * once per provider (Entra / Google Cloud) and pastes the client id here. Each
+ * provider can hold several accounts (slots); tokens are stored per slot in
+ * Windows Credential Manager and used only inside the native layer.
  */
 export function MailAccountsPanel({ onChanged }: { onChanged: () => void }) {
   const email = getProviders().email as Partial<EmailAutoProvider>;
+  const slots = useEmailAccountsStore((s) => s.accounts);
+  const add = useEmailAccountsStore((s) => s.add);
   const real = email.real ?? [];
   if (!config.isTauri || real.length === 0) {
     return (
@@ -36,29 +42,50 @@ export function MailAccountsPanel({ onChanged }: { onChanged: () => void }) {
       </div>
     );
   }
+  const byProvider = (p: "outlook" | "gmail") => slots.filter((s) => s.provider === p).sort((a, b) => a.slot - b.slot);
   return (
     <div className="py-5">
       <p className="flex items-center gap-2 text-[15px] text-white/85"><Mail size={15} className="text-white/40" /> Email</p>
       <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-white/40">
-        Connect with your own application registration — NEXUS never ships shared credentials. Tokens are stored in Windows Credential Manager and used only inside the native layer; message bodies are never written to disk.
+        Connect with your own application registration — NEXUS never ships shared credentials. Tokens are stored per account in Windows Credential Manager and used only inside the native layer; message bodies are never written to disk. One registration per provider serves every account of that provider.
       </p>
-      <div className="mt-6 space-y-8">
-        {real.map((p) => <AccountRow key={p.providerId} provider={p} onChanged={onChanged} />)}
+      <div className="mt-6 space-y-10">
+        {(["outlook", "gmail"] as const).map((p) => (
+          <div key={p}>
+            <div className="flex items-baseline justify-between">
+              <p className="text-micro text-white/40">{p === "gmail" ? "Gmail" : "Outlook · Microsoft 365"}</p>
+              <button onClick={() => { const a = add(p); if (!a) notify.warn("Account limit", "Up to nine accounts per provider."); else onChanged(); }} className="flex items-center gap-1 text-[12.5px] text-white/45 transition-colors hover:text-white"><Plus size={12} /> Add account</button>
+            </div>
+            <div className="mt-3 space-y-7">
+              {byProvider(p).map((slot) => {
+                const provider = real.find((r) => r.accountId === slot.id);
+                return provider ? <AccountRow key={slot.id} slot={slot} provider={provider} onChanged={onChanged} /> : null;
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onChanged: () => void }) {
+function AccountRow({ slot, provider, onChanged }: { slot: MailAccountSlot; provider: RealMailProvider; onChanged: () => void }) {
   const [state, setState] = useState<EmailConnectionState>(provider.connectionState());
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [editingLabel, setEditingLabel] = useState(false);
+  const { setLabel, remove, setAddress } = useEmailAccountsStore();
   const isGmail = provider.providerId === "gmail";
-  const label = isGmail ? "Gmail" : "Outlook";
+  const providerLabel = isGmail ? "Gmail" : "Outlook";
+  const rt = provider.runtime();
 
-  const refresh = async () => setState(await provider.refreshStatus());
+  const refresh = async () => {
+    setState(await provider.refreshStatus());
+    const acct = provider.runtime().account;
+    if (acct && acct.address !== slot.address) setAddress(slot.id, acct.address);
+  };
   useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveClient = async () => {
@@ -75,7 +102,7 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
       setClientId("");
       setClientSecret("");
       setShowConfig(false);
-      notify.success(`${label} configured`, "Client registration stored securely.");
+      notify.success(`${providerLabel} configured`, "Client registration stored securely.");
       await refresh();
       onChanged();
     } catch (e) {
@@ -92,10 +119,9 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
     setBusy(false);
     await refresh();
     if (r.ok) {
-      notify.success(`${label} connected`, "Syncing your inbox.");
-      activity.record("integration-connected", `${label} connected`);
-    }
-    else notify.warn(`${label} not connected`, r.error);
+      notify.success(`${slot.label} connected`, "Syncing your inbox.");
+      activity.record("integration-connected", `${providerLabel} account connected`);
+    } else notify.warn(`${slot.label} not connected`, r.error);
     onChanged();
   };
 
@@ -103,10 +129,21 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
     setBusy(true);
     await provider.disconnect();
     setBusy(false);
+    setAddress(slot.id, null);
     await refresh();
-    notify.neutral(`${label} disconnected`, "Tokens removed from Credential Manager.");
-    activity.record("integration-disconnected", `${label} disconnected`);
+    notify.neutral(`${slot.label} disconnected`, "Tokens removed from Credential Manager.");
+    activity.record("integration-disconnected", `${providerLabel} account disconnected`);
     onChanged();
+  };
+
+  const removeSlot = () => {
+    requestConfirm({
+      title: `Remove ${slot.label}?`,
+      message: "Disconnects the account (tokens deleted) and removes this slot. Messages stay in your mailbox.",
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: async () => { if (state !== "not-configured" && state !== "ready-to-connect") await provider.disconnect(); remove(slot.id); onChanged(); },
+    });
   };
 
   const clearClient = async () => {
@@ -118,25 +155,32 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-6">
-        <div className="flex items-baseline gap-4">
-          <p className="font-display text-[17px] tracking-wide text-white/90">{label}</p>
+      <div className="flex flex-wrap items-baseline justify-between gap-6">
+        <div className="flex min-w-0 items-baseline gap-4">
+          {editingLabel ? (
+            <input autoFocus defaultValue={slot.label} onBlur={(e) => { setLabel(slot.id, e.target.value); setEditingLabel(false); }} onKeyDown={(e) => { if (e.key === "Enter") { setLabel(slot.id, (e.target as HTMLInputElement).value); setEditingLabel(false); } }} className="h-7 w-40 border-b border-white/20 bg-transparent font-display text-[17px] tracking-wide text-white focus:outline-none" />
+          ) : (
+            <button onClick={() => setEditingLabel(true)} title="Rename" className="font-display text-[17px] tracking-wide text-white/90 hover:text-white">{slot.label}</button>
+          )}
+          {slot.address && <span className="truncate text-[12.5px] text-white/35" data-selectable="true">{slot.address}</span>}
           <span className={cn("text-micro", state === "connected" ? "text-status-nominal/80" : state === "auth-error" ? "text-status-attention" : state === "offline" ? "text-status-warning/80" : "text-white/40")}>{STATE_LABEL[state]}</span>
         </div>
         <div className="flex items-center gap-2">
           {state === "not-configured" && <Button size="sm" variant="outline" onClick={() => setShowConfig((v) => !v)}>Configure</Button>}
           {(state === "ready-to-connect" || state === "auth-error") && <Button size="sm" variant="primary" disabled={busy} onClick={() => void connect()}>Connect</Button>}
+          {(state === "connected" || state === "offline" || state === "auth-error") && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void provider.syncNow(true).then(() => { void refresh(); onChanged(); })}>Refresh</Button>}
           {(state === "connected" || state === "offline" || state === "auth-error") && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void disconnect()}>Disconnect</Button>}
-          {state !== "not-configured" && state !== "connecting" && <Button size="sm" variant="ghost" onClick={() => setShowConfig((v) => !v)}>Registration</Button>}
+          {state !== "not-configured" && state !== "connecting" && slot.slot === 1 && <Button size="sm" variant="ghost" onClick={() => setShowConfig((v) => !v)}>Registration</Button>}
+          {slot.slot !== 1 && <Button size="sm" variant="ghost" onClick={removeSlot}>Remove</Button>}
         </div>
       </div>
       <p className="mt-1 text-[12.5px] text-white/35">
         {state === "not-configured" && (isGmail ? "Create an OAuth client (Desktop app) in Google Cloud and paste its client id and secret." : "Register an app in Microsoft Entra (public client, redirect http://127.0.0.1) and paste its Application (client) id.")}
         {state === "ready-to-connect" && "Sign in through your browser. NEXUS receives a token on a local loopback address only."}
         {state === "connecting" && "Complete sign-in in the browser window. This times out after three minutes."}
-        {state === "connected" && "Inbox syncs on demand, at most every 90 seconds, up to 400 recent messages."}
+        {state === "connected" && `Syncs on demand, at most every 90 seconds · ${rt.loaded.toLocaleString()} loaded${rt.hasMore ? ", more on request" : ""}${rt.sync.lastSyncAt ? ` · last sync ${formatRelativeTime(rt.sync.lastSyncAt)}` : rt.lastAttemptAt ? ` · last attempt ${formatRelativeTime(rt.lastAttemptAt)}` : ""}${rt.sync.rateLimitedUntil && rt.sync.rateLimitedUntil > Date.now() ? ` · rate limited for ${Math.ceil((rt.sync.rateLimitedUntil - Date.now()) / 1000)}s` : ""}${rt.account?.totals?.unread != null ? ` · ${rt.account.totals.unread.toLocaleString()} unread in the mailbox` : ""}`}
         {state === "auth-error" && "The stored token was rejected. Reconnect to sign in again."}
-        {state === "offline" && "Mail service unreachable. Cached messages remain available."}
+        {state === "offline" && "Mail service unreachable. Loaded messages remain available."}
       </p>
       {showConfig && (
         <div className="mt-4 grid gap-4">
@@ -147,7 +191,7 @@ function AccountRow({ provider, onChanged }: { provider: RealMailProvider; onCha
           <div className="flex items-center gap-3">
             <Button size="sm" variant="primary" disabled={busy || !clientId.trim() || (isGmail && !clientSecret.trim() && state === "not-configured")} onClick={() => void saveClient()}>Save securely</Button>
             {state !== "not-configured" && <Button size="sm" variant="ghost" onClick={() => void clearClient()}>Remove registration</Button>}
-            <span className="text-[12px] text-white/30">Scopes: {isGmail ? "gmail.modify" : "Mail.ReadWrite, User.Read"} — read, mark, archive, delete. Never send.</span>
+            <span className="text-[12px] text-white/30">Scopes: {isGmail ? "gmail.modify + gmail.settings.basic" : "Mail.ReadWrite, MailboxSettings.ReadWrite, User.Read"} — read, mark, archive, delete, rules. Never send.</span>
           </div>
         </div>
       )}

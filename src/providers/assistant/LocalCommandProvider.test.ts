@@ -129,3 +129,25 @@ describe("LocalCommandProvider", () => {
     expect(performance.now() - t0).toBeLessThan(500);
   });
 });
+
+describe("Communications commands", () => {
+  it("routes mail intents to views and surfaces, destructive ones to review workflows", async () => {
+    expect((await topMatch("unread mail"))?.args).toMatchObject({ surface: "inbox", view: "all" });
+    expect((await topMatch("today's receipts"))?.args).toMatchObject({ view: "receipts" });
+    expect((await topMatch("inbox health"))?.args).toMatchObject({ surface: "health" });
+    expect((await topMatch("subscriptions"))?.args).toMatchObject({ surface: "subscriptions" });
+    const cleanup = await topMatch("cleanup inbox");
+    expect(cleanup?.actionId).toBe("open-mail"); // navigates to the review view — never executes
+    expect(cleanup?.args).toMatchObject({ view: "cleanup" });
+    expect((await topMatch("email rules"))?.args).toMatchObject({ surface: "rules" });
+    expect((await topMatch("refresh gmail"))?.actionId).toBe("refresh-mail");
+    expect((await topMatch("refresh gmail"))?.args).toMatchObject({ provider: "gmail" });
+  });
+  it("'messages from X' filters by sender address or searches by name", async () => {
+    const byName = await topMatch("messages from John");
+    expect(byName?.actionId).toBe("open-mail");
+    expect(byName?.args).toMatchObject({ query: "john" });
+    const byAddress = await topMatch("mail from alex.chen@gmail.example");
+    expect(byAddress?.args).toMatchObject({ sender: "alex.chen@gmail.example" });
+  });
+});

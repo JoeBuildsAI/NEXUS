@@ -48,8 +48,8 @@ impl Provider {
     }
     fn scopes(&self) -> &'static str {
         match self {
-            Self::Outlook => "offline_access User.Read Mail.ReadWrite",
-            Self::Gmail => "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email",
+            Self::Outlook => "offline_access User.Read Mail.ReadWrite MailboxSettings.ReadWrite",
+            Self::Gmail => "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/userinfo.email",
         }
     }
     fn api_base(&self) -> &'static str {

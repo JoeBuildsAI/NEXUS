@@ -17,6 +17,7 @@ const GROUP_LABEL: Record<MatchGroup, string> = {
   system: "System",
   media: "Media",
   settings: "Settings",
+  mail: "Mail",
 };
 
 const SUGGESTIONS: AssistantMatch[] = [

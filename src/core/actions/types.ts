@@ -22,7 +22,9 @@ export type ActionId =
   | "show-hardware"
   | "show-startup"
   | "clear-workspace"
-  | "open-diagnostics";
+  | "open-diagnostics"
+  | "open-mail"
+  | "refresh-mail";
 
 export interface ActionContext {
   /** Free-form arguments parsed from the command (e.g. { screen: "gaming" }). */

@@ -217,6 +217,34 @@ export function setupActions(): void {
       },
     },
     {
+      id: "open-mail",
+      title: "Open Mail",
+      description: "Open a Communications view, surface or sender.",
+      requiresConfirmation: false,
+      keywords: ["mail", "inbox", "email"],
+      handler: (ctx) => {
+        const a = ctx.args as { surface?: string; view?: string; sender?: string; query?: string; accountId?: string };
+        useNavigationStore.getState().openCommunications({ surface: (a.surface as "inbox" | "health" | "subscriptions" | "rules" | "summary") ?? "inbox", view: a.view, sender: a.sender, query: a.query, accountId: a.accountId });
+        return { ok: true };
+      },
+    },
+    {
+      id: "refresh-mail",
+      title: "Refresh Mail",
+      description: "Sync every connected account now.",
+      requiresConfirmation: false,
+      keywords: ["refresh", "sync", "mail"],
+      handler: async (ctx) => {
+        const a = ctx.args as { provider?: "gmail" | "outlook" };
+        const email = getProviders().email as { real?: { providerId: string; syncNow: (force?: boolean) => Promise<void> }[] };
+        const targets = (email.real ?? []).filter((p) => !a.provider || p.providerId === a.provider);
+        await Promise.all(targets.map((p) => p.syncNow(true).catch(() => undefined)));
+        useNavigationStore.getState().openCommunications({ surface: "inbox" });
+        notify.neutral(a.provider ? `${a.provider === "gmail" ? "Gmail" : "Outlook"} refreshed` : "Mail refreshed");
+        return { ok: true };
+      },
+    },
+    {
       id: "system-query",
       title: "System Query",
       description: "Report a live system metric.",

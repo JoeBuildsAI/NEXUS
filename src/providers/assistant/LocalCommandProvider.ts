@@ -76,6 +76,24 @@ const RULES: Rule[] = [
   R("mute-media", "Mute All Media", ["mute", "mute all", "silence"], "media"),
   R("privacy-mode", "Activate Privacy Mode", ["privacy", "privacy mode", "panic", "hide", "hide everything"], "media"),
   R("clear-workspace", "Clear Media Workspace", ["clear workspace", "unload players", "clear players"], "media"),
+  // Mail — destructive intents navigate to review workflows, never execute.
+  R("open-mail", "Unread mail", ["unread mail", "unread", "unread messages", "new mail"], "mail", { surface: "inbox", view: "all" }, "Inbox · unread"),
+  R("open-mail", "Important mail", ["important mail", "priority mail", "priority", "urgent mail"], "mail", { surface: "inbox", view: "important" }),
+  R("open-mail", "Today's receipts", ["receipts", "today's receipts", "todays receipts", "show receipts", "invoices"], "mail", { surface: "inbox", view: "receipts" }),
+  R("open-mail", "Purchases & orders", ["purchases", "orders", "my orders", "shipping"], "mail", { surface: "inbox", view: "purchases" }),
+  R("open-mail", "Travel mail", ["travel", "itinerary", "flights", "bookings"], "mail", { surface: "inbox", view: "travel" }),
+  R("open-mail", "Financial mail", ["financial", "statements", "bank mail", "bills"], "mail", { surface: "inbox", view: "financial" }),
+  R("open-mail", "Newsletters", ["newsletters", "show newsletters", "digests"], "mail", { surface: "inbox", view: "newsletters" }),
+  R("open-mail", "Promotions", ["promotions", "promos", "deals mail", "marketing"], "mail", { surface: "inbox", view: "promotions" }),
+  R("open-mail", "Notifications", ["notifications mail", "notification emails", "alerts mail"], "mail", { surface: "inbox", view: "notifications" }),
+  R("open-mail", "Subscriptions", ["subscriptions", "subscription manager", "manage subscriptions", "unsubscribe", "newsletters manager"], "mail", { surface: "subscriptions" }, "Review first"),
+  R("open-mail", "Inbox Health", ["inbox health", "email health", "mail health", "analyze inbox", "how much mail"], "mail", { surface: "health" }),
+  R("open-mail", "Cleanup inbox", ["cleanup inbox", "clean inbox", "clean up email", "delete newsletters", "archive old mail", "bulk delete"], "mail", { surface: "inbox", view: "cleanup" }, "Review first"),
+  R("open-mail", "Email rules", ["email rules", "mail rules", "routing rules", "filters", "gmail filters", "outlook rules"], "mail", { surface: "rules" }),
+  R("open-mail", "Today in mail", ["today's mail", "what mattered today", "daily summary", "mail summary", "today"], "mail", { surface: "summary" }),
+  R("refresh-mail", "Refresh Gmail", ["refresh gmail", "sync gmail", "check gmail"], "mail", { provider: "gmail" }),
+  R("refresh-mail", "Refresh Outlook", ["refresh outlook", "sync outlook", "check outlook"], "mail", { provider: "outlook" }),
+  R("refresh-mail", "Refresh mail", ["refresh mail", "sync mail", "check mail", "refresh email", "check email"], "mail"),
   // Environment
   R("set-environment", "Environment · NEXUS", ["nexus environment", "nexus theme"], "settings", { environment: "nexus" }),
   R("set-environment", "Environment · Void", ["void", "void environment"], "settings", { environment: "void" }),
@@ -146,6 +164,14 @@ export class LocalCommandProvider implements AssistantProvider {
         group: "app",
         hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : a.source === "app-paths" ? "Registered" : "Installed",
       });
+    }
+
+    // "messages from X" / "mail from X" / "emails from X" → inbox filtered by sender or search.
+    const from = /^(?:messages?|mail|emails?)\s+from\s+(.{2,60})$/.exec(q);
+    if (from) {
+      const who = from[1]!.trim();
+      const isAddress = who.includes("@");
+      matches.push({ actionId: "open-mail", args: isAddress ? { surface: "inbox", view: "all", sender: who } : { surface: "inbox", view: "all", query: who }, confidence: 0.95, label: `Messages from ${who}`, group: "mail", hint: isAddress ? "Exact sender" : "Search" });
     }
 
     // Rules

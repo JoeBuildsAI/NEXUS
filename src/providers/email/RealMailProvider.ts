@@ -127,7 +127,8 @@ export class RealMailProvider implements EmailProvider {
   }
 
   private api: ApiFn = async (method, path, body) => {
-    const r = await this.bridge.api(this.adapter.id, this.slot, method, path, body);
+    // Paths must be whitespace-free for the native allowlist; OData queries carry spaces.
+    const r = await this.bridge.api(this.adapter.id, this.slot, method, path.replace(/ /g, "%20"), body);
     if (r.status === "ok") return r;
     if (r.status === "rate-limited") this.sync = { ...this.sync, rateLimitedUntil: Date.now() + (r.retryAfterSecs ?? 60) * 1000 };
     if (r.status === "auth-error") this.connection = "auth-error";
