@@ -30,13 +30,26 @@ export interface Game {
   readonly coverUrl: string | null;
   readonly heroUrl: string | null;
   readonly genres: readonly string[];
+  /** Absolute install folder when known (used for safe game-session probing). */
+  readonly installPath?: string | null;
 }
+
+export type AchievementSourceStatus =
+  | "ok"
+  | "not-configured"
+  | "private-profile"
+  | "no-achievements"
+  | "network-error"
+  | "api-error"
+  | "demo";
 
 export interface GameAchievements {
   readonly gameId: string;
   readonly unlocked: number;
   readonly total: number;
   readonly achievements: readonly Achievement[];
+  /** Where the data came from / why it may be empty. Defaults to "ok". */
+  readonly status?: AchievementSourceStatus;
 }
 
 export interface GameDetails extends Game {

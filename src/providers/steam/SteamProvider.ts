@@ -1,4 +1,4 @@
-import type { Game, GameAchievements, GameDetails } from "@/core/types";
+import type { Game, GameAchievements, GameDetails, ProviderHealth, SteamStatus } from "@/core/types";
 
 /**
  * Abstraction over a game library + achievements source. Method shapes mirror
@@ -17,4 +17,10 @@ export interface SteamProvider {
    * issued. On the dev laptop the mock provider only simulates this.
    */
   launchGame(gameId: string): Promise<boolean>;
+  /** Optional: installation/config status for Settings → Integrations. */
+  getStatus?(): Promise<SteamStatus>;
+  health?(): Promise<ProviderHealth>;
+  /** Optional: safe session probe (process under the install folder). */
+  isGameRunning?(gameId: string): Promise<boolean>;
+  invalidate?(): void;
 }

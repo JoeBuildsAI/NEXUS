@@ -9,7 +9,7 @@ import { useModeStore } from "@/state/modeStore";
 /**
  * Gaming Mode config. The background-app ALLOWLIST is the set of processes the
  * user marked "Suspend in Gaming Mode" (System → Processes). Only those — and
- * only when system safety is enabled — can ever be suspended.
+ * only when system safety is enabled — can ever be closed (gracefully, never force-killed).
  */
 export function GamingSettingsSection() {
   const { gaming, setGaming, system } = useSettingsStore();
@@ -18,13 +18,13 @@ export function GamingSettingsSection() {
   const stepsFor = useModeStore((s) => s.stepsFor);
   const [draft, setDraft] = useState("");
 
-  const allow = Object.entries(prefs).filter(([, p]) => p === "suspend").map(([n]) => n);
+  const allow = Object.entries(prefs).filter(([, p]) => p === "close").map(([n]) => n);
   const never = Object.entries(prefs).filter(([, p]) => p === "never").map(([n]) => n);
 
   const addApp = () => {
     const name = draft.trim();
     if (!name) return;
-    setPref(name.endsWith(".exe") ? name : `${name}.exe`, "suspend");
+    setPref(name.endsWith(".exe") ? name : `${name}.exe`, "close");
     setDraft("");
   };
 
@@ -35,7 +35,7 @@ export function GamingSettingsSection() {
       </SettingRow>
 
       <div className="py-4">
-        <p className="text-sm text-white/85">Allowed to suspend in Gaming Mode</p>
+        <p className="text-sm text-white/85">Close when Gaming Mode starts</p>
         <p className="mt-0.5 text-xs text-white/40">
           Exact process names. Also manageable per-process from System → Processes. Protected classes can never be added.
         </p>

@@ -1,5 +1,12 @@
 mod apps;
+mod hardware;
+mod media;
+mod secrets;
+mod session;
 mod state;
+mod steam;
+mod steam_api;
+mod storage;
 mod system;
 mod telemetry;
 
@@ -24,8 +31,17 @@ pub fn run() {
         ))
         .manage(AppState::new())
         .manage(AppRegistry::new())
+        .manage(media::MediaState::new())
+        .manage(storage::StorageState::new())
+        .manage(hardware::HardwareCache(std::sync::Mutex::new(None)))
+        .manage(steam_api::ApiCache::new())
         .setup(|app| {
             setup_tray(app.handle())?;
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -40,9 +56,35 @@ pub fn run() {
             telemetry::get_drives,
             system::get_processes,
             system::get_startup_apps,
+            system::startup_set_enabled,
             system::open_external,
+            system::process_close_graceful,
+            system::process_running_under,
+            system::power_get_state,
+            system::power_set_active,
             apps::discover_apps,
             apps::launch_app,
+            steam::steam_discover,
+            steam::steam_local_artwork,
+            steam::steam_launch,
+            steam_api::steam_api_get,
+            secrets::secret_set,
+            secrets::secret_delete,
+            secrets::secret_status,
+            media::media_register_root,
+            media::media_revoke_root,
+            media::media_root_status,
+            media::media_file_exists,
+            media::media_scan_root,
+            media::media_cancel_scan,
+            hardware::get_hardware,
+            session::session_read,
+            session::session_write,
+            session::session_clear,
+            storage::storage_analyze,
+            storage::storage_cancel,
+            storage::cleanup_discover,
+            storage::cleanup_execute,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NEXUS");

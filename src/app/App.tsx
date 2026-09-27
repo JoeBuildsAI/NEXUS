@@ -15,6 +15,7 @@ import { ScreenRouter } from "@/app/ScreenRouter";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useModeStore } from "@/state/modeStore";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { setupActions } from "@/core/actions/setup";
 import { getProviders } from "@/providers";
@@ -34,12 +35,24 @@ export function App() {
 
   useGlobalHotkeys();
 
+  const gameRunning = useModeStore((s) => s.gameRunning);
+
   useEffect(() => {
-    startTelemetry();
-    // Warm the application index early so the palette is instant.
-    void getProviders().apps.getApps();
+    // GAME SESSION ACTIVE → poll telemetry far less often.
+    useTelemetryStore.getState().stop();
+    startTelemetry(gameRunning ? 6000 : 1500);
     return () => useTelemetryStore.getState().stop();
-  }, [startTelemetry]);
+  }, [startTelemetry, gameRunning]);
+
+  useEffect(() => {
+    const p = getProviders();
+    // Warm the application index early so the palette is instant.
+    void p.apps.getApps();
+    // Re-grant access to previously authorized media roots (desktop only).
+    void p.media.getAuthorizedRoots().catch(() => undefined);
+    // Crash recovery: restore anything a previous Gaming Mode session changed.
+    void useModeStore.getState().recoverStaleSession();
+  }, []);
 
   useEffect(() => {
     if (!isDevBuild) return;

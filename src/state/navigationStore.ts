@@ -9,7 +9,7 @@ export type Screen =
   | "settings";
 
 export type BootPhase = "booting" | "ready";
-export type SystemTab = "overview" | "processes" | "storage" | "startup";
+export type SystemTab = "overview" | "hardware" | "processes" | "storage" | "startup";
 export type SettingsSection =
   | "general"
   | "appearance"

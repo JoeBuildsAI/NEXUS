@@ -8,6 +8,7 @@ import {
   type SystemTab,
 } from "@/state/navigationStore";
 import { useModeStore } from "@/state/modeStore";
+import { useGameSessionStore } from "@/state/gameSessionStore";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useMediaStore } from "@/state/mediaStore";
 import { useSettingsStore, type EnvironmentPreset } from "@/state/settingsStore";
@@ -74,8 +75,8 @@ export function setupActions(): void {
         }
         const ok = await steam.launchGame(gameId);
         if (ok) {
-          useModeStore.getState().setGameRunning(true);
-          notify.success(`Launching ${title}`, "Ambient effects reduced while the game runs.");
+          useGameSessionStore.getState().begin(gameId, title);
+          notify.success(`Launching ${title}`, "NEXUS footprint reduced while the game runs.");
         } else {
           notify.error(`Could not launch ${title}`);
         }

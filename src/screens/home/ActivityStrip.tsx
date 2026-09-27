@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export function ActivityStrip() {
   const s = useTelemetryStore((st) => st.snapshot);
   const mode = useModeStore((m) => m.current);
-  const approved = useProcessPrefsStore((p) => Object.values(p.prefs).filter((x) => x === "suspend").length);
+  const approved = useProcessPrefsStore((p) => Object.values(p.prefs).filter((x) => x === "close").length);
 
   if (!s) return null;
   const health = HEALTH_META[s.health];

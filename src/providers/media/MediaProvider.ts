@@ -1,4 +1,4 @@
-import type { AuthorizedRoot, MediaCollection, MediaItem } from "@/core/types";
+import type { AuthorizedRoot, MediaCollection, MediaItem, MediaScanProgress, ProviderHealth } from "@/core/types";
 
 /**
  * Abstraction over a LOCAL media library.
@@ -20,6 +20,17 @@ export interface MediaProvider {
    */
   authorizeRoot(): Promise<AuthorizedRoot | null>;
   revokeRoot(rootId: string): Promise<void>;
-  /** Clear all locally stored media history/index. */
+  /** Clear all locally stored media history/index (authorizations remain). */
   clearHistory(): Promise<void>;
+
+  // ---- library management (all local) ----
+  scanRoot?(rootId: string, onProgress?: (p: MediaScanProgress) => void): Promise<void>;
+  cancelScan?(): Promise<void>;
+  setFavorite?(itemId: string, favorite: boolean): Promise<void>;
+  createCollection?(name: string): Promise<MediaCollection>;
+  setItemCollection?(itemId: string, collectionId: string | null): Promise<void>;
+  deleteCollection?(collectionId: string): Promise<void>;
+  /** Re-check that an item's file still exists (drive connected). */
+  checkAvailable?(itemId: string): Promise<boolean>;
+  health?(): Promise<ProviderHealth>;
 }

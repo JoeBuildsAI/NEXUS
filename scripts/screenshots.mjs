@@ -41,8 +41,12 @@ await page.getByRole("button", { name: /Processes/ }).click(); await shot("proce
 await page.getByRole("button", { name: /Storage/ }).click(); await shot("storage");
 await nav("Comms"); await shot("comms");
 await page.getByRole("button", { name: /Subscriptions/ }).click(); await shot("subscriptions");
+await nav("System"); await page.getByRole("button", { name: /Hardware/ }).click(); await shot("hardware");
 await nav("Settings"); await shot("settings");
 await page.getByRole("button", { name: "Appearance" }).click(); await shot("settings-appearance");
+await page.getByRole("button", { name: "Integrations" }).click(); await page.waitForTimeout(800); await shot("settings-integrations");
+await page.getByRole("main").getByRole("button", { name: "Media", exact: true }).click(); await shot("settings-media");
+await page.getByRole("main").getByRole("button", { name: "System", exact: true }).click(); await page.waitForTimeout(800); await shot("settings-system");
 await nav("Home");
 await page.keyboard.press("Control+Space"); await page.waitForTimeout(400); await shot("palette-idle");
 await page.keyboard.type("open dis"); await page.waitForTimeout(400); await shot("palette-query");

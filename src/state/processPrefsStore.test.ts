@@ -6,13 +6,13 @@ describe("process preferences", () => {
   beforeEach(() => useProcessPrefsStore.setState({ prefs: {} }));
 
   it("stores preferences case-insensitively", () => {
-    useProcessPrefsStore.getState().setPref("Spotify.EXE", "suspend");
-    expect(useProcessPrefsStore.getState().getPref("spotify.exe")).toBe("suspend");
+    useProcessPrefsStore.getState().setPref("Spotify.EXE", "close");
+    expect(useProcessPrefsStore.getState().getPref("spotify.exe")).toBe("close");
   });
 
   it("only exposes 'suspend' entries as the allowlist", () => {
     const s = useProcessPrefsStore.getState();
-    s.setPref("Spotify.exe", "suspend");
+    s.setPref("Spotify.exe", "close");
     s.setPref("Discord.exe", "never");
     s.setPref("Chrome.exe", "normal");
     expect(useProcessPrefsStore.getState().suspendAllowlist()).toEqual(["spotify.exe"]);
@@ -20,7 +20,7 @@ describe("process preferences", () => {
 
   it("setting 'normal' removes the entry", () => {
     const s = useProcessPrefsStore.getState();
-    s.setPref("Spotify.exe", "suspend");
+    s.setPref("Spotify.exe", "close");
     s.setPref("Spotify.exe", "normal");
     expect(useProcessPrefsStore.getState().prefs).toEqual({});
   });

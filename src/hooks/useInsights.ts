@@ -4,6 +4,8 @@ import { useTelemetryStore } from "@/state/telemetryStore";
 import { useModeStore } from "@/state/modeStore";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
 import { useDevStore } from "@/state/devStore";
+import { useGamePrefsStore } from "@/state/gamePrefsStore";
+import { useGameSessionStore } from "@/state/gameSessionStore";
 import { getProviders } from "@/providers";
 import { DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
 import type { GameDetails, InboxSummary } from "@/core/types";
@@ -47,7 +49,9 @@ export function useInsights(): Insight[] {
     };
   }, [steamConnected, emailPulse, achievementPulse]);
 
-  const approvedAppCount = Object.values(prefs).filter((p) => p === "suspend").length;
+  const approvedAppCount = Object.values(prefs).filter((p) => p === "close").length;
+  const tracked = useGamePrefsStore((s) => s.tracked[0] ?? null);
+  const sessionTitle = useGameSessionStore((s) => (s.phase === "active" ? s.title : null));
 
   return useMemo(
     () =>
@@ -60,8 +64,10 @@ export function useInsights(): Insight[] {
         mode,
         steamConnected,
         mediaConnected,
+        tracked,
+        gameSession: sessionTitle ? { title: sessionTitle } : null,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, approvedAppCount, mode, steamConnected, mediaConnected],
+    [health, snapshot?.memory.usagePercent && Math.round(snapshot.memory.usagePercent / 5), games, inbox, approvedAppCount, mode, steamConnected, mediaConnected, tracked, sessionTitle],
   );
 }

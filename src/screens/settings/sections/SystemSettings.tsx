@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import { SettingsSection, SettingRow } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 
 export function SystemSettingsSection() {
   const { system, setSystem } = useSettingsStore();
@@ -39,13 +40,14 @@ export function SystemSettingsSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Allow process management" description="Permit suspending allowlisted applications.">
+      <SettingRow label="Allow process management" description="Permit gracefully closing allowlisted applications when Gaming Mode starts.">
         <Toggle
           checked={system.allowProcessManagement}
           disabled={!enabled}
           onChange={(v) => setSystem({ allowProcessManagement: v })}
         />
       </SettingRow>
+      <DiagnosticsPanel />
     </SettingsSection>
   );
 }

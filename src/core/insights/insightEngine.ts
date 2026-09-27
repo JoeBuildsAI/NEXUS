@@ -21,6 +21,8 @@ export interface InsightInputs {
   readonly mode: OperatingMode;
   readonly steamConnected: boolean;
   readonly mediaConnected: boolean;
+  readonly tracked?: { gameId: string; gameTitle: string; name: string } | null;
+  readonly gameSession?: { title: string } | null;
 }
 
 const GB = 1024 ** 3;
@@ -32,6 +34,19 @@ const GB = 1024 ** 3;
 export function generateInsights(i: InsightInputs): Insight[] {
   const out: Insight[] = [];
   const t = i.telemetry;
+
+  if (i.gameSession) {
+    out.push({ id: "session", text: `Game session active — ${i.gameSession.title}. NEXUS is running with a reduced footprint.`, tone: "accent", priority: 95 });
+  }
+  if (i.tracked) {
+    out.push({
+      id: "tracked",
+      text: `Tracking “${i.tracked.name}” in ${i.tracked.gameTitle}.`,
+      tone: "accent",
+      action: { label: "Open", actionId: "show-game", args: { gameId: i.tracked.gameId } },
+      priority: 70,
+    });
+  }
 
   if (t) {
     const pressured = t.storage.filter((d) => d.kind === "fixed" && d.totalBytes > 0 && d.freeBytes / d.totalBytes < 0.12);

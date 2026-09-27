@@ -20,8 +20,10 @@ export function AchievementRow({ achievement, compact }: { achievement: Achievem
 
   return (
     <div className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors", unlocked ? "hover:bg-white/[0.03]" : "opacity-75 hover:opacity-100")}>
-      <div className={cn("flex shrink-0 items-center justify-center rounded-lg", compact ? "h-9 w-9" : "h-11 w-11", unlocked ? "bg-gradient-to-br from-ember/30 to-ember/5 text-ember shadow-[0_0_16px_-4px_rgba(230,161,94,0.5)]" : "bg-white/[0.04] text-white/25")}>
-        {unlocked ? <Trophy size={compact ? 15 : 18} /> : <Lock size={14} />}
+      <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-lg", compact ? "h-9 w-9" : "h-11 w-11", unlocked ? "bg-gradient-to-br from-ember/30 to-ember/5 text-ember shadow-[0_0_16px_-4px_rgba(230,161,94,0.5)]" : "bg-white/[0.04] text-white/25")}>
+        {achievement.iconUrl && !secret ? (
+          <img src={achievement.iconUrl} alt="" loading="lazy" className={cn("h-full w-full object-cover", !unlocked && "opacity-60 grayscale")} />
+        ) : unlocked ? <Trophy size={compact ? 15 : 18} /> : <Lock size={14} />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

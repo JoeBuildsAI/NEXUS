@@ -25,7 +25,7 @@ const FILTERS: { id: "all" | ProcessClass | "managed"; label: string }[] = [
 ];
 
 const PREF_META: Record<ProcessPreference, { label: string; icon: typeof Shield; tone: string }> = {
-  suspend: { label: "Suspend in Gaming Mode", icon: ShieldCheck, tone: "text-accent border-accent/40 bg-accent/10" },
+  close: { label: "Close when Gaming Mode starts", icon: ShieldCheck, tone: "text-accent border-accent/40 bg-accent/10" },
   never: { label: "Never touch", icon: ShieldOff, tone: "text-status-attention border-status-attention/40 bg-status-attention/10" },
   normal: { label: "Normal", icon: Shield, tone: "text-white/60 border-white/10" },
 };
@@ -140,7 +140,7 @@ export function ProcessViewer() {
                   className="grid w-full grid-cols-[1fr_90px_100px_150px_36px] items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-white/[0.02]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", pref === "suspend" ? "bg-accent" : pref === "never" ? "bg-status-attention" : meta.protected ? "bg-white/20" : "bg-white/40")} />
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", pref === "close" ? "bg-accent" : pref === "never" ? "bg-status-attention" : meta.protected ? "bg-white/20" : "bg-white/40")} />
                     <div className="min-w-0">
                       <p className="truncate text-white/85">
                         {friendly.name}
@@ -171,7 +171,7 @@ export function ProcessViewer() {
                           <p className="text-[10px] uppercase tracking-wide2 text-white/30">Gaming Mode handling</p>
                           {canMark ? (
                             <div className="mt-2 flex flex-col gap-1.5">
-                              {(["suspend", "never", "normal"] as ProcessPreference[]).map((opt) => {
+                              {(["close", "never", "normal"] as ProcessPreference[]).map((opt) => {
                                 const M = PREF_META[opt];
                                 const Icon = M.icon;
                                 return (
@@ -188,7 +188,7 @@ export function ProcessViewer() {
                                 );
                               })}
                               <p className="mt-1 text-[10px] leading-relaxed text-white/30">
-                                Suspension only happens in Gaming Mode, only when system safety is enabled, and is reversed on exit.
+                                Closing happens only when Gaming Mode starts and system safety is enabled. NEXUS asks the app to close (never force-kills); reopen it yourself when you are done.
                               </p>
                             </div>
                           ) : (

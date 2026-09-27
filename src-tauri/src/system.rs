@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use serde::Serialize;
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::ProcessesToUpdate;
 use tauri::State;
 
 /// Raw process info. Safety classification is applied on the frontend from the
@@ -137,6 +137,42 @@ pub fn get_startup_apps() -> Result<Vec<StartupApp>, String> {
     Err("startup enumeration is Windows-only".into())
 }
 
+/// Enable/disable a CURRENT-USER startup entry via the StartupApproved key —
+/// the same reversible mechanism Task Manager uses. Never deletes the Run
+/// value itself. HKLM (all-users) and folder entries are read-only here.
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub fn startup_set_enabled(id: String, enabled: bool) -> Result<bool, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
+    use winreg::{RegKey, RegValue};
+    let Some(name) = id.strip_prefix("hkcu:") else {
+        return Err("Only current-user registry entries can be toggled. This entry is read-only.".into());
+    };
+    if name.is_empty() || name.len() > 200 {
+        return Err("invalid entry".into());
+    }
+    let approved = RegKey::predef(HKEY_CURRENT_USER)
+        .create_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", KEY_READ | KEY_WRITE)
+        .map(|(k, _)| k)
+        .map_err(|e| e.to_string())?;
+    // Preserve existing blob (timestamp bytes) when present.
+    let mut bytes = approved.get_raw_value(name).map(|v| v.bytes).unwrap_or_else(|_| vec![0u8; 12]);
+    if bytes.len() < 12 {
+        bytes.resize(12, 0);
+    }
+    bytes[0] = if enabled { 0x02 } else { 0x03 };
+    approved
+        .set_raw_value(name, &RegValue { bytes, vtype: winreg::enums::RegType::REG_BINARY })
+        .map_err(|e| e.to_string())?;
+    Ok(enabled)
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+pub fn startup_set_enabled(_id: String, _enabled: bool) -> Result<bool, String> {
+    Err("Windows only".into())
+}
+
 fn estimate_impact(command: &str) -> String {
     let c = command.to_lowercase();
     if ["discord", "steam", "epicgames", "teams", "onedrive", "dropbox"].iter().any(|k| c.contains(k)) {
@@ -152,19 +188,27 @@ fn estimate_impact(command: &str) -> String {
 /// This maps to an explicit, predefined command — never arbitrary shell input.
 #[tauri::command]
 pub fn open_external(url: String) -> Result<(), String> {
-    // Only allow known safe schemes.
+    open_url(&url)
+}
+
+/// Scheme-allowlisted URL open. Shared by app/steam launch paths.
+pub fn open_url(url: &str) -> Result<(), String> {
     let allowed = ["https://", "http://", "steam://", "mailto:"];
     if !allowed.iter().any(|s| url.starts_with(s)) {
         return Err(format!("Refusing to open disallowed URL scheme: {url}"));
     }
-    let _ = System::name(); // touch sysinfo to keep import used across cfg
-    open_url_impl(&url)
+    if url.chars().any(|c| c.is_control() || c == '"' || c == '&' || c == '|' || c == '^') {
+        return Err("Refusing URL with shell metacharacters".into());
+    }
+    open_url_impl(url)
 }
 
 #[cfg(target_os = "windows")]
 fn open_url_impl(url: &str) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
     std::process::Command::new("cmd")
         .args(["/C", "start", "", url])
+        .creation_flags(0x08000000)
         .spawn()
         .map(|_| ())
         .map_err(|e| e.to_string())
@@ -173,4 +217,188 @@ fn open_url_impl(url: &str) -> Result<(), String> {
 #[cfg(not(target_os = "windows"))]
 fn open_url_impl(_url: &str) -> Result<(), String> {
     Err("open_external is only implemented on Windows".into())
+}
+
+/// Process names NEXUS refuses to close under any configuration. Second line of
+/// defense behind the frontend classifier + user allowlist.
+const PROTECTED_PROCESSES: &[&str] = &[
+    "system", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe",
+    "svchost.exe", "explorer.exe", "dwm.exe", "fontdrvhost.exe", "conhost.exe", "sihost.exe",
+    "taskhostw.exe", "msmpeng.exe", "securityhealthservice.exe", "nvcontainer.exe", "nvdisplay.container.exe",
+    "steam.exe", "steamwebhelper.exe", "nexus.exe", "runtimebroker.exe", "searchhost.exe", "startmenuexperiencehost.exe",
+];
+
+fn validate_process_name(name: &str) -> Result<String, String> {
+    let n = name.trim();
+    if n.is_empty() || n.len() > 80 {
+        return Err("invalid process name".into());
+    }
+    if n.contains(['\\', '/', ':', '*', '?', '"', '<', '>', '|', ' ', '&', '^']) {
+        return Err("process name must be a bare executable name".into());
+    }
+    if !n.to_lowercase().ends_with(".exe") {
+        return Err("process name must end with .exe".into());
+    }
+    if PROTECTED_PROCESSES.contains(&n.to_lowercase().as_str()) {
+        return Err(format!("{n} is protected and cannot be managed"));
+    }
+    Ok(n.to_string())
+}
+
+/// Gracefully close a USER application by image name (WM_CLOSE via taskkill
+/// without /F). Never force-kills. The name must pass validation and must be
+/// currently running; returns the number of processes signalled.
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub fn process_close_graceful(state: State<AppState>, name: String) -> Result<u32, String> {
+    use std::os::windows::process::CommandExt;
+    let n = validate_process_name(&name)?;
+    let running = {
+        let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
+        sys.refresh_processes(ProcessesToUpdate::All, true);
+        sys.processes().values().filter(|p| p.name().to_string_lossy().eq_ignore_ascii_case(&n)).count() as u32
+    };
+    if running == 0 {
+        return Ok(0);
+    }
+    let out = std::process::Command::new("taskkill")
+        .args(["/IM", &n])
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(running)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+pub fn process_close_graceful(_state: State<AppState>, _name: String) -> Result<u32, String> {
+    Err("Windows only".into())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowerScheme {
+    guid: String,
+    name: String,
+    active: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PowerState {
+    supported: bool,
+    schemes: Vec<PowerScheme>,
+    active_guid: Option<String>,
+}
+
+fn run_powercfg(args: &[&str]) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let out = std::process::Command::new("powercfg")
+            .args(args)
+            .creation_flags(0x08000000)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = args;
+        Err("Windows only".into())
+    }
+}
+
+/// Parse `powercfg /list` output into schemes. Pure so it can be unit tested.
+pub fn parse_powercfg_list(text: &str) -> Vec<PowerScheme> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let Some(idx) = line.find("GUID:") else { continue };
+        let rest = &line[idx + 5..];
+        let mut it = rest.trim().splitn(2, ' ');
+        let guid = it.next().unwrap_or("").trim().to_string();
+        let tail = it.next().unwrap_or("");
+        let name = tail.trim().trim_start_matches('(').split(')').next().unwrap_or("").trim().to_string();
+        let active = tail.contains('*');
+        if guid.len() == 36 {
+            out.push(PowerScheme { guid, name, active });
+        }
+    }
+    out
+}
+
+/// Read available power schemes and the active one (read-only).
+#[tauri::command]
+pub fn power_get_state() -> Result<PowerState, String> {
+    match run_powercfg(&["/list"]) {
+        Ok(text) => {
+            let schemes = parse_powercfg_list(&text);
+            let active = schemes.iter().find(|s| s.active).map(|s| s.guid.clone());
+            Ok(PowerState { supported: !schemes.is_empty(), schemes, active_guid: active })
+        }
+        Err(_) => Ok(PowerState { supported: false, schemes: vec![], active_guid: None }),
+    }
+}
+
+/// Activate an EXISTING power scheme by GUID. Never creates or modifies schemes.
+#[tauri::command]
+pub fn power_set_active(guid: String) -> Result<(), String> {
+    let g = guid.trim().to_lowercase();
+    let valid = g.len() == 36 && g.chars().all(|c| c.is_ascii_hexdigit() || c == '-');
+    if !valid {
+        return Err("invalid power scheme guid".into());
+    }
+    // Only allow schemes that exist on this machine.
+    let list = run_powercfg(&["/list"])?;
+    if !parse_powercfg_list(&list).iter().any(|s| s.guid.eq_ignore_ascii_case(&g)) {
+        return Err("unknown power scheme".into());
+    }
+    run_powercfg(&["/setactive", &g]).map(|_| ())
+}
+
+/// Whether any process executable lives under `install_dir` (game session probe).
+/// Read-only enumeration — no attach, inject, or window interaction.
+#[tauri::command]
+pub fn process_running_under(state: State<AppState>, install_dir: String) -> Result<bool, String> {
+    let dir = install_dir.trim().to_lowercase().replace('/', "\\");
+    if dir.len() < 4 {
+        return Err("install dir too short".into());
+    }
+    let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    Ok(sys.processes().values().any(|p| {
+        p.exe()
+            .map(|e| e.to_string_lossy().to_lowercase().starts_with(&dir))
+            .unwrap_or(false)
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_protected_and_malformed_names() {
+        assert!(validate_process_name("explorer.exe").is_err());
+        assert!(validate_process_name("C:\\x\\a.exe").is_err());
+        assert!(validate_process_name("notepad").is_err());
+        assert!(validate_process_name("Spotify.exe").is_ok());
+    }
+
+    #[test]
+    fn parses_powercfg_list() {
+        let text = "Existing Power Schemes (* Active)\n-----------------------------------\nPower Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced) *\nPower Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (High performance)\n";
+        let s = parse_powercfg_list(text);
+        assert_eq!(s.len(), 2);
+        assert!(s[0].active);
+        assert_eq!(s[1].name, "High performance");
+        assert!(!s[1].active);
+    }
 }

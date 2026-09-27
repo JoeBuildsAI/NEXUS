@@ -40,6 +40,7 @@ export function ModeTransitionOverlay() {
             {transition.steps.map((step, i) => {
               const done = i < transition.current || transition.done;
               const active = i === transition.current && !transition.done;
+              const result = transition.results[step.id];
               return (
                 <motion.div
                   key={step.id}
@@ -51,11 +52,15 @@ export function ModeTransitionOverlay() {
                   <span
                     className={cn(
                       "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
-                      done
-                        ? "border-accent/50 bg-accent/15 text-accent"
-                        : active
-                          ? "border-white/30 text-white/70"
-                          : "border-white/10 text-white/20",
+                      done && result === "failed"
+                        ? "border-status-critical/50 bg-status-critical/10 text-status-critical"
+                        : done && (result === "unsupported" || result === "skipped" || result === "observed")
+                          ? "border-white/15 text-white/40"
+                          : done
+                            ? "border-accent/50 bg-accent/15 text-accent"
+                            : active
+                              ? "border-white/30 text-white/70"
+                              : "border-white/10 text-white/20",
                     )}
                   >
                     {done ? <Check size={13} /> : active ? <Loader2 size={13} className="animate-spin" /> : <span className="h-1 w-1 rounded-full bg-current" />}
@@ -64,11 +69,13 @@ export function ModeTransitionOverlay() {
                     <p className={cn("text-sm", done ? "text-white/85" : "text-white/60")}>{step.label}</p>
                     <p className="truncate text-xs text-white/35">{step.detail}</p>
                   </div>
-                  {!step.live && (
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide2 text-white/30">
-                      <Eye size={11} /> observe
+                  {done && result && result !== "done" ? (
+                    <span className={cn("flex items-center gap-1 text-[10px] uppercase tracking-wide2", result === "failed" ? "text-status-critical" : "text-white/30")}>
+                      {result === "observed" && <Eye size={11} />} {result}
                     </span>
-                  )}
+                  ) : !step.live ? (
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide2 text-white/30"><Eye size={11} /> observe</span>
+                  ) : null}
                 </motion.div>
               );
             })}

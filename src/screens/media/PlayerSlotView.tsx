@@ -42,7 +42,7 @@ export function PlayerSlotView({ slot, item, onAssign, large, className }: Props
     if (v && Number.isFinite(seekRequest.time)) v.currentTime = Math.min(seekRequest.time, v.duration || seekRequest.time);
   }, [seekRequest, slot.index]);
 
-  useEffect(() => { setErrored(false); setProgress(0); }, [item?.id]);
+  useEffect(() => { setErrored(item?.available === false); setProgress(0); }, [item?.id, item?.available]);
 
   if (!item) {
     return (
@@ -63,10 +63,14 @@ export function PlayerSlotView({ slot, item, onAssign, large, className }: Props
   return (
     <div className={cn("group relative overflow-hidden rounded-xl bg-black ring-1 ring-white/[0.06] transition-shadow hover:ring-white/15", large ? "" : "aspect-video", className)}>
       {errored ? (
-        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 text-center text-white/35" style={{ background: item.thumbnailColor }}>
+        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center text-white/35" style={{ background: item.thumbnailColor }}>
           <RefreshCw size={18} />
-          <p className="text-xs">Source unavailable</p>
-          <button onClick={() => onAssign(slot.index)} className="text-[11px] text-accent hover:underline">Replace</button>
+          <p className="text-xs uppercase tracking-wide2">{item.available === false ? "Media source unavailable" : item.playability === "potentially-unsupported" ? `${item.ext?.toUpperCase()} not playable here` : "Source unavailable"}</p>
+          <p className="max-w-[220px] truncate text-[11px] text-white/45">{item.title}</p>
+          <div className="flex gap-3 text-[11px]">
+            <button onClick={() => onAssign(slot.index)} className="text-accent hover:underline">Replace</button>
+            <button onClick={() => clearSlot(slot.index)} className="text-white/50 hover:underline">Clear</button>
+          </div>
         </div>
       ) : (
         <video

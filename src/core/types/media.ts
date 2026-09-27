@@ -1,10 +1,12 @@
 /** Local media workspace domain models. Privacy-sensitive by design. */
 
+export type Playability = "playable" | "potentially-unsupported";
+
 export interface MediaItem {
   readonly id: string;
   readonly title: string;
   readonly durationSeconds: number;
-  /** Source URL/path resolvable by the player (asset://, blob:, http:). */
+  /** Source URL resolvable by the player (asset://, blob:, http:). */
   readonly src: string;
   readonly thumbnailColor: string;
   readonly thumbnailUrl: string | null;
@@ -13,19 +15,41 @@ export interface MediaItem {
   readonly favorite: boolean;
   /** Marks media as private — excluded from Home/global recent activity. */
   readonly private: boolean;
+  /** Real-media fields (absent for demo items). */
+  readonly rootId?: string;
+  readonly folder?: string;
+  readonly ext?: string;
+  readonly sizeBytes?: number;
+  readonly playability?: Playability;
+  /** False when the backing file/drive is currently unavailable. */
+  readonly available?: boolean;
 }
 
 export interface MediaCollection {
   readonly id: string;
   readonly name: string;
   readonly itemCount: number;
+  readonly itemIds?: readonly string[];
 }
 
 export interface AuthorizedRoot {
   readonly id: string;
   readonly path: string;
-  readonly kind: "fixed" | "removable" | "network";
+  readonly kind: "fixed" | "removable" | "network" | "unknown";
   readonly authorizedAt: number;
+  /** Whether the folder is currently reachable (drive connected). */
+  readonly exists?: boolean;
+  readonly fileCount?: number;
+  readonly lastScannedAt?: number | null;
+}
+
+export interface MediaScanProgress {
+  readonly rootId: string;
+  readonly files: number;
+  readonly folders: number;
+  readonly done: boolean;
+  readonly cancelled: boolean;
+  readonly truncated: boolean;
 }
 
 /** State for a single slot in the six-player workspace. */

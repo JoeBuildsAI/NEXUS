@@ -31,7 +31,7 @@ pub struct NetworkTelemetry {
     ssid_or_interface: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DriveInfo {
     mount_point: String,

@@ -1,4 +1,4 @@
-import type { Game, GameAchievements, GameDetails } from "@/core/types";
+import type { Game, GameAchievements, GameDetails, ProviderHealth, SteamStatus } from "@/core/types";
 import { DEMO_GAMES } from "@/core/demo/games";
 import { ProviderOfflineError } from "@/core/errors";
 import { useDevStore } from "@/state/devStore";
@@ -35,5 +35,18 @@ export class MockSteamProvider implements SteamProvider {
     if (!game) return false;
     console.info(`[MockSteamProvider] Simulating launch of "${game.title}"`);
     return true;
+  }
+
+  async getStatus(): Promise<SteamStatus> {
+    return { detected: false, steamPath: null, libraries: 0, installedGames: 0, apiConfigured: false, steamIdConfigured: false, malformedManifests: 0 };
+  }
+
+  async health(): Promise<ProviderHealth> {
+    const ok = useDevStore.getState().steamConnected;
+    return { state: ok ? "not-configured" : "unavailable", summary: ok ? "Demo library · Steam not connected" : "Offline (simulated)", checkedAt: Date.now() };
+  }
+
+  async mode(): Promise<"real" | "demo"> {
+    return "demo";
   }
 }
