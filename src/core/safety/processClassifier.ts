@@ -28,6 +28,15 @@ const SYSTEM_CRITICAL = new Set([
   "conhost.exe",
   "sihost.exe",
   "taskhostw.exe",
+  "audiodg.exe",
+  "ctfmon.exe",
+  "spoolsv.exe",
+  "wudfhost.exe",
+  "dashost.exe",
+  "searchindexer.exe",
+  "lsaiso.exe",
+  // Shared WebView2 runtime: NEXUS itself and many system surfaces render through it.
+  "msedgewebview2.exe",
 ]);
 
 const SECURITY_HINTS = [
@@ -37,14 +46,32 @@ const SECURITY_HINTS = [
   "mssense",
   "nissrv",
   "windefend",
+  "microsoftsecurityapp",
 ];
 
 const DRIVER_HINTS = ["nvidia", "nvcontainer", "nvsphelper", "amd", "radeon", "intel", "igfx"];
 
 const HARDWARE_PUBLISHERS = ["razer", "logitech", "corsair", "steelseries", "asus", "msi", "elgato"];
 
+/**
+ * Peripheral / motherboard / audio / display / input vendor software (names
+ * observed on real gaming hardware). Closing these can drop
+ * fan curves, RGB, audio effects, input devices or monitor control.
+ */
+const HARDWARE_NAME = /^(armourycrate|armoury|asus|atkex|aac[a-z0-9]*hal|rog[a-z]|aura|lightingservice|lghub|logi_|lgmonitor|icue|razer|steelseries|nahimic|rtkaud|realtek|dolby|noisecanceling|thunderbolt|tbtp2p|igcc|oneapp\.igcc|gameinput)/;
+const HARDWARE_PATH_HINTS = ["/asus/", ".armourycrate_", "/lghub/", "/logitech", "/razer", "/corsair", "/steelseries", "/nzxt", "/elgato", ".lgmonitorapp_", "/nahimic", "/killer networks/", "/rivet networks/", "/gigabyte/", "/microsoft gameinput/"];
+
+/** Game platforms, their services and anti-cheat. Closing them breaks running games. */
+const PLATFORM_NAMES = new Set([
+  "steam.exe", "steamwebhelper.exe", "steamservice.exe", "gameoverlayui.exe", "gameoverlayui64.exe", "steamerrorreporter.exe",
+  "gamingservices.exe", "gamingservicesnet.exe", "gamelaunchhelper.exe", "gamesdk.exe", "xboxappservices.exe",
+  "riotclientservices.exe", "riot client.exe", "riotclientcrashhandler.exe", "vgc.exe", "vgtray.exe",
+  "easyanticheat.exe", "easyanticheat_eos.exe", "beservice.exe", "beservice_x64.exe", "faceitservice.exe",
+]);
+const PLATFORM_NAME = /^(xboxpc|xboxgamebar|gamebar|easyanticheat|battleye)/;
+const PLATFORM_PATH_HINTS = ["/riot vanguard/", "/easyanticheat", "/battleye/", "microsoft.gamingapp_", "microsoft.gamingservices_", "microsoft.xboxgamingoverlay_", "/steam/"];
+
 const KNOWN_USER_APPS = new Set([
-  "steam.exe",
   "chrome.exe",
   "firefox.exe",
   "msedge.exe",
@@ -70,8 +97,12 @@ function classifyByPath(path: string | null | undefined): ProcessClass | null {
   if (!p.includes("/")) return null;
   if (SECURITY_PATH_HINTS.some((h) => p.includes(h))) return "security";
   if (DRIVER_PATH_HINTS.some((h) => p.includes(h))) return "driver";
+  if (PLATFORM_PATH_HINTS.some((h) => p.includes(h)) && !p.includes("/steamapps/")) return "platform";
+  if (HARDWARE_PATH_HINTS.some((h) => p.includes(h))) return "hardware";
   // Anything shipped inside the Windows directory is part of Windows: protected.
-  if (p.includes("/windows/") && !p.includes("/windows/systemapps/")) return "system-critical";
+  if (p.includes("/windows/")) return "system-critical";
+  // Windows' own inbox packages (publisher id cw5n1h2txyewy) live under WindowsApps too.
+  if (p.includes("_cw5n1h2txyewy")) return "system-critical";
   // Installed applications: Program Files, per-user program folders, store packages, per-user vendor folders.
   if (USER_APP_PATH_HINTS.some((h) => p.includes(h))) return "user-application";
   if (/\/appdata\/local\/[^/]+\/[^/]+\.exe$/.test(p)) return "user-application";
@@ -90,7 +121,8 @@ export function classifyProcess(
   if (SYSTEM_CRITICAL.has(n)) return "system-critical";
   if (SECURITY_HINTS.some((h) => n.includes(h))) return "security";
   if (DRIVER_HINTS.some((h) => n.includes(h) || pub.includes(h))) return "driver";
-  if (HARDWARE_PUBLISHERS.some((h) => pub.includes(h))) return "hardware";
+  if (PLATFORM_NAMES.has(n) || PLATFORM_NAME.test(n)) return "platform";
+  if (HARDWARE_PUBLISHERS.some((h) => pub.includes(h)) || HARDWARE_NAME.test(n)) return "hardware";
   if (KNOWN_USER_APPS.has(n)) return "user-application";
   // Name hints are weak; the executable's location is decisive when available.
   const byPath = classifyByPath(path);

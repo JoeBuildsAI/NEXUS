@@ -91,6 +91,8 @@ export type ProcessClass =
   | "driver"
   | "security"
   | "hardware"
+  /** Game platforms, their services and anti-cheat (Steam, Xbox, Riot Vanguard…). Protected. */
+  | "platform"
   | "user-application"
   | "optional"
   | "unknown";

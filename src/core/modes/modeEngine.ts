@@ -66,6 +66,8 @@ export interface EnterModeOptions {
   readonly approvedApps: readonly string[];
   /** Whether the machine exposes a switchable power plan. */
   readonly powerSupported?: boolean;
+  /** Name of the active plan when it already is a high/ultimate performance plan. */
+  readonly activePerformancePlan?: string | null;
 }
 
 export type StepKind = ModeChange["kind"] | "environment" | "restore" | "performance";
@@ -103,16 +105,20 @@ export function planModeSteps(config: ModeConfig, opts: EnterModeOptions): ModeS
 
   if (config.powerProfile && config.powerProfile !== "balanced") {
     const supported = opts.powerSupported !== false;
+    const keep = supported ? opts.activePerformancePlan : null;
     steps.push({
       id: "power",
       label: "Power plan",
       detail: !supported
         ? "No switchable high-performance plan found on this machine — skipped."
-        : live
-          ? "Switch to the High performance plan. The previous plan is recorded and restored on exit."
-          : "Would switch to the High performance plan (observe-only).",
-      kind: "power-profile",
-      live: live && supported,
+        : keep
+          ? `Already on “${keep}” — left unchanged.`
+          : live
+            ? "Switch to the High performance plan. The previous plan is recorded and restored on exit."
+            : "Would switch to the High performance plan (observe-only).",
+      // Keeping the user's plan is a note: nothing is changed, recorded or restored.
+      kind: keep ? "note" : "power-profile",
+      live: live && supported && !keep,
     });
   }
 
@@ -194,9 +200,25 @@ export function planRestoreSteps(changes: readonly ModeChange[]): ModeStep[] {
   return steps;
 }
 
-/** Pick the high-performance scheme from `powercfg /list` output, if any. */
+const ULTIMATE_GUID = "e9a42b02-d5df-448d-aa00-03f14749eb61";
+const HIGH_GUID = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
+
+/** Whether a plan is a high/ultimate performance plan (built-in GUIDs work on localized Windows). */
+export function isPerformanceScheme(s: { guid: string; name: string }): boolean {
+  const g = s.guid.toLowerCase();
+  return g === ULTIMATE_GUID || g === HIGH_GUID || /(ultimate|high) performance/i.test(s.name);
+}
+
+/**
+ * Pick the high-performance scheme from `powercfg /list` output, if any.
+ * If the ACTIVE plan already is a performance plan (e.g. a vendor plan such as
+ * "GameTurbo (High Performance)"), it is returned so Gaming Mode leaves the
+ * user's choice alone instead of swapping it for another plan.
+ */
 export function pickHighPerformanceScheme(schemes: readonly { guid: string; name: string; active: boolean }[]): { guid: string; name: string } | null {
-  const byName = (re: RegExp) => schemes.find((s) => re.test(s.name.toLowerCase()));
-  const s = byName(/ultimate performance/) ?? byName(/high performance/) ?? schemes.find((x) => x.guid.toLowerCase() === "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
+  const active = schemes.find((s) => s.active && isPerformanceScheme(s));
+  const byGuid = (g: string) => schemes.find((s) => s.guid.toLowerCase() === g);
+  const byName = (re: RegExp) => schemes.find((s) => re.test(s.name));
+  const s = active ?? byGuid(ULTIMATE_GUID) ?? byName(/ultimate performance/i) ?? byGuid(HIGH_GUID) ?? byName(/high performance/i);
   return s ? { guid: s.guid, name: s.name } : null;
 }

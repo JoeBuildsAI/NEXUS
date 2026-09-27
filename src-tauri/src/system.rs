@@ -285,6 +285,12 @@ const PROTECTED_PROCESSES: &[&str] = &[
     "svchost.exe", "explorer.exe", "dwm.exe", "fontdrvhost.exe", "conhost.exe", "sihost.exe",
     "taskhostw.exe", "msmpeng.exe", "securityhealthservice.exe", "nvcontainer.exe", "nvdisplay.container.exe",
     "steam.exe", "steamwebhelper.exe", "nexus.exe", "runtimebroker.exe", "searchhost.exe", "startmenuexperiencehost.exe",
+    // Observed on a real gaming PC: shared WebView2 (NEXUS renders through it), platform
+    // services, anti-cheat, input and security surfaces.
+    "msedgewebview2.exe", "steamservice.exe", "gameoverlayui.exe", "gameoverlayui64.exe", "gamingservices.exe",
+    "gamingservicesnet.exe", "gamelaunchhelper.exe", "vgc.exe", "vgtray.exe", "easyanticheat.exe", "easyanticheat_eos.exe",
+    "beservice.exe", "beservice_x64.exe", "gameinputsvc.exe", "gameinputredistservice.exe", "microsoftsecurityapp.exe",
+    "audiodg.exe", "ctfmon.exe", "textinputhost.exe", "shellexperiencehost.exe", "lsaiso.exe",
 ];
 
 fn validate_process_name(name: &str) -> Result<String, String> {
@@ -384,8 +390,13 @@ pub fn parse_powercfg_list(text: &str) -> Vec<PowerScheme> {
         let mut it = rest.trim().splitn(2, ' ');
         let guid = it.next().unwrap_or("").trim().to_string();
         let tail = it.next().unwrap_or("");
-        let name = tail.trim().trim_start_matches('(').split(')').next().unwrap_or("").trim().to_string();
-        let active = tail.contains('*');
+        // Names can nest parentheses (vendor plans like "GameTurbo (High Performance)"),
+        // so take everything between the first '(' and the last ')'.
+        let name = match (tail.find('('), tail.rfind(')')) {
+            (Some(a), Some(b)) if b > a => tail[a + 1..b].trim().to_string(),
+            _ => String::new(),
+        };
+        let active = tail.trim_end().ends_with('*');
         if guid.len() == 36 {
             out.push(PowerScheme { guid, name, active });
         }
@@ -449,6 +460,9 @@ mod tests {
         assert!(validate_process_name("C:\\x\\a.exe").is_err());
         assert!(validate_process_name("notepad").is_err());
         assert!(validate_process_name("Spotify.exe").is_ok());
+        for n in ["msedgewebview2.exe", "VGC.exe", "gamingservices.exe", "SteamWebHelper.exe", "MicrosoftSecurityApp.exe"] {
+            assert!(validate_process_name(n).is_err(), "{n} must be protected natively");
+        }
     }
 
     #[test]
@@ -478,5 +492,14 @@ mod tests {
         assert!(s[0].active);
         assert_eq!(s[1].name, "High performance");
         assert!(!s[1].active);
+    }
+
+    #[test]
+    fn parses_vendor_plan_names_with_nested_parentheses() {
+        let text = "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)\nPower Scheme GUID: 69472b16-83b2-4296-838b-569e8cae9cfe  (GameTurbo (High Performance)) *\nPower Scheme GUID: 991e80d5-ab7a-4b53-ba2e-110827b0c52d  (Vendor Cortex Power Plan)\n";
+        let s = parse_powercfg_list(text);
+        assert_eq!(s.len(), 3);
+        assert_eq!(s[1].name, "GameTurbo (High Performance)");
+        assert!(s[1].active && !s[0].active && !s[2].active);
     }
 }

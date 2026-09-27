@@ -25,10 +25,24 @@ interface ProcessPrefsState {
 const key = (n: string) => n.trim().toLowerCase();
 const normalizePref = (p: string): ProcessPreference => (p === "suspend" ? "close" : p === "never" ? "never" : p === "close" ? "close" : "normal");
 
+/**
+ * Before v3 the store shipped with Spotify + Discord pre-approved for closing.
+ * An untouched copy of exactly that default was never a user decision, so it is
+ * dropped; any other allowlist is the user's own and is kept.
+ */
+export function migratePrefs(raw: Record<string, string>, version: number): { prefs: Record<string, ProcessPreference> } {
+  const prefs: Record<string, ProcessPreference> = {};
+  for (const [k, v] of Object.entries(raw)) prefs[k] = normalizePref(v);
+  const keys = Object.keys(prefs).sort();
+  if (version < 3 && keys.length === 2 && keys[0] === "discord.exe" && keys[1] === "spotify.exe" && prefs["discord.exe"] === "close" && prefs["spotify.exe"] === "close") return { prefs: {} };
+  return { prefs };
+}
+
 export const useProcessPrefsStore = create<ProcessPrefsState>()(
   persist(
     (set, get) => ({
-      prefs: { "spotify.exe": "close", "discord.exe": "close" },
+      // Nothing is pre-approved: every close requires an explicit user choice.
+      prefs: {},
       setPref: (name, pref) =>
         set((s) => {
           const next = { ...s.prefs };
@@ -46,13 +60,8 @@ export const useProcessPrefsStore = create<ProcessPrefsState>()(
     {
       name: "nexus-process-prefs",
       storage: safeStorage(),
-      version: 2,
-      migrate: (persisted) => {
-        const p = persisted as { prefs?: Record<string, string> };
-        const prefs: Record<string, ProcessPreference> = {};
-        for (const [k, v] of Object.entries(p?.prefs ?? {})) prefs[k] = normalizePref(v);
-        return { prefs } as ProcessPrefsState;
-      },
+      version: 3,
+      migrate: (persisted, version) => migratePrefs((persisted as { prefs?: Record<string, string> })?.prefs ?? {}, version) as unknown as ProcessPrefsState,
     },
   ),
 );

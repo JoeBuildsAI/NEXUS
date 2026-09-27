@@ -66,4 +66,29 @@ describe("mode engine", () => {
     expect(pickHighPerformanceScheme([{ guid: "a", name: "Balanced", active: true }, { guid: "b", name: "High performance", active: false }])?.guid).toBe("b");
     expect(pickHighPerformanceScheme([{ guid: "b", name: "High performance", active: false }, { guid: "c", name: "Ultimate Performance", active: false }])?.guid).toBe("c");
   });
+
+  it("real gaming PC: an active vendor performance plan is kept, not swapped", () => {
+    const schemes = [
+      { guid: "381b4222-f694-41f0-9685-ff5bb260df2e", name: "Balanced", active: false },
+      { guid: "69472b16-83b2-4296-838b-569e8cae9cfe", name: "GameTurbo (High Performance)", active: true },
+      { guid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", name: "High performance", active: false },
+    ];
+    expect(pickHighPerformanceScheme(schemes)?.guid).toBe("69472b16-83b2-4296-838b-569e8cae9cfe");
+    // From Balanced, the built-in High performance plan (by GUID) is preferred over a vendor plan listed first.
+    const fromBalanced = schemes.map((s) => ({ ...s, active: s.name === "Balanced" }));
+    expect(pickHighPerformanceScheme(fromBalanced)?.guid).toBe("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
+  });
+
+  it("an already-active performance plan is previewed as unchanged and never recorded or restored", () => {
+    const opts = { safety: "enabled" as const, approvedApps: [], powerSupported: true, activePerformancePlan: "GameTurbo (High Performance)" };
+    const steps = planModeSteps(DEFAULT_MODE_CONFIGS.gaming, opts);
+    const power = steps.find((s) => s.id === "power")!;
+    expect(power.live).toBe(false);
+    expect(power.detail).toContain("GameTurbo (High Performance)");
+    expect(stepsToChanges(steps, opts).some((c) => c.kind === "power-profile")).toBe(false);
+  });
+
+  it("localized Windows: built-in plans are found by GUID", () => {
+    expect(pickHighPerformanceScheme([{ guid: "381b4222-f694-41f0-9685-ff5bb260df2e", name: "Bilanciato", active: true }, { guid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", name: "Prestazioni elevate", active: false }])?.guid).toBe("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
+  });
 });

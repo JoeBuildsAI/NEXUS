@@ -42,6 +42,8 @@ interface ModeState {
   /** Power plan GUID that was active before NEXUS changed it (null = unchanged). */
   previousPowerGuid: string | null;
   powerSupported: boolean | null;
+  /** Name of the active plan when it already is a performance plan (Gaming Mode leaves it alone). */
+  activePerformancePlan: string | null;
   requestMode: (mode: OperatingMode) => void;
   cancelPreview: () => void;
   enterMode: (mode: OperatingMode) => Promise<void>;
@@ -58,12 +60,13 @@ interface ModeState {
 const STEP_MS = 420;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function currentOpts(powerSupported: boolean | null) {
+function currentOpts(powerSupported: boolean | null, activePerformancePlan: string | null = null) {
   const settings = useSettingsStore.getState();
   return {
     safety: settings.system.safety,
     approvedApps: useProcessPrefsStore.getState().closeAllowlist(),
     powerSupported: powerSupported ?? true,
+    activePerformancePlan,
   };
 }
 
@@ -78,20 +81,21 @@ export const useModeStore = create<ModeState>((set, get) => ({
   notificationsSuppressed: false,
   previousPowerGuid: null,
   powerSupported: null,
+  activePerformancePlan: null,
 
   probePower: async () => {
-    const cached = get().powerSupported;
-    if (cached != null) return cached;
+    // Not cached: the user can switch plans outside NEXUS at any time.
     const st = await native.powerState();
-    const supported = st.supported && pickHighPerformanceScheme(st.schemes) != null;
-    set({ powerSupported: supported });
-    return supported;
+    const hp = st.supported ? pickHighPerformanceScheme(st.schemes) : null;
+    const active = hp && st.activeGuid && hp.guid.toLowerCase() === st.activeGuid.toLowerCase() ? hp.name : null;
+    set({ powerSupported: hp != null, activePerformancePlan: active });
+    return hp != null;
   },
 
   stepsFor: (mode) =>
     mode === "normal"
       ? planRestoreSteps(get().session?.changes ?? [])
-      : planModeSteps(get().configs[mode], currentOpts(get().powerSupported)),
+      : planModeSteps(get().configs[mode], currentOpts(get().powerSupported, get().activePerformancePlan)),
 
   requestMode: (mode) => {
     if (mode === get().current) return;
@@ -105,7 +109,7 @@ export const useModeStore = create<ModeState>((set, get) => ({
     const { configs, session, history, transition } = get();
     if (transition) return;
     const powerSupported = await get().probePower();
-    const opts = currentOpts(powerSupported);
+    const opts = currentOpts(powerSupported, get().activePerformancePlan);
     const reducedMotion = useSettingsStore.getState().appearance.reducedMotion;
     const steps = mode === "normal" ? planRestoreSteps(session?.changes ?? []) : planModeSteps(configs[mode], opts);
     set({ preview: null, transition: { target: mode, steps, current: 0, done: false, results: {} } });

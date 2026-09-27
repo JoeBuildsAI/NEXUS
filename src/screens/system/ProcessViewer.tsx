@@ -29,7 +29,7 @@ type SortKey = "cpu" | "mem" | "name" | "class";
 
 /** Short class label for the table (plain English, restrained color). */
 const CLASS_TEXT: Record<ProcessClass, string> = {
-  "system-critical": "text-white/40", driver: "text-white/40", security: "text-white/40", hardware: "text-white/40",
+  "system-critical": "text-white/40", driver: "text-white/40", security: "text-white/40", hardware: "text-white/40", platform: "text-white/40",
   "user-application": "text-white/85", optional: "text-white/60", unknown: "text-status-attention/80",
 };
 

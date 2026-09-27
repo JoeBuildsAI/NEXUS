@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useProcessPrefsStore } from "./processPrefsStore";
+import { migratePrefs, useProcessPrefsStore } from "./processPrefsStore";
 import { fuzzyScore } from "@/lib/fuzzy";
 
 describe("process preferences", () => {
@@ -16,6 +16,18 @@ describe("process preferences", () => {
     s.setPref("Discord.exe", "never");
     s.setPref("Chrome.exe", "normal");
     expect(useProcessPrefsStore.getState().suspendAllowlist()).toEqual(["spotify.exe"]);
+  });
+
+  it("SAFETY: a fresh install pre-approves nothing for closing", () => {
+    expect(useProcessPrefsStore.getInitialState().prefs).toEqual({});
+    expect(useProcessPrefsStore.getInitialState().closeAllowlist()).toEqual([]);
+  });
+
+  it("migration drops the old shipped Spotify+Discord default but keeps real user choices", () => {
+    expect(migratePrefs({ "spotify.exe": "close", "discord.exe": "close" }, 2).prefs).toEqual({});
+    expect(migratePrefs({ "spotify.exe": "close", "discord.exe": "never" }, 2).prefs).toEqual({ "spotify.exe": "close", "discord.exe": "never" });
+    expect(migratePrefs({ "spotify.exe": "close", "discord.exe": "close", "obs64.exe": "close" }, 2).prefs).toHaveProperty("discord.exe", "close");
+    expect(migratePrefs({ "spotify.exe": "suspend", "discord.exe": "close" }, 3).prefs).toEqual({ "spotify.exe": "close", "discord.exe": "close" });
   });
 
   it("setting 'normal' removes the entry", () => {

@@ -38,7 +38,7 @@ function fakeNative(opts: { active?: string; schemes?: { guid: string; name: str
 
 describe("Gaming Mode transaction semantics", () => {
   beforeEach(() => {
-    useModeStore.setState({ current: "normal", session: null, history: [], transition: null, preview: null, gameRunning: false, previousPowerGuid: null, powerSupported: null });
+    useModeStore.setState({ current: "normal", session: null, history: [], transition: null, preview: null, gameRunning: false, previousPowerGuid: null, powerSupported: null, activePerformancePlan: null });
     useSettingsStore.getState().setSystem({ safety: "enabled", allowProcessManagement: true });
     useSettingsStore.getState().setAppearance({ reducedMotion: true }); // no step delays in tests
     useProcessPrefsStore.setState({ prefs: { "Spotify.exe": "close", "Discord.exe": "close" } });
@@ -67,6 +67,19 @@ describe("Gaming Mode transaction semantics", () => {
     expect(useModeStore.getState().previousPowerGuid).toBeNull();
     await useModeStore.getState().exitToNormal();
     expect(n.setCalls).toEqual([]); // nothing to restore
+  });
+
+  it("real gaming PC: an active vendor performance plan is kept through enter and exit", async () => {
+    const VENDOR = "69472b16-83b2-4296-838b-569e8cae9cfe";
+    const n = fakeNative({ active: VENDOR, schemes: [{ guid: BALANCED, name: "Balanced" }, { guid: VENDOR, name: "GameTurbo (High Performance)" }, { guid: HIGH, name: "High performance" }] });
+    await useModeStore.getState().probePower();
+    expect(useModeStore.getState().stepsFor("gaming").find((s) => s.id === "power")?.detail).toContain("left unchanged");
+    await useModeStore.getState().enterMode("gaming");
+    expect(n.setCalls).toEqual([]);
+    expect(n.active).toBe(VENDOR);
+    await useModeStore.getState().exitToNormal();
+    expect(n.setCalls).toEqual([]);
+    expect(n.active).toBe(VENDOR);
   });
 
   it("a failed power switch is not recorded as a change, so exit never 'restores' it", async () => {
