@@ -54,6 +54,14 @@
     "publisher": "NEXUS",
     "copyright": "Copyright (c) 2026 NEXUS",
     "category": "Utility",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true }
+    },
     "shortDescription": "A premium personal operating layer for Windows.",
     "longDescription": "NEXUS is a premium personal operating layer for Windows — a cinematic command center for gaming, media, system telemetry and communications."
   }

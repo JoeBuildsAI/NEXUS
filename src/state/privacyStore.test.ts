@@ -41,6 +41,28 @@ describe("privacy mode", () => {
     expect(usePrivacyStore.getState().active).toBe(false);
   });
 
+  it("hide-to-tray action still leaves the media screen and pauses first", () => {
+    useSettingsStore.getState().setPrivacy({ action: "tray" });
+    usePrivacyStore.getState().activate("hotkey");
+    expect(useMediaStore.getState().slots.every((s) => !s.playing)).toBe(true);
+    expect(useNavigationStore.getState().screen).toBe("home");
+    expect(usePrivacyStore.getState().active).toBe(true);
+  });
+
+  it("clearWorkspaceOnTrigger unloads every slot so nothing resumes", () => {
+    useSettingsStore.getState().setPrivacy({ clearWorkspaceOnTrigger: true });
+    usePrivacyStore.getState().activate("hotkey");
+    expect(useMediaStore.getState().slots.every((s) => s.itemId === null && !s.playing)).toBe(true);
+    useSettingsStore.getState().setPrivacy({ clearWorkspaceOnTrigger: false });
+  });
+
+  it("closes the command palette and records activation time", () => {
+    useNavigationStore.getState().openCommandPalette();
+    usePrivacyStore.getState().activate("test");
+    expect(useNavigationStore.getState().commandPaletteOpen).toBe(false);
+    expect(usePrivacyStore.getState().lastActivatedAt).not.toBeNull();
+  });
+
   it("respects the stopPlaybackOnTrigger=false setting", () => {
     useSettingsStore.getState().setPrivacy({ stopPlaybackOnTrigger: false });
     useMediaStore.setState({
