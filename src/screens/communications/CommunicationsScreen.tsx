@@ -3,7 +3,6 @@ import { Filter, RefreshCw, Search, X } from "lucide-react";
 import type { Message } from "@/core/types";
 import { useInbox, type DateRange, type SortKey, type ThreadRow } from "@/hooks/useInbox";
 import { useNavigationStore, type CommsSurface } from "@/state/navigationStore";
-import { useEmailAccountsStore } from "@/state/emailAccountsStore";
 import { useEmailRulesStore } from "@/state/emailRulesStore";
 import { isOffline } from "@/core/errors";
 import type { InboxView } from "@/core/email/classify";
@@ -44,7 +43,6 @@ export function CommunicationsScreen() {
   const request = useNavigationStore((s) => s.commsRequest);
   const navigate = useNavigationStore((s) => s.navigate);
   const setSection = useNavigationStore((s) => s.setSettingsSection);
-  const slots = useEmailAccountsStore((s) => s.accounts);
   const rulesVersion = useEmailRulesStore((s) => s.rules.length);
   void rulesVersion;
 
@@ -220,7 +218,6 @@ export function CommunicationsScreen() {
         {surface === "subscriptions" && <div className="h-full overflow-y-auto pt-8"><SubscriptionManager messages={messages} accounts={accounts} onChanged={() => void reload()} /></div>}
         {surface === "rules" && <div className="h-full overflow-y-auto pt-8"><RulesPanel messages={messages} accounts={accounts} onChanged={() => void reload()} /></div>}
       </div>
-      {slots.length > 2 && mode === "real" && null}
     </div>
   );
 }

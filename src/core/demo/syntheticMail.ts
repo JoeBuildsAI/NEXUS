@@ -1,4 +1,4 @@
-import type { Message, MessageCategory } from "@/core/types";
+import type { Message } from "@/core/types";
 import { classifyMessage } from "@/core/email/classify";
 
 /**
@@ -88,4 +88,3 @@ export function syntheticMessages(opts: SyntheticMailOptions): Message[] {
   return out.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-export const SYNTHETIC_CATEGORY_HINT: Partial<Record<MessageCategory, string>> = {};
