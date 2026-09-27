@@ -65,6 +65,10 @@ interface MediaState {
   setActiveIndex: (index: number | null) => void;
   /** Add an item to the first free player; returns the index or null when full. */
   addToWall: (itemId: string, opts?: { primary?: boolean; play?: boolean }) => number | null;
+  /** Browser surfaces (isolated web pages) share the wall with videos. */
+  addBrowser: (url: string) => number | null;
+  setBrowserUrl: (index: number, url: string) => void;
+  setBrowserAspect: (index: number, aspect: number) => void;
   setSlotItem: (index: number, itemId: string | null) => void;
   clearSlot: (index: number) => void;
   clearAll: () => void;
@@ -101,6 +105,7 @@ const validSlot = (sl: unknown, i: number, loop: LoopMode): PlayerSlot => {
   return {
     index: i,
     itemId: typeof o.itemId === "string" ? o.itemId : null,
+    browser: isObj(o.browser) && typeof o.browser.url === "string" && o.browser.url.startsWith("https://") && o.browser.url.length < 2048 ? { url: o.browser.url, aspect: vNum(o.browser.aspect, 16 / 9, 0.25, 4) } : null,
     playing: false,
     muted: vBool(o.muted, true),
     volume: vNum(o.volume, 0.8, 0, 1),
@@ -142,9 +147,19 @@ export const useMediaStore = create<MediaState>()(
       setFocusIndex: (focusIndex) => set({ focusIndex }),
       setActiveIndex: (activeIndex) => set({ activeIndex }),
 
+      addBrowser: (url) => {
+        const s = get();
+        const free = s.slots.find((sl) => !sl.itemId && !sl.browser);
+        if (!free) return null;
+        set((st) => ({ slots: st.slots.map((sl) => (sl.index === free.index ? { ...emptySlot(free.index, st.defaults.loop), browser: { url, aspect: 16 / 9 } } : sl)), activeIndex: free.index }));
+        return free.index;
+      },
+      setBrowserUrl: (index, url) => set((s) => ({ slots: s.slots.map((sl) => (sl.index === index && sl.browser ? { ...sl, browser: { ...sl.browser, url } } : sl)) })),
+      setBrowserAspect: (index, aspect) => set((s) => ({ slots: s.slots.map((sl) => (sl.index === index && sl.browser ? { ...sl, browser: { ...sl.browser, aspect: Math.min(4, Math.max(0.25, aspect)) } } : sl)) })),
+
       addToWall: (itemId, opts) => {
         const s = get();
-        const free = s.slots.find((sl) => !sl.itemId);
+        const free = s.slots.find((sl) => !sl.itemId && !sl.browser);
         if (!free) return null;
         const d = s.defaults;
         const volume = d.restoreVolume && s.lastVolume[itemId] != null ? s.lastVolume[itemId]! : 0.8;

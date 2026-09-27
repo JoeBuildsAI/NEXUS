@@ -87,3 +87,25 @@ describe("media workspace store", () => {
     expect(useMediaStore.getState().slots.every((sl) => !sl.itemId)).toBe(true);
   });
 });
+
+describe("browser surfaces", () => {
+  it("share the wall with videos, keep their own aspect, and are cleared like players", () => {
+    useMediaStore.getState().clearPrivateWorkspace();
+    const s = useMediaStore.getState();
+    s.addToWall("v1");
+    const idx = s.addBrowser("https://example.com/");
+    expect(idx).toBe(1);
+    expect(useMediaStore.getState().slots[1]).toMatchObject({ itemId: null, browser: { url: "https://example.com/", aspect: 16 / 9 } });
+    s.setBrowserAspect(1, 9 / 16);
+    s.setBrowserUrl(1, "https://example.org/");
+    expect(useMediaStore.getState().slots[1]!.browser).toEqual({ url: "https://example.org/", aspect: 9 / 16 });
+    // occupied slots are skipped for both kinds
+    for (let i = 0; i < 4; i++) s.addBrowser("https://a.example/");
+    expect(useMediaStore.getState().addBrowser("https://b.example/")).toBeNull();
+    expect(useMediaStore.getState().addToWall("v2")).toBeNull();
+    s.clearSlot(1);
+    expect(useMediaStore.getState().slots[1]!.browser ?? null).toBeNull();
+    s.clearAll();
+    expect(useMediaStore.getState().slots.every((sl) => !sl.itemId && !sl.browser)).toBe(true);
+  });
+});

@@ -56,9 +56,18 @@ export type FitMode = "fit" | "fill" | "smart";
 export type LoopMode = "off" | "full" | "ab";
 
 /** State for a single player on the adaptive wall (up to 6). */
+/** A non-video surface on the wall (isolated, untrusted web page). */
+export interface BrowserSurface {
+  readonly url: string;
+  /** User-adjustable display aspect (pages expose none). */
+  readonly aspect: number;
+}
+
 export interface PlayerSlot {
   readonly index: number;
   readonly itemId: string | null;
+  /** When set (and itemId is null) the slot is a BROWSER surface. */
+  readonly browser?: BrowserSurface | null;
   readonly playing: boolean;
   readonly muted: boolean;
   readonly volume: number;

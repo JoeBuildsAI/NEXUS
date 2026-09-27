@@ -26,7 +26,7 @@ const resetLibrary = async () => page.evaluate(() => { localStorage.removeItem("
 // 1. 500-game library + extreme titles
 await sim({ steamLibrarySize: 500, extremeText: true });
 await resetLibrary();
-await nav("Home"); await nav("Gaming");
+await nav("Today"); await nav("Play");
 await page.waitForTimeout(1500);
 await shot("gaming-500-extreme");
 await page.getByRole("button", { name: "Name", exact: true }).click(); await page.waitForTimeout(400);
@@ -45,7 +45,7 @@ await page.getByLabel("Search library").fill("");
 // 2. Private profile
 await sim({ steamPrivateProfile: true });
 await resetLibrary();
-await nav("Home"); await nav("Gaming"); await page.waitForTimeout(1200);
+await nav("Today"); await nav("Play"); await page.waitForTimeout(1200);
 await page.locator('button[aria-label^="Baldur"]').first().click().catch(() => {});
 await page.waitForTimeout(700);
 await shot("game-detail-private");
@@ -63,15 +63,15 @@ await sim({ mediaLibrarySize: 0, extremeText: false });
 
 // 4. Provider exceptions (chaos) — every screen must stay up
 await sim({ providerExceptions: true });
-await nav("Home"); await page.waitForTimeout(900); await shot("chaos-home");
-await nav("Gaming"); await page.waitForTimeout(900); await shot("chaos-gaming");
+await nav("Today"); await page.waitForTimeout(900); await shot("chaos-home");
+await nav("Play"); await page.waitForTimeout(900); await shot("chaos-gaming");
 await nav("Media"); await page.waitForTimeout(900); await shot("chaos-media");
 await nav("Communications"); await page.waitForTimeout(900); await shot("chaos-comms");
 await sim({ providerExceptions: false });
 
 // 5. Offline everything
 await sim({ steamConnected: false, mediaConnected: false, emailConnected: false, telemetryAvailable: false });
-await nav("Home"); await page.waitForTimeout(900); await shot("offline-home");
+await nav("Today"); await page.waitForTimeout(900); await shot("offline-home");
 await nav("Communications"); await page.waitForTimeout(900); await shot("offline-comms");
 await nav("System"); await page.waitForTimeout(900); await shot("offline-system");
 

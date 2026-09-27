@@ -56,7 +56,7 @@ await add(5); await page.evaluate(() => window.__nexusMedia.getState().playAll()
   await page.evaluate(() => { const s = window.__nexusMedia.getState(); for (let i = 0; i < 6; i++) s.clearSegment(i); });
   // Leak check: clear the wall, switch screens repeatedly, compare heap + listeners
   await page.evaluate(() => window.__nexusMedia.getState().clearAll());
-  for (let i = 0; i < 6; i++) { await page.locator('nav button[aria-label="Home"]').click(); await page.waitForTimeout(250); await page.locator('nav button[aria-label="Media"]').click(); await page.waitForTimeout(250); }
+  for (let i = 0; i < 6; i++) { await page.locator('nav button[aria-label="Today"]').click(); await page.waitForTimeout(250); await page.locator('nav button[aria-label="Media"]').click(); await page.waitForTimeout(250); }
   await cdp.send("HeapProfiler.collectGarbage").catch(() => {});
   const end = Object.fromEntries((await cdp.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
   console.log(`after clear + 6 screen round-trips: heap ${(end.JSHeapUsedSize / 1048576).toFixed(1)}MB · nodes ${end.Nodes} · listeners ${end.JSEventListeners}`);
@@ -80,6 +80,17 @@ const samples = await page.evaluate(async () => {
 });
 const outOfRange = samples.filter((t) => t < 3.5 || t > 9.6);
 console.log("A–B samples", samples.map((t) => t.toFixed(2)).join(" "), outOfRange.length ? `OUT OF RANGE: ${outOfRange.length}` : "stable");
+
+// Browser surface: an isolated iframe shares the wall with videos (mixed layout stays stable).
+await clear();
+await add(0); await add(1);
+await page.evaluate(() => window.__nexusMedia.getState().addBrowser("https://example.com/"));
+await page.waitForTimeout(1500);
+const mixed = await page.evaluate(() => ({ tiles: document.querySelectorAll("[data-player]").length, browser: document.querySelectorAll('[data-surface="browser"]').length, iframeHasTauri: (() => { const f = document.querySelector("iframe"); try { return f && f.contentWindow && "__TAURI_INTERNALS__" in f.contentWindow; } catch { return "cross-origin (isolated)"; } })() }));
+console.log("mixed wall:", JSON.stringify(mixed));
+if (mixed.tiles !== 3 || mixed.browser !== 1) errors.push("browser surface did not join the wall: " + JSON.stringify(mixed));
+await shot("mixed-browser", 300);
+await page.evaluate(() => window.__nexusMedia.getState().setBrowserAspect(2, 9 / 16)); await shot("mixed-browser-portrait", 800);
 
 // Drag/drop: a library tile dropped on the wall is added; a fake external file drop is ignored.
 await clear();

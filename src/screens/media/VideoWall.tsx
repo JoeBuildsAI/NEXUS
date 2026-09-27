@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderPlus, Keyboard, Library, Link2, Pause, Play, Plus, Save, ShieldOff, Trash2, Volume2, VolumeX, Zap } from "lucide-react";
+import { FolderPlus, Keyboard, Library, Link2, Pause, Play, Plus, Save, ShieldOff, Trash2, Volume2, VolumeX, Zap, Globe } from "lucide-react";
 import { PlayerTile } from "./PlayerTile";
+import { BrowserTile, normalizeUrl } from "./BrowserTile";
 import { MediaPicker } from "./MediaPicker";
 import { SavedWorkspaces } from "./SavedWorkspaces";
 import { useMediaStore, WALL_MODES, SLOT_COUNT } from "@/state/mediaStore";
@@ -40,7 +41,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
   const prevLayoutId = useRef<string | null>(null);
 
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const active = useMemo(() => slots.filter((s) => s.itemId && itemById.has(s.itemId)), [slots, itemById]);
+  const active = useMemo(() => slots.filter((s) => (s.itemId && itemById.has(s.itemId)) || s.browser), [slots, itemById]);
   const loaded = active.length;
   const anyPlaying = active.some((s) => s.playing);
   const anyMuted = active.some((s) => s.muted);
@@ -67,7 +68,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
     const result = optimizeLayout({
       width: size.width,
       height: size.height,
-      players: active.map((s) => ({ index: s.index, aspect: aspects[s.index] ?? null })),
+      players: active.map((s) => ({ index: s.index, aspect: s.browser ? s.browser.aspect : aspects[s.index] ?? null })),
       primaryIndex,
       focusIndex: mode === "focus" ? (active.some((s) => s.index === focusIndex) ? focusIndex : active[0]?.index ?? null) : null,
       mode,
@@ -126,6 +127,13 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
   const onClear = () => {
     if (loaded === 0) return;
     requestConfirm({ title: "Clear the wall?", message: "Unloads every player. Your files, presets and saved workspaces are untouched.", confirmLabel: "Clear", danger: true, onConfirm: () => { store.clearAll(); notify.neutral("Wall cleared"); } });
+  };
+  const addBrowserSurface = () => {
+    const input = window.prompt("Web address for the browser surface (https)");
+    if (input == null) return;
+    const url = normalizeUrl(input);
+    if (!url) { notify.warn("Not a web address", "Browser surfaces open https pages only."); return; }
+    if (store.addBrowser(url) == null) notify.warn("Wall is full");
   };
   const positions = () => Object.fromEntries(Object.entries(videoEls.current).filter(([, v]) => v).map(([k, v]) => [Number(k), v!.currentTime]));
   const [dropHint, setDropHint] = useState(false);
@@ -188,7 +196,8 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
             ))}
           </div>
           <span className="h-4 w-px bg-white/10" />
-          {loaded < SLOT_COUNT && <Ctl onClick={() => setPickerSlot(slots.find((s) => !s.itemId)?.index ?? null)} label="Add video"><Plus size={14} /></Ctl>}
+          {loaded < SLOT_COUNT && <Ctl onClick={() => setPickerSlot(slots.find((s) => !s.itemId && !s.browser)?.index ?? null)} label="Add video"><Plus size={14} /></Ctl>}
+          {loaded < SLOT_COUNT && <Ctl onClick={addBrowserSurface} label="Add browser surface (isolated web page)"><Globe size={14} /></Ctl>}
           <Ctl onClick={() => setShowSaved(true)} label="Saved workspaces"><Save size={14} /></Ctl>
           <Ctl onClick={() => setShowKeys((v) => !v)} label="Keyboard shortcuts (?)" active={showKeys}><Keyboard size={14} /></Ctl>
           <Ctl onClick={onClear} label="Clear wall"><Trash2 size={14} /></Ctl>
@@ -200,6 +209,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
       <div ref={containerRef} data-wall className={cn("relative min-h-0 flex-1 overflow-hidden bg-black", dropHint && "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]")} onMouseDown={(e) => { if (e.target === e.currentTarget) store.setActiveIndex(null); }} onDragOver={onDragOver} onDragLeave={() => setDropHint(false)} onDrop={(e) => onDrop(e)}>
         {size.width > 0 && layout.tiles.map((tile) => {
           const slot = slots[tile.index]!;
+          if (slot.browser && !slot.itemId) return <BrowserTile key={slot.index} slot={slot} tile={tile} isPrimary={primaryIndex === slot.index} isActive={activeIndex === slot.index} onActivate={store.setActiveIndex} />;
           const item = itemById.get(slot.itemId!)!;
           return (
             <PlayerTile

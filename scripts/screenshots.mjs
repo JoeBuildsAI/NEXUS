@@ -35,7 +35,7 @@ const tab = async (name) => { await page.getByRole("tab", { name }).click(); awa
 const settingsSection = async (name) => { await page.getByRole("navigation", { name: "Settings sections" }).getByRole("button", { name, exact: true }).click(); await page.waitForTimeout(600); };
 
 await shot("home");
-await nav("Gaming"); await shot("gaming");
+await nav("Play"); await shot("gaming");
 await page.getByRole("button", { name: "Details" }).click(); await shot("game-detail");
 await nav("Media"); await shot("media-empty-wall");
 await page.evaluate(async () => { const items = await window.__nexusProviders.media.getItems(); const s = window.__nexusMedia.getState(); for (const it of items.slice(0, 4)) s.addToWall(it.id); });
@@ -59,7 +59,7 @@ await settingsSection("Media"); await shot("settings-media");
 await settingsSection("Privacy"); await shot("settings-privacy");
 await settingsSection("System"); await page.waitForTimeout(800); await shot("settings-system");
 await settingsSection("Integrations"); await page.waitForTimeout(800); await shot("settings-integrations");
-await nav("Home");
+await nav("Today");
 await page.keyboard.press("Control+Space"); await page.waitForTimeout(400); await shot("palette-idle");
 await page.keyboard.type("open dis"); await page.waitForTimeout(400); await shot("palette-query");
 await page.keyboard.press("Escape");
@@ -76,11 +76,11 @@ if (!quick) {
   await page.getByRole("button", { name: "Resume" }).click();
 
   // Empty states via the dev simulation panel: Steam offline, media disconnected, email offline
-  await nav("Home");
+  await nav("Today");
   await page.keyboard.press("Control+Shift+D"); await page.waitForTimeout(400);
   for (const name of ["Steam connected", "Media drive connected", "Email connected"]) await page.getByRole("switch", { name }).click();
   await page.keyboard.press("Control+Shift+D"); await page.waitForTimeout(300);
-  await nav("Gaming"); await shot("empty-steam");
+  await nav("Play"); await shot("empty-steam");
   await nav("Media"); await shot("empty-media");
   await nav("Communications"); await shot("empty-comms");
   await page.keyboard.press("Control+Shift+D"); await page.waitForTimeout(300);
