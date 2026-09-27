@@ -35,7 +35,7 @@ export function MediaPicker({ open, items, onPick, onClose }: Props) {
               {filtered.length === 0 && <p className="py-6 text-sm text-white/30">No local matches.</p>}
               {filtered.map((item) => (
                 <button key={item.id} onClick={() => onPick(item)} disabled={item.available === false} className={cn("group flex w-full items-center gap-4 py-2 text-left", item.available === false && "opacity-40")}>
-                  <span className="h-8 w-14 shrink-0 rounded-sm" style={{ background: item.thumbnailColor }} />
+                  <span className="h-8 w-14 shrink-0 overflow-hidden rounded-sm" style={{ background: item.thumbnailColor }}>{item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover" />}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] text-white/80 transition-colors group-hover:text-white">{item.title}</span>
                     {item.folder && <span className="block truncate text-[11px] text-white/30">{item.folder.split("\\").pop()}</span>}

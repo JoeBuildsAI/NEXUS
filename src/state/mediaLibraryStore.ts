@@ -34,6 +34,10 @@ interface MediaLibraryState {
   /** Transient */
   scan: MediaScanProgress | null;
   unavailable: string[];
+  /** Transient: file id → thumbnail asset URL (null = none available). */
+  thumbs: Record<string, string | null>;
+  setThumb: (id: string, url: string | null) => void;
+  clearThumbs: () => void;
   addRoot: (root: AuthorizedRoot) => void;
   updateRoot: (id: string, patch: Partial<AuthorizedRoot>) => void;
   removeRoot: (id: string) => void;
@@ -56,6 +60,9 @@ export const useMediaLibraryStore = create<MediaLibraryState>()(
       collections: [],
       scan: null,
       unavailable: [],
+      thumbs: {},
+      setThumb: (id, url) => set((s) => ({ thumbs: { ...s.thumbs, [id]: url } })),
+      clearThumbs: () => set({ thumbs: {} }),
       addRoot: (root) => set((s) => ({ roots: s.roots.some((r) => r.id === root.id) ? s.roots.map((r) => (r.id === root.id ? { ...r, ...root } : r)) : [...s.roots, root] })),
       updateRoot: (id, patch) => set((s) => ({ roots: s.roots.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
       removeRoot: (id) =>
@@ -110,6 +117,7 @@ export const useMediaLibraryStore = create<MediaLibraryState>()(
           collections: vArr(p.collections, (x): x is LocalCollection => isObj(x) && typeof x.id === "string" && typeof x.name === "string" && Array.isArray(x.itemIds), [], 200),
           scan: null,
           unavailable: [],
+          thumbs: {},
         };
       },
     },

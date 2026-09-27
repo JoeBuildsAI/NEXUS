@@ -128,8 +128,8 @@ export function MediaSettingsSection() {
       <SettingRow label="Pause when hidden" description="Pause all players when the workspace is hidden.">
         <Toggle checked={media.pauseOnHide} onChange={(v) => setMedia({ pauseOnHide: v })} />
       </SettingRow>
-      <SettingRow label="Generate local thumbnails" description="Off by default. Thumbnails would be generated and cached locally only — never uploaded.">
-        <Toggle checked={false} disabled onChange={() => undefined} />
+      <SettingRow label="Local thumbnails" description={config.isTauri ? "Rendered by Windows' own thumbnail provider and cached locally under hashed names. Removed with the location's authorization." : "Available in the desktop build."}>
+        <Toggle checked={media.thumbnails} disabled={!config.isTauri} onChange={(v) => { setMedia({ thumbnails: v }); if (!v) void provider.purgeThumbnails?.(); }} />
       </SettingRow>
       <SettingRow label="Clear workspace" description="Unload every player slot now.">
         <Button size="sm" variant="outline" onClick={() => { clearWorkspace(); notify.neutral("Workspace cleared"); }}>Clear workspace</Button>

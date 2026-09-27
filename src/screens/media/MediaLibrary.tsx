@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronRight, Folder, FolderPlus, Play, Plus, Search, Star, X } from "lucide-react";
 import { Button, ContextMenu, type ContextMenuItem } from "@/components/ui";
 import { useAsync } from "@/hooks/useAsync";
+import { useThumbnails } from "@/hooks/useThumbnails";
 import { getProviders } from "@/providers";
 import { useMediaStore } from "@/state/mediaStore";
 import { notify } from "@/state/toastStore";
@@ -46,6 +47,8 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
     else if (view === "library") all = all.filter((i) => (i.folder ?? "") === folder);
     return all;
   }, [items, view, collection, folder, query]);
+
+  useThumbnails(filtered.slice(0, 60));
 
   const sendToSlot = (item: MediaItem, index?: number) => {
     if (item.available === false) return notify.warn("Unavailable", "The source drive or file is not reachable right now.");
@@ -163,7 +166,9 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
             <ContextMenu key={item.id} items={menuFor(item)}>
               <div className={cn("group", item.available === false && "opacity-50")}>
                 <div className="relative aspect-video overflow-hidden rounded-sm bg-black">
-                  <div className="absolute inset-0 transition-transform duration-700 ease-nexus group-hover:scale-[1.03]" style={{ background: `radial-gradient(90% 90% at 30% 20%, ${item.thumbnailColor}, #000 90%)` }} />
+                  <div className="absolute inset-0 transition-transform duration-700 ease-nexus group-hover:scale-[1.03]" style={{ background: `radial-gradient(90% 90% at 30% 20%, ${item.thumbnailColor}, #000 90%)` }}>
+                    {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
+                  </div>
                   <button onClick={() => sendToSlot(item)} className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100" aria-label={`Load ${item.title}`}>
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-black"><Play size={14} className="ml-0.5" fill="currentColor" /></span>
                   </button>

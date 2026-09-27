@@ -2,6 +2,7 @@ mod apps;
 mod gpu;
 mod hardware;
 mod media;
+mod media_thumbs;
 mod secrets;
 mod session;
 mod state;
@@ -86,6 +87,8 @@ pub fn run() {
             media::media_file_exists,
             media::media_scan_root,
             media::media_cancel_scan,
+            media_thumbs::media_thumbnail,
+            media_thumbs::media_purge_thumbnails,
             hardware::get_hardware,
             gpu::gpu_set_preferred,
             session::session_read,

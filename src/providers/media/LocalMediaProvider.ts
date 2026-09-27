@@ -38,7 +38,7 @@ export class LocalMediaProvider implements MediaProvider {
     log.info("Media roots registered", { roots: s.roots.length });
   }
 
-  private toItem(f: IndexedFile, favorites: Set<string>, collectionOf: Map<string, string>, roots: Map<string, AuthorizedRoot>, unavailable: Set<string>): MediaItem {
+  private toItem(f: IndexedFile, favorites: Set<string>, collectionOf: Map<string, string>, roots: Map<string, AuthorizedRoot>, unavailable: Set<string>, thumbs: Record<string, string | null>): MediaItem {
     const pal = generatedPalette(f.name);
     const root = roots.get(f.rootId);
     return {
@@ -47,7 +47,7 @@ export class LocalMediaProvider implements MediaProvider {
       durationSeconds: 0,
       src: this.bridge.toAssetUrl(f.path),
       thumbnailColor: pal.cover,
-      thumbnailUrl: null,
+      thumbnailUrl: thumbs[f.id] ?? null,
       addedAt: f.addedAt,
       collectionId: collectionOf.get(f.id) ?? null,
       favorite: favorites.has(f.id),
@@ -72,7 +72,7 @@ export class LocalMediaProvider implements MediaProvider {
     const collectionOf = new Map<string, string>();
     for (const c of s.collections) for (const id of c.itemIds) collectionOf.set(id, c.id);
     const roots = new Map(s.roots.map((r) => [r.id, r]));
-    return s.files.map((f) => this.toItem(f, favorites, collectionOf, roots, unavailable));
+    return s.files.map((f) => this.toItem(f, favorites, collectionOf, roots, unavailable, s.thumbs));
   }
 
   async getCollections(): Promise<readonly MediaCollection[]> {
@@ -101,6 +101,7 @@ export class LocalMediaProvider implements MediaProvider {
     if (!root) return;
     try {
       await this.bridge.revokeRoot(root.path);
+      await this.bridge.purgeThumbnails(rootId).catch(() => undefined);
     } finally {
       this.store.getState().removeRoot(rootId);
       log.info("Media root authorization removed");
@@ -109,6 +110,33 @@ export class LocalMediaProvider implements MediaProvider {
 
   async clearHistory(): Promise<void> {
     this.store.getState().clearHistory();
+    this.store.getState().clearThumbs();
+    await this.bridge.purgeThumbnails().catch(() => undefined);
+  }
+
+  /**
+   * Generate/fetch a local thumbnail for one item. Cached in native storage under
+   * a hashed name; the store keeps the asset URL for this session only.
+   */
+  async ensureThumbnail(itemId: string): Promise<string | null> {
+    const s = this.store.getState();
+    if (itemId in s.thumbs) return s.thumbs[itemId] ?? null;
+    const f = s.files.find((x) => x.id === itemId);
+    if (!f) return null;
+    try {
+      const path = await this.bridge.thumbnail(f.path, f.rootId);
+      const url = path ? this.bridge.toAssetUrl(path) : null;
+      this.store.getState().setThumb(itemId, url);
+      return url;
+    } catch {
+      this.store.getState().setThumb(itemId, null);
+      return null;
+    }
+  }
+
+  async purgeThumbnails(): Promise<void> {
+    this.store.getState().clearThumbs();
+    await this.bridge.purgeThumbnails().catch(() => undefined);
   }
 
   async scanRoot(rootId: string, onProgress?: (p: MediaScanProgress) => void): Promise<void> {

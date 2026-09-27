@@ -62,6 +62,12 @@ export class MediaAutoProvider implements MediaProvider {
   checkAvailable(itemId: string): Promise<boolean> {
     return this.pick().checkAvailable?.(itemId) ?? Promise.resolve(true);
   }
+  ensureThumbnail(itemId: string): Promise<string | null> {
+    return this.pick() === this.local ? this.local.ensureThumbnail(itemId) : Promise.resolve(null);
+  }
+  purgeThumbnails(): Promise<void> {
+    return this.local.purgeThumbnails();
+  }
   async health(): Promise<ProviderHealth> {
     const h = await this.local.health!();
     if (h.state === "not-configured" && this.allowDemoFallback) return { ...h, summary: "No authorized locations · using demo library" };

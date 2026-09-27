@@ -120,6 +120,23 @@ describe("LocalMediaProvider", () => {
     expect(cols.find((c) => c.id === col.id)?.itemCount).toBe(1);
   });
 
+  it("thumbnails are generated per item and purged with the root's authorization", async () => {
+    const { bridge, provider } = setup();
+    const root = await provider.authorizeRoot();
+    await provider.scanRoot(root!.id);
+    const item = (await provider.getItems())[0]!;
+    const url = await provider.ensureThumbnail(item.id);
+    expect(url).toMatch(/^fixture:\/\/C:\\cache\\thumbs\\/);
+    expect(url).not.toContain("a.mp4"); // hashed, never the filename
+    expect((await provider.getItems()).find((i) => i.id === item.id)?.thumbnailUrl).toBe(url);
+    // Cached in-session: second call does not hit the bridge again
+    const before = bridge.thumbs.size;
+    await provider.ensureThumbnail(item.id);
+    expect(bridge.thumbs.size).toBe(before);
+    await provider.revokeRoot(root!.id);
+    expect(bridge.purged).toContain(root!.id);
+  });
+
   it("clear history wipes index but keeps authorization", async () => {
     const { provider } = setup();
     const root = await provider.authorizeRoot();

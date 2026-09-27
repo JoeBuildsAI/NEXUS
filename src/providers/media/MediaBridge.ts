@@ -41,6 +41,9 @@ export interface MediaBridge {
   scanRoot(path: string, onProgress: (p: MediaScanProgress) => void): Promise<NativeScanResult>;
   cancelScan(): Promise<void>;
   toAssetUrl(path: string): string;
+  /** Local thumbnail (Windows Shell); returns an absolute cache path or null. */
+  thumbnail(path: string, rootId: string): Promise<string | null>;
+  purgeThumbnails(rootId?: string): Promise<void>;
 }
 
 export class TauriMediaBridge implements MediaBridge {
@@ -104,6 +107,13 @@ export class TauriMediaBridge implements MediaBridge {
   toAssetUrl(path: string) {
     return convertFileSrc(path);
   }
+  async thumbnail(path: string, rootId: string) {
+    const r = await this.invoke<{ path: string | null; cached: boolean }>("media_thumbnail", { path, rootId });
+    return r.path;
+  }
+  async purgeThumbnails(rootId?: string) {
+    await this.invoke<number>("media_purge_thumbnails", { rootId: rootId ?? null });
+  }
 }
 
 /** Fixture bridge: an in-memory "drive" for tests and simulated environments. */
@@ -146,5 +156,17 @@ export class FixtureMediaBridge implements MediaBridge {
   async cancelScan() {}
   toAssetUrl(path: string) {
     return `fixture://${path}`;
+  }
+  thumbs = new Map<string, string>();
+  purged: string[] = [];
+  async thumbnail(path: string) {
+    if (!this.registered.size) throw new Error("not authorized");
+    const t = ["C:", "cache", "thumbs", `${path.length}.png`].join("\\");
+    this.thumbs.set(path, t);
+    return t;
+  }
+  async purgeThumbnails(rootId?: string) {
+    this.purged.push(rootId ?? "*");
+    this.thumbs.clear();
   }
 }
