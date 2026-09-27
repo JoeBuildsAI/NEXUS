@@ -73,6 +73,7 @@ pub fn run() {
             system::set_close_behavior,
             system::exit_app,
             system::launch_flags,
+            system::background_register,
             apps::discover_apps,
             apps::launch_app,
             apps::app_icon,

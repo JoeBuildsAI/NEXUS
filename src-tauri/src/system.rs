@@ -1,7 +1,7 @@
 use crate::state::AppState;
 use serde::Serialize;
 use sysinfo::ProcessesToUpdate;
-use tauri::State;
+use tauri::{Manager, State};
 
 /// Raw process info. Safety classification is applied on the frontend from the
 /// name/publisher — see `src/core/safety/processClassifier.ts`.
@@ -194,6 +194,26 @@ pub fn set_close_behavior(state: State<AppState>, behavior: String) -> Result<()
     };
     *state.close_behavior.lock().map_err(|e| e.to_string())? = b;
     Ok(())
+}
+
+/// Allow one explicitly chosen local image to be displayed as the Home
+/// backdrop. Only common image extensions; the file (not its folder) is granted.
+#[tauri::command]
+pub fn background_register(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let p = std::path::PathBuf::from(path.trim());
+    let canon = p.canonicalize().map_err(|_| "Image not found.".to_string())?;
+    if !canon.is_file() {
+        return Err("Not a file.".into());
+    }
+    let ext = canon.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).unwrap_or_default();
+    if !["png", "jpg", "jpeg", "webp", "avif", "bmp"].contains(&ext.as_str()) {
+        return Err("Choose a PNG, JPEG, WebP or AVIF image.".into());
+    }
+    if std::fs::metadata(&canon).map(|m| m.len()).unwrap_or(u64::MAX) > 64 * 1024 * 1024 {
+        return Err("Image is larger than 64 MB.".into());
+    }
+    app.asset_protocol_scope().allow_file(&canon).map_err(|e| e.to_string())?;
+    Ok(crate::media::normalize(&canon).to_string_lossy().to_string())
 }
 
 /// Launch flags the frontend needs to honor user settings (e.g. "start minimized").

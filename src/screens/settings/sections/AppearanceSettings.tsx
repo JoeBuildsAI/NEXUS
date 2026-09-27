@@ -1,12 +1,32 @@
-import { Check } from "lucide-react";
+import { Check, ImageIcon } from "lucide-react";
 import { SettingsSection, SettingRow, Select } from "../SettingsControls";
-import { Toggle, Slider } from "@/components/ui";
+import { Toggle, Slider, Button } from "@/components/ui";
+import { config } from "@/core/config";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { notify } from "@/state/toastStore";
 import { useSettingsStore, type BackgroundPerformance, type EnvironmentPreset } from "@/state/settingsStore";
 import { ENVIRONMENTS } from "@/components/background/environments";
 import { cn } from "@/lib/utils";
 
+async function chooseBackgroundImage(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const picked = await open({ multiple: false, directory: false, title: "Choose a background image", filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "avif", "bmp"] }] });
+  if (!picked || typeof picked !== "string") return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  // Settings keep the native path; the asset grant is re-applied on every launch.
+  return invoke<string>("background_register", { path: picked });
+}
+
 export function AppearanceSettings() {
   const { appearance, setAppearance } = useSettingsStore();
+  const pickImage = async () => {
+    try {
+      const url = await chooseBackgroundImage();
+      if (url) setAppearance({ backgroundImage: url });
+    } catch (e) {
+      notify.warn("Image not applied", String((e as Error).message ?? e));
+    }
+  };
   return (
     <SettingsSection title="Appearance" description="Environment, motion and glass.">
       <div className="py-5">
@@ -37,6 +57,13 @@ export function AppearanceSettings() {
           onChange={(v) => setAppearance({ backgroundPerformance: v })}
           options={[{ value: "full", label: "Full" }, { value: "balanced", label: "Balanced" }, { value: "minimal", label: "Minimal" }]}
         />
+      </SettingRow>
+      <SettingRow label="Background image" description={config.isTauri ? "One local image, held far behind the environment and dimmed. Nothing is copied or uploaded." : "Available in the desktop build."}>
+        <div className="flex items-center gap-3">
+          {appearance.backgroundImage && <img src={convertFileSrc(appearance.backgroundImage)} alt="" className="h-8 w-14 rounded-sm object-cover opacity-80" />}
+          {appearance.backgroundImage && <Button size="sm" variant="ghost" onClick={() => setAppearance({ backgroundImage: null })}>Remove</Button>}
+          <Button size="sm" variant="outline" disabled={!config.isTauri} onClick={() => void pickImage()}><ImageIcon size={13} /> {appearance.backgroundImage ? "Change" : "Choose"}</Button>
+        </div>
       </SettingRow>
       <SettingRow label="Background intensity" description="Density and brightness of the ambient scene.">
         <div className="w-48"><Slider value={appearance.backgroundIntensity} onChange={(v) => setAppearance({ backgroundIntensity: v })} valueLabel={`${appearance.backgroundIntensity}%`} /></div>

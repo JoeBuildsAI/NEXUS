@@ -46,6 +46,15 @@ export function useNativeEvents() {
     void import("@tauri-apps/api/core").then(({ invoke }) => invoke("gpu_set_preferred", { luid: preferredGpu }).catch(() => undefined));
   }, [preferredGpu]);
 
+  // Re-grant the chosen background image to the asset scope (grants are per-process).
+  const backgroundImage = useSettingsStore((s) => s.appearance.backgroundImage);
+  useEffect(() => {
+    if (!config.isTauri || !backgroundImage) return;
+    void import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke<string>("background_register", { path: backgroundImage }).catch(() => useSettingsStore.getState().setAppearance({ backgroundImage: null })),
+    );
+  }, [backgroundImage]);
+
   // Autostart always launches with --minimized (hidden by the native layer). If the
   // user did NOT ask to start minimized, reveal the window once the shell is ready.
   useEffect(() => {

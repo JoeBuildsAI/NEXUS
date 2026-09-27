@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
 import { useNavigationStore } from "@/state/navigationStore";
@@ -33,6 +34,7 @@ export function AmbientBackground() {
   const spec = ENVIRONMENTS[appearance.environment];
   // Media screen blacks out the environment regardless of mode.
   const mood = screen === "media" ? MODE_MOOD.media : MODE_MOOD[mode];
+  const blackout = screen === "media";
   const perf = appearance.backgroundPerformance;
   const still = appearance.reducedMotion || !appearance.animationsEnabled;
 
@@ -177,10 +179,15 @@ export function AmbientBackground() {
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={{ background: spec.base[2] }}>
+      {appearance.backgroundImage && !blackout && (
+        // Explicitly chosen local image, held far back: blurred edge, dimmed, never competing with type.
+        <img src={convertFileSrc(appearance.backgroundImage)} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.22 + intensity * 0.18, filter: "saturate(0.7)" }} draggable={false} />
+      )}
       <div
         className="absolute inset-0 transition-opacity duration-1000"
         style={{
           background: `radial-gradient(120% 80% at 50% -10%, ${spec.base[0]} 0%, ${spec.base[1]} 45%, ${spec.base[2]} 100%)`,
+          opacity: appearance.backgroundImage && !blackout ? 0.75 : 1,
         }}
       />
 

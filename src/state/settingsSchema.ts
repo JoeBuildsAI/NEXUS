@@ -41,7 +41,7 @@ export function sanitizeSettings(persisted: unknown, defaults: SettingsData): Se
       telemetryAnimation: vBool(a.telemetryAnimation, d.appearance.telemetryAnimation),
       reducedMotion: vBool(a.reducedMotion, d.appearance.reducedMotion),
       cursorLighting: vBool(a.cursorLighting, d.appearance.cursorLighting),
-      backgroundImage: typeof a.backgroundImage === "string" ? a.backgroundImage.slice(0, 1024) : null,
+      backgroundImage: typeof a.backgroundImage === "string" && a.backgroundImage.length > 3 && a.backgroundImage.charAt(1) === ":" ? a.backgroundImage.slice(0, 1024) : null,
     },
     startup: {
       launchOnLogin: vBool(st.launchOnLogin, d.startup.launchOnLogin),
