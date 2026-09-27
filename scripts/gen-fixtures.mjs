@@ -20,19 +20,31 @@ const SPECS = [
   { name: "landscape-c", w: 640, h: 360, seconds: 30, hue: 260 },
 ];
 
+// Small bundled demo clips (shipped in public/demo so the demo wall is truthfully playable offline).
+const DEMO_OUT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "demo");
+mkdirSync(DEMO_OUT, { recursive: true });
+const DEMO_SPECS = [
+  { name: "coastal", w: 320, h: 180, seconds: 8, hue: 205 },
+  { name: "studio", w: 320, h: 180, seconds: 8, hue: 340 },
+  { name: "trail", w: 180, h: 320, seconds: 8, hue: 140 },
+  { name: "city", w: 240, h: 240, seconds: 8, hue: 45 },
+  { name: "interview", w: 420, h: 180, seconds: 8, hue: 265 },
+  { name: "workshop", w: 320, h: 180, seconds: 8, hue: 185 },
+];
+
 const browser = await chromium.launch({ channel: "msedge", headless: true, args: ["--autoplay-policy=no-user-gesture-required"] });
 const page = await browser.newPage();
 await page.goto("about:blank");
 
-for (const spec of SPECS) {
-  const file = path.join(out, `${spec.name}.webm`);
+for (const spec of [...SPECS.map((s) => ({ ...s, dir: out, bitrate: 1_200_000 })), ...DEMO_SPECS.map((s) => ({ ...s, dir: DEMO_OUT, bitrate: 220_000 }))]) {
+  const file = path.join(spec.dir, `${spec.name}.webm`);
   if (existsSync(file)) { console.log("exists", spec.name); continue; }
-  const b64 = await page.evaluate(async ({ w, h, seconds, hue, name }) => {
+  const b64 = await page.evaluate(async ({ w, h, seconds, hue, name, bitrate }) => {
     const canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
     const stream = canvas.captureStream(30);
-    const rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8", videoBitsPerSecond: 1_200_000 });
+    const rec = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8", videoBitsPerSecond: bitrate });
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     const done = new Promise((res) => (rec.onstop = res));

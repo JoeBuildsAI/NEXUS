@@ -68,6 +68,8 @@ export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, 
   const lastSyncSeq = useRef(0);
   const seekingRef = useRef(false);
   const lastTickRef = useRef(0);
+  /** Some containers (MediaRecorder WebM) report Infinity until the end is probed once. */
+  const probingRef = useRef(false);
   const segment = slot.loop === "ab" && slot.loopA != null && slot.loopB != null ? { a: slot.loopA, b: slot.loopB } : null;
   const segmentRef = useRef(segment);
   segmentRef.current = segment;
@@ -152,11 +154,20 @@ export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, 
       for (let i = 0; i < v.buffered.length; i++) r.push([v.buffered.start(i), v.buffered.end(i)]);
       setBuffered(r);
     };
+    const onDuration = () => {
+      if (!Number.isFinite(v.duration)) return;
+      setDuration(v.duration);
+      if (probingRef.current) {
+        probingRef.current = false;
+        v.currentTime = 0;
+      }
+    };
     v.addEventListener("play", onPlay);
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("seeked", onSeeked);
     v.addEventListener("ended", onEnded);
     v.addEventListener("progress", onProgress);
+    v.addEventListener("durationchange", onDuration);
     if (!v.paused) onPlay();
     return () => {
       v.removeEventListener("play", onPlay);
@@ -164,6 +175,7 @@ export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, 
       v.removeEventListener("seeked", onSeeked);
       v.removeEventListener("ended", onEnded);
       v.removeEventListener("progress", onProgress);
+      v.removeEventListener("durationchange", onDuration);
       if (useFrames && handle) rvfc.cancelVideoFrameCallback?.(handle);
     };
   }, [item.id, slot.index, setSlotPlaying]);
@@ -186,7 +198,12 @@ export function PlayerTile({ slot, item, tile, isPrimary, isActive, fitDefault, 
   const nudge = (delta: number) => seekTo((videoRef.current?.currentTime ?? 0) + delta);
 
   const onLoaded = (v: HTMLVideoElement) => {
-    setDuration(Number.isFinite(v.duration) ? v.duration : null);
+    if (Number.isFinite(v.duration)) setDuration(v.duration);
+    else if (!probingRef.current) {
+      // Probe the end once so the timeline, A–B and seeking have a real duration.
+      probingRef.current = true;
+      v.currentTime = 1e9;
+    }
     if (v.videoWidth && v.videoHeight) setAspect(v.videoWidth / v.videoHeight);
     setFailure(null);
     const restore = useMediaStore.getState();
