@@ -2078,6 +2078,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-window-state",
  "ureq",
+ "windows 0.62.2",
  "winreg 0.55.0",
 ]
 

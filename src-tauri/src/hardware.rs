@@ -77,6 +77,7 @@ $out | ConvertTo-Json -Compress
         v @ serde_json::Value::Object(_) => vec![v],
         _ => vec![],
     };
+    let pdh_available = crate::gpu::GpuState::new().report().supported;
     items
         .into_iter()
         .filter_map(|v| {
@@ -91,9 +92,11 @@ $out | ConvertTo-Json -Compress
                 name: Some(name),
                 vram_total_mb: vram,
                 driver_version: driver,
-                utilization_supported: false,
+                // Live counters come from PDH GPU Engine / GPU Adapter Memory (see gpu.rs).
+                // Temperature has no vendor-neutral source and stays unsupported.
+                utilization_supported: pdh_available,
                 temperature_supported: false,
-                memory_supported: false,
+                memory_supported: pdh_available,
             })
         })
         .collect()
@@ -136,7 +139,8 @@ mod tests {
         assert!(inv.logical_cores >= 1);
         assert!(inv.total_memory_bytes > 0);
         for g in &inv.gpus {
-            assert!(!g.utilization_supported && !g.temperature_supported && !g.memory_supported);
+            assert!(!g.temperature_supported, "temperature must never be claimed");
+            assert_eq!(g.utilization_supported, g.memory_supported, "both come from the same PDH source");
             assert!(g.name.as_deref().map(|n| !n.is_empty()).unwrap_or(false));
         }
     }

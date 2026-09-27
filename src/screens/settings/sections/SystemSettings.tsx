@@ -2,11 +2,13 @@ import { AlertTriangle } from "lucide-react";
 import { SettingsSection, SettingRow, Select } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useTelemetryStore } from "@/state/telemetryStore";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 
 export function SystemSettingsSection() {
   const { system, setSystem } = useSettingsStore();
   const enabled = system.safety === "enabled";
+  const adapters = useTelemetryStore((st) => st.snapshot?.gpuAdapters ?? []);
 
   return (
     <SettingsSection title="System" description="Cleanup and process-management permissions.">
@@ -40,6 +42,15 @@ export function SystemSettingsSection() {
           onChange={(v) => setSystem({ allowProcessManagement: v })}
         />
       </SettingRow>
+      {adapters.length > 1 && (
+        <SettingRow label="Primary GPU" description="NEXUS picks the adapter with the most dedicated memory. Override if the integrated GPU is being reported instead.">
+          <Select
+            value={system.preferredGpu ?? "auto"}
+            onChange={(v) => setSystem({ preferredGpu: v === "auto" ? null : v })}
+            options={[{ value: "auto", label: "Auto" }, ...adapters.filter((a) => a.luid).map((a) => ({ value: a.luid!, label: a.name.replace(/^NVIDIA GeForce /, "").replace(/(TM)|(R)/gi, "").trim() }))]}
+          />
+        </SettingRow>
+      )}
       <DiagnosticsPanel />
     </SettingsSection>
   );

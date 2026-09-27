@@ -11,6 +11,8 @@ export interface TelemetrySnapshot {
   readonly timestamp: number;
   readonly cpu: CpuTelemetry;
   readonly gpu: GpuTelemetry | null;
+  /** All adapters with live counters (multi-GPU). Optional for demo data. */
+  readonly gpuAdapters?: readonly GpuTelemetry[];
   readonly memory: MemoryTelemetry;
   readonly storage: readonly DriveInfo[];
   readonly network: NetworkTelemetry;
@@ -42,7 +44,12 @@ export interface GpuTelemetry {
   readonly usagePercent: number;
   readonly memoryUsedMb: number;
   readonly memoryTotalMb: number;
+  /** No vendor-neutral source on Windows; null means unsupported, never zero. */
   readonly temperatureC: number | null;
+  /** Adapter LUID (Windows). Absent in demo data. */
+  readonly luid?: string;
+  readonly software?: boolean;
+  readonly primary?: boolean;
 }
 
 export interface MemoryTelemetry {

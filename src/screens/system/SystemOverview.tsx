@@ -54,7 +54,17 @@ export function SystemOverview() {
       <div className="grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[1fr_1.2fr]">
         <dl className="divide-y divide-white/[0.05]">
           <Vital label="Processor" value={snapshot.cpu.name} sub={`${hw?.physicalCores ? `${hw.physicalCores} cores · ` : ""}${snapshot.cpu.cores} threads${snapshot.cpu.temperatureC != null ? ` · ${snapshot.cpu.temperatureC}°C` : ""}`} />
-          <Vital label="Graphics" value={gpu?.name ?? snapshot.gpu?.name ?? "Unavailable"} sub={gpu?.vramTotalMb ? `${Math.round(gpu.vramTotalMb / 1024)} GB · utilization and temperature unsupported on this build` : snapshot.gpu ? `${formatBytes(snapshot.gpu.memoryUsedMb * 1024 ** 2, 0)} / ${formatBytes(snapshot.gpu.memoryTotalMb * 1024 ** 2, 0)}` : "GPU counters need a vendor source; shown as unavailable rather than estimated."} />
+          <Vital
+            label="Graphics"
+            value={snapshot.gpu?.name ?? gpu?.name ?? "Unavailable"}
+            sub={
+              snapshot.gpu
+                ? `${formatBytes(snapshot.gpu.memoryUsedMb * 1024 ** 2, 1)} of ${formatBytes(snapshot.gpu.memoryTotalMb * 1024 ** 2, 0)} dedicated · temperature unsupported${(snapshot.gpuAdapters?.length ?? 0) > 1 ? ` · ${snapshot.gpuAdapters!.length - 1} other adapter${snapshot.gpuAdapters!.length - 1 === 1 ? "" : "s"}` : ""}`
+                : gpu?.vramTotalMb
+                  ? `${Math.round(gpu.vramTotalMb / 1024)} GB · live counters unavailable on this build`
+                  : "GPU counters need a vendor source; shown as unavailable rather than estimated."
+            }
+          />
           <Vital label="Memory" value={`${formatBytes(snapshot.memory.totalBytes, 0)} installed`} sub={`${snapshot.memory.usagePercent}% in use · ${formatBytes(snapshot.memory.totalBytes - snapshot.memory.usedBytes, 1)} free`} />
           <Vital label="Network" value={snapshot.network.ssidOrInterface ?? "Offline"} sub={`↓ ${formatBitrate(snapshot.network.downBytesPerSec)} · ↑ ${formatBitrate(snapshot.network.upBytesPerSec)}`} />
         </dl>

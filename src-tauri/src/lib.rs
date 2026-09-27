@@ -1,4 +1,5 @@
 mod apps;
+mod gpu;
 mod hardware;
 mod media;
 mod secrets;
@@ -36,6 +37,7 @@ pub fn run() {
         .manage(storage::StorageState::new())
         .manage(hardware::HardwareCache(std::sync::Mutex::new(None)))
         .manage(steam_api::ApiCache::new())
+        .manage(gpu::GpuState::new())
         .setup(|app| {
             setup_tray(app.handle())?;
             if let Some(w) = app.get_webview_window("main") {
@@ -85,6 +87,7 @@ pub fn run() {
             media::media_scan_root,
             media::media_cancel_scan,
             hardware::get_hardware,
+            gpu::gpu_set_preferred,
             session::session_read,
             session::session_write,
             session::session_clear,

@@ -46,7 +46,14 @@ export function HardwareInventory() {
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-micro">
               <Cap label="Utilization" ok={primaryGpu.utilizationSupported} /><Cap label="Temperature" ok={primaryGpu.temperatureSupported} /><Cap label="VRAM usage" ok={primaryGpu.memorySupported} />
             </div>
-            {gpus.length > 1 && <p className="mt-4 text-[12px] text-white/35">Also present: {gpus.filter((g) => g !== primaryGpu).map((g) => g.name).join(", ")}</p>}
+            <p className="mt-3 text-[12px] leading-relaxed text-white/30">{primaryGpu.utilizationSupported ? "Utilization and dedicated memory come from Windows performance counters (the same source as Task Manager). Temperature has no vendor-neutral source and is not shown." : "Live counters unavailable on this build; nothing is estimated."}</p>
+            {gpus.length > 1 && (
+              <div className="mt-5">
+                <p className="label mb-2">Other graphics</p>
+                {gpus.filter((g) => g !== primaryGpu).map((g) => <p key={g.name} className="text-[13px] text-white/55">{g.name}{g.vramTotalMb ? <span className="text-white/30"> · {g.vramTotalMb >= 1024 ? `${Math.round(g.vramTotalMb / 1024)} GB` : `${g.vramTotalMb} MB`}</span> : null}</p>)}
+                <p className="mt-2 text-[12px] text-white/30">Change the primary adapter in Settings → System if auto-detection is wrong.</p>
+              </div>
+            )}
           </Spec>
         )}
         <Spec label="Processor">

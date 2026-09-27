@@ -41,14 +41,19 @@ export function InstrumentLedger() {
 
   const primary = s.storage.find((d) => d.kind === "fixed") ?? s.storage[0];
   const storagePct = primary ? ((primary.totalBytes - primary.freeBytes) / primary.totalBytes) * 100 : 0;
-  const gpuName = hw?.gpus.find((g) => g.name && !/intel|amd radeon\(tm\) graphics/i.test(g.name))?.name ?? hw?.gpus[0]?.name ?? s.gpu?.name ?? null;
-  const gpuVram = hw?.gpus.find((g) => g.name === gpuName)?.vramTotalMb ?? (s.gpu ? s.gpu.memoryTotalMb : null);
-  const gpuShort = gpuName?.replace(/^NVIDIA\s+GeForce\s+/i, "").replace(/^AMD\s+/i, "").trim() ?? null;
+  // Live telemetry names the primary adapter; hardware inventory is the fallback.
+  const gpuName = s.gpu?.name ?? hw?.gpus.find((g) => g.name && !/intel|amd radeon\(tm\) graphics/i.test(g.name))?.name ?? hw?.gpus[0]?.name ?? null;
+  const gpuVramTotal = s.gpu?.memoryTotalMb ?? hw?.gpus.find((g) => g.name === gpuName)?.vramTotalMb ?? null;
+  const gpuVramUsed = s.gpu?.memoryUsedMb ?? null;
+  const gpuShort = gpuName?.replace(/^NVIDIA\s+GeForce\s+/i, "").replace(/^AMD\s+/i, "").replace(/\(TM\)|\(R\)/gi, "").trim() ?? null;
+  const gpuMeta = gpuShort
+    ? `${gpuShort}${gpuVramTotal ? ` · ${gpuVramUsed != null && gpuVramUsed > 0 ? `${(gpuVramUsed / 1024).toFixed(1)} / ` : ""}${Math.round(gpuVramTotal / 1024)} GB` : ""}`
+    : "unavailable";
 
   return (
     <div className="space-y-3">
       <Row label="CPU" value={pad2(s.cpu.usagePercent)} pct={s.cpu.usagePercent} meta={`${s.cpu.cores} threads`} />
-      <Row label="GPU" value={s.gpu ? pad2(s.gpu.usagePercent) : "––"} pct={s.gpu?.usagePercent ?? null} dim={!s.gpu} meta={gpuShort ? `${gpuShort}${gpuVram ? ` · ${Math.round(gpuVram / 1024)} GB` : ""}` : "unavailable"} />
+      <Row label="GPU" value={s.gpu ? pad2(s.gpu.usagePercent) : "––"} pct={s.gpu?.usagePercent ?? null} dim={!s.gpu} meta={gpuMeta} />
       <Row label="MEMORY" value={pad2(s.memory.usagePercent)} pct={s.memory.usagePercent} meta={formatBytes(s.memory.totalBytes, 0)} />
       <Row label="STORAGE" value={pad2(storagePct)} pct={storagePct} meta={primary ? `${primary.mountPoint} ${formatBytes(primary.totalBytes, 0)}` : ""} />
       <div className="grid grid-cols-[88px_1fr] items-baseline gap-5 pt-3">

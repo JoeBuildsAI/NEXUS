@@ -15,6 +15,7 @@ import { useModeStore } from "@/state/modeStore";
  */
 export function useNativeEvents() {
   const closeBehavior = useSettingsStore((s) => s.window.closeBehavior);
+  const preferredGpu = useSettingsStore((s) => s.system.preferredGpu);
 
   useEffect(() => {
     if (!config.isTauri) return;
@@ -39,6 +40,11 @@ export function useNativeEvents() {
     if (!config.isTauri) return;
     void import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_close_behavior", { behavior: closeBehavior }).catch(() => undefined));
   }, [closeBehavior]);
+
+  useEffect(() => {
+    if (!config.isTauri) return;
+    void import("@tauri-apps/api/core").then(({ invoke }) => invoke("gpu_set_preferred", { luid: preferredGpu }).catch(() => undefined));
+  }, [preferredGpu]);
 
   useEffect(() => {
     // After the machine sleeps, timers fire in a burst on wake. Restart the

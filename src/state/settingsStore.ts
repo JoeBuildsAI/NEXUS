@@ -66,6 +66,8 @@ export interface SystemSettings {
   allowProcessManagement: boolean;
   /** Keep a local, private activity history (game sessions, modes, cleanup). */
   activityHistory: boolean;
+  /** Manually chosen primary GPU (adapter LUID) when auto-detection is ambiguous. */
+  preferredGpu: string | null;
 }
 
 export interface AISettings {
@@ -120,7 +122,7 @@ export const DEFAULT_SETTINGS: SettingsData = {
   gaming: { gamingModeEnabled: true, approvedBackgroundApps: ["Spotify.exe", "Discord.exe"], defaultLauncher: "steam" },
   media: { authorizedFolders: [], defaultColumns: 3, defaultRows: 2, pauseOnHide: true, thumbnails: false, restoreWorkspace: true },
   privacy: { hotkey: "CommandOrControl+Shift+`", action: "home", stopPlaybackOnTrigger: true, clearWorkspaceOnTrigger: false },
-  system: { safety: "observe", allowStartupChanges: false, allowProcessManagement: false, activityHistory: true },
+  system: { safety: "observe", allowStartupChanges: false, allowProcessManagement: false, activityHistory: true, preferredGpu: null },
   ai: { provider: "local", localCommandMode: true },
   shortcuts: { commandPalette: "Ctrl+Space", privacy: "Ctrl+Shift+`", screenPrefix: "ctrl", screenShortcutsEnabled: true },
   window: { closeBehavior: "tray" },

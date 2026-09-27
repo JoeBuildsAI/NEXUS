@@ -72,6 +72,7 @@ export function sanitizeSettings(persisted: unknown, defaults: SettingsData): Se
       allowStartupChanges: vBool(sy.allowStartupChanges, d.system.allowStartupChanges),
       allowProcessManagement: vBool(sy.allowProcessManagement, d.system.allowProcessManagement),
       activityHistory: vBool(sy.activityHistory, d.system.activityHistory),
+      preferredGpu: typeof sy.preferredGpu === "string" && /^luid_0x[0-9A-Fa-f]{8}_0x[0-9A-Fa-f]{8}$/.test(sy.preferredGpu) ? sy.preferredGpu : null,
     },
     ai: {
       provider: vOneOf(ai.provider, ["local", "openai", "anthropic"], d.ai.provider),

@@ -43,12 +43,50 @@ pub struct DriveInfo {
     eligible_for_scan: bool,
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GpuTelemetry {
+    luid: String,
+    name: String,
+    usage_percent: u8,
+    memory_used_mb: u64,
+    memory_total_mb: u64,
+    /// No vendor-neutral source; always None. The capability model says so.
+    temperature_c: Option<f32>,
+    software: bool,
+    primary: bool,
+}
+
+/// Build per-adapter telemetry from the PDH/DXGI report (pure; tested).
+pub fn gpu_telemetry_from(report: &crate::gpu::GpuTelemetryReport) -> Vec<GpuTelemetry> {
+    report
+        .adapters
+        .iter()
+        .filter(|a| !a.software)
+        .map(|a| {
+            let s = report.samples.iter().find(|s| s.luid == a.luid);
+            GpuTelemetry {
+                luid: a.luid.clone(),
+                name: a.name.clone(),
+                usage_percent: s.map(|s| s.utilization_3d.max(s.utilization_max * 0.0).round() as u8).unwrap_or(0),
+                memory_used_mb: s.map(|s| s.dedicated_used_bytes / (1024 * 1024)).unwrap_or(0),
+                memory_total_mb: a.dedicated_total_bytes / (1024 * 1024),
+                temperature_c: None,
+                software: a.software,
+                primary: report.primary_luid.as_deref() == Some(a.luid.as_str()),
+            }
+        })
+        .collect()
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetrySnapshot {
     timestamp: u64,
     cpu: CpuTelemetry,
-    gpu: Option<serde_json::Value>,
+    gpu: Option<GpuTelemetry>,
+    /// Every adapter with live counters (multi-GPU); `gpu` is the primary one.
+    gpu_adapters: Vec<GpuTelemetry>,
     memory: MemoryTelemetry,
     storage: Vec<DriveInfo>,
     network: NetworkTelemetry,
@@ -101,7 +139,7 @@ pub fn collect_drives() -> Vec<DriveInfo> {
 }
 
 #[tauri::command]
-pub fn get_telemetry(state: State<AppState>) -> Result<TelemetrySnapshot, String> {
+pub fn get_telemetry(state: State<AppState>, gpu_state: State<crate::gpu::GpuState>) -> Result<TelemetrySnapshot, String> {
     let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
     sys.refresh_cpu_usage();
     sys.refresh_memory();
@@ -157,6 +195,11 @@ pub fn get_telemetry(state: State<AppState>) -> Result<TelemetrySnapshot, String
 
     let storage = collect_drives();
 
+    // GPU: vendor-neutral counters; None when unsupported (never invented).
+    let gpu_report = gpu_state.report();
+    let gpu_adapters = if gpu_report.supported { gpu_telemetry_from(&gpu_report) } else { vec![] };
+    let gpu_primary = gpu_adapters.iter().find(|g| g.primary).cloned();
+
     // Non-scientific health heuristic.
     let ssd_pressure = storage.iter().any(|d| {
         d.kind == "fixed" && d.total_bytes > 0 && (d.free_bytes as f64 / d.total_bytes as f64) < 0.08
@@ -180,8 +223,8 @@ pub fn get_telemetry(state: State<AppState>) -> Result<TelemetrySnapshot, String
             per_core,
             temperature_c: None,
         },
-        // GPU telemetry is not available via sysinfo; the frontend handles null.
-        gpu: None,
+        gpu: gpu_primary.clone(),
+        gpu_adapters,
         memory: MemoryTelemetry {
             used_bytes: used_mem,
             total_bytes: total_mem,
