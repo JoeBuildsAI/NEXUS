@@ -295,6 +295,8 @@ export const useLifeStore = create<LifeState>()((set, get) => {
 
     // -------------------------------------------------------------- demo / data
     addSampleData: async () => {
+      // Idempotent: a second load replaces the previous sample rows instead of duplicating them.
+      await repo().purgeDemo();
       const dump = sampleLifeData(todayKey());
       for (const c of LIFE_COLLECTIONS) await repo().put(c, dump[c] as LifeEntityMap[typeof c][]);
       if (!(await repo().getKV("nutrition.targets"))) await repo().setKV("nutrition.targets", dump.kv["nutrition.targets"]);

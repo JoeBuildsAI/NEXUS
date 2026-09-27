@@ -120,3 +120,15 @@ describe("life store over the repository", () => {
     expect(useLifeStore.getState().tasks.find((x) => x.id === plain.id)!.status).toBe("done");
   });
 });
+
+describe("sample data idempotency", () => {
+  it("loading sample data twice never duplicates rows", async () => {
+    setLifeRepository(new MemoryLifeRepository(null));
+    useLifeStore.setState({ status: "idle" });
+    await useLifeStore.getState().load({ force: true });
+    await useLifeStore.getState().addSampleData();
+    const before = useLifeStore.getState().counts!;
+    await useLifeStore.getState().addSampleData();
+    expect(useLifeStore.getState().counts).toEqual(before);
+  });
+});

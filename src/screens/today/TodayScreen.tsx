@@ -15,6 +15,8 @@ import { summarize } from "@/core/email/classify";
 import { Button } from "@/components/ui";
 import { SessionLine } from "@/screens/home/SessionLine";
 import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
+import { useTelemetryStore } from "@/state/telemetryStore";
+import { HEALTH_META } from "@/core/safety/health";
 import { formatTime } from "@/hooks/useClock";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,8 @@ export function TodayScreen() {
   const { openLife, openCalendar, openCommunications, navigate } = useNavigationStore();
   const emailConnected = useDevStore((s) => s.emailConnected);
   const [mail, setMail] = useState<{ important: number; receipts: number; shipments: number; security: number } | null>(null);
+  const health = useTelemetryStore((s) => s.snapshot?.health);
+  const healthMeta = health ? HEALTH_META[health] : null;
 
   useEffect(() => { void life.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -72,6 +76,11 @@ export function TodayScreen() {
         <div>
           <p className="text-micro tracking-cinematic text-white/35">{formatDayLong(day)}</p>
           <h1 className="mt-3 font-display text-display-lg font-semibold uppercase tracking-wide text-white">{greeting(now.getHours(), name || null)}</h1>
+          <button onClick={() => navigate("system")} className="mt-4 flex items-baseline gap-4 text-left">
+            <span className="font-display text-[12px] font-semibold tracking-[0.34em] text-white/45">NEXUS</span>
+            <span className="h-3 w-px bg-white/15" />
+            <span className={cn("font-display text-[12px] tracking-[0.3em]", healthMeta ? (healthMeta.tone === "nominal" ? "text-white/60" : healthMeta.tone === "attention" ? "text-status-attention" : healthMeta.tone === "warning" ? "text-status-warning" : "text-status-critical") : "text-white/30")}>{healthMeta ? `SYSTEM ${healthMeta.label.toUpperCase()}` : "CALIBRATING"}</span>
+          </button>
         </div>
         <div className="flex flex-col items-start gap-3 lg:items-end">
           <p className="font-mono text-display-md font-light leading-none tabular tracking-tight text-white">{hour12 ? formatMinute(nowMinute, true) : formatTime(now)}</p>
