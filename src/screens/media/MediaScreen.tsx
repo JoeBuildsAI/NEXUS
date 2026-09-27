@@ -11,6 +11,7 @@ import { useNavigationStore } from "@/state/navigationStore";
 import { useMediaStore } from "@/state/mediaStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useAsync } from "@/hooks/useAsync";
+import { useMediaRootWatch } from "@/hooks/useMediaRootWatch";
 import { getProviders } from "@/providers";
 import { isOffline } from "@/core/errors";
 import { notify } from "@/state/toastStore";
@@ -32,16 +33,18 @@ export function MediaScreen() {
   const activatePrivacy = usePrivacyStore((s) => s.activate);
   const mediaConnected = useDevStore((s) => s.mediaConnected);
   const rootsCount = useMediaLibraryStore((s) => s.roots.length);
+  const reachableRoots = useMediaLibraryStore((s) => s.roots.filter((r) => r.exists !== false).length);
   const fileCount = useMediaLibraryStore((s) => s.files.length);
   const favCount = useMediaLibraryStore((s) => s.favorites.length);
   const scan = useMediaLibraryStore((s) => s.scan);
   const navigate = useNavigationStore((s) => s.navigate);
   const setSection = useNavigationStore((s) => s.setSettingsSection);
   const provider = useMemo(() => getProviders().media, []);
-  const { data: items, error, reload } = useAsync<readonly MediaItem[]>(() => provider.getItems(), [mediaConnected, rootsCount, fileCount, favCount]);
+  const { data: items, error, reload } = useAsync<readonly MediaItem[]>(() => provider.getItems(), [mediaConnected, rootsCount, reachableRoots, fileCount, favCount]);
   const offline = error && isOffline(error);
   const withMode = provider as { mode?: () => "real" | "demo" };
   const mode = typeof withMode.mode === "function" ? withMode.mode() : "demo";
+  useMediaRootWatch(mode === "real");
 
   // Privacy curtain: a workspace restored from a previous session stays hidden
   // until revealed — once per app session. Nothing plays until then.

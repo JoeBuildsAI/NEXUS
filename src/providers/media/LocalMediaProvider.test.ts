@@ -164,3 +164,21 @@ describe("loop presets follow media authorization", () => {
     expect(left[0]!.rootId).toBe("another-root");
   });
 });
+
+describe("removable drive lifecycle (refreshRoots)", () => {
+  it("disconnect marks the root unreachable; reconnect re-registers the same canonical root", async () => {
+    const { bridge, provider } = setup();
+    const root = await provider.authorizeRoot();
+    await provider.scanRoot(root!.id);
+    bridge.connected = false;
+    await provider.refreshRoots();
+    expect(useMediaLibraryStore.getState().roots[0]!.exists).toBe(false);
+    expect((await provider.getItems().catch((e) => e)) instanceof Error).toBe(true); // typed offline while nothing reachable
+    bridge.registered.clear(); // the asset grant is gone with the device
+    bridge.connected = true;
+    await provider.refreshRoots();
+    expect(useMediaLibraryStore.getState().roots[0]!.exists).toBe(true);
+    expect(bridge.registered.size).toBe(1); // re-granted on the same path only
+    expect((await provider.getItems()).every((i) => i.available !== false)).toBe(true);
+  });
+});

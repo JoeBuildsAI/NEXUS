@@ -20,6 +20,25 @@ export function MediaSettingsSection() {
   const scan = useMediaLibraryStore((s) => s.scan);
   const fileCount = useMediaLibraryStore((s) => s.files.length);
   const clearWorkspace = useMediaStore((s) => s.clearAll);
+  const defaults = useMediaStore((s) => s.defaults);
+  const setDefaults = useMediaStore((s) => s.setDefaults);
+  const clearPrivateWorkspace = useMediaStore((s) => s.clearPrivateWorkspace);
+  const savedWorkspaces = useMediaStore((s) => s.savedLayouts.length);
+  const clearPrivate = () => {
+    requestConfirm({
+      title: "Clear private workspace?",
+      message: ["Unloads every player and forgets remembered positions and volumes.", "Saved loop presets and cached thumbnails are also removed.", savedWorkspaces ? `${savedWorkspaces} saved workspace${savedWorkspaces === 1 ? "" : "s"} are kept — delete them from the Workspaces panel if needed.` : "", "Your files and authorized locations are untouched."].filter(Boolean).join(String.fromCharCode(10)),
+      confirmLabel: "Clear",
+      danger: true,
+      onConfirm: async () => {
+        clearPrivateWorkspace();
+        const { useLoopPresetsStore } = await import("@/state/loopPresetsStore");
+        useLoopPresetsStore.getState().clear();
+        await provider.purgeThumbnails?.().catch(() => undefined);
+        notify.neutral("Private workspace cleared");
+      },
+    });
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const { data: health, reload: reloadHealth } = useAsync(() => provider.health?.() ?? Promise.resolve(null), [roots.length, fileCount]);
 
@@ -128,14 +147,39 @@ export function MediaSettingsSection() {
       <SettingRow label="Pause when hidden" description="Pause all players when the workspace is hidden.">
         <Toggle checked={media.pauseOnHide} onChange={(v) => setMedia({ pauseOnHide: v })} />
       </SettingRow>
+      <div className="py-5">
+        <p className="text-[15px] text-white/85">Workspace defaults</p>
+        <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-white/40">New players inherit these; every player can still be changed on the wall. Quality is always the original source — nothing is transcoded or downscaled.</p>
+      </div>
+      <SettingRow label="Autoplay" description="Start playing when a video is added to the wall.">
+        <Toggle checked={defaults.autoplay} onChange={(v) => setDefaults({ autoplay: v })} />
+      </SettingRow>
+      <SettingRow label="Loop" description="Default loop mode for new players. A–B needs a segment set on the player.">
+        <Select value={defaults.loop} onChange={(v) => setDefaults({ loop: v })} options={[{ value: "full" as const, label: "Full video" }, { value: "off" as const, label: "Off" }]} />
+      </SettingRow>
+      <SettingRow label="Fit" description="Smart fill fills the tile when it costs little cropping, otherwise shows the whole frame.">
+        <Select value={defaults.fit} onChange={(v) => setDefaults({ fit: v })} options={[{ value: "smart" as const, label: "Smart fill" }, { value: "fit" as const, label: "Fit" }, { value: "fill" as const, label: "Fill" }]} />
+      </SettingRow>
+      <SettingRow label="Muted on load" description="New players start silent.">
+        <Toggle checked={defaults.mutedOnLoad} onChange={(v) => setDefaults({ mutedOnLoad: v })} />
+      </SettingRow>
+      <SettingRow label="Restore last volume" description="Remember volume per video (local only).">
+        <Toggle checked={defaults.restoreVolume} onChange={(v) => setDefaults({ restoreVolume: v })} />
+      </SettingRow>
+      <SettingRow label="Restore last position" description="Resume where a video was left. Off by default — positions are private state.">
+        <Toggle checked={defaults.restorePosition} onChange={(v) => setDefaults({ restorePosition: v })} />
+      </SettingRow>
       <SettingRow label="Restore workspace" description="Bring back the last workspace structure on launch — behind a curtain, never auto-playing. Off clears players on every start.">
         <Toggle checked={media.restoreWorkspace} onChange={(v) => setMedia({ restoreWorkspace: v })} />
       </SettingRow>
       <SettingRow label="Local thumbnails" description={config.isTauri ? "Rendered by Windows' own thumbnail provider and cached locally under hashed names. Removed with the location's authorization." : "Available in the desktop build."}>
         <Toggle checked={media.thumbnails} disabled={!config.isTauri} onChange={(v) => { setMedia({ thumbnails: v }); if (!v) void provider.purgeThumbnails?.(); }} />
       </SettingRow>
-      <SettingRow label="Clear workspace" description="Unload every player slot now.">
-        <Button size="sm" variant="outline" onClick={() => { clearWorkspace(); notify.neutral("Workspace cleared"); }}>Clear workspace</Button>
+      <SettingRow label="Clear wall" description="Unload every player now.">
+        <Button size="sm" variant="outline" onClick={() => { clearWorkspace(); notify.neutral("Wall cleared"); }}>Clear wall</Button>
+      </SettingRow>
+      <SettingRow label="Clear private workspace" description="Players, remembered positions and volumes, loop presets and thumbnail cache.">
+        <Button size="sm" variant="outline" onClick={clearPrivate}>Clear private workspace</Button>
       </SettingRow>
       <SettingRow label="Clear media history" description="Remove the local index, favorites and collections.">
         <Button size="sm" variant="danger" onClick={clearHistory}><Trash2 size={14} /> Clear history</Button>

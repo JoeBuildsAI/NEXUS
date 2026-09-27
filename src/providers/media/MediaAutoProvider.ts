@@ -62,6 +62,9 @@ export class MediaAutoProvider implements MediaProvider {
   checkAvailable(itemId: string): Promise<boolean> {
     return this.pick().checkAvailable?.(itemId) ?? Promise.resolve(true);
   }
+  refreshRoots(): Promise<void> {
+    return this.local.refreshRoots();
+  }
   ensureThumbnail(itemId: string): Promise<string | null> {
     return this.pick() === this.local ? this.local.ensureThumbnail(itemId) : Promise.resolve(null);
   }

@@ -189,6 +189,30 @@ export class LocalMediaProvider implements MediaProvider {
     this.store.getState().deleteCollection(collectionId);
   }
 
+  /**
+   * Re-check every root. A root that comes back is re-registered with the asset
+   * scope (same canonical path); a different device under the same letter that
+   * lacks the folder stays unreachable.
+   */
+  async refreshRoots(): Promise<void> {
+    const s = this.store.getState();
+    for (const root of s.roots) {
+      try {
+        const status = await this.bridge.rootStatus(root.path);
+        if (status.exists && root.exists === false) {
+          const info = await this.bridge.registerRoot(root.path);
+          s.updateRoot(root.id, { exists: info.exists, kind: info.kind });
+        } else if (status.exists !== (root.exists !== false)) {
+          s.updateRoot(root.id, { exists: status.exists });
+        }
+      } catch {
+        s.updateRoot(root.id, { exists: false });
+      }
+    }
+    // Clear per-file unavailability for roots that are back; tiles re-check on play.
+    if (s.roots.some((r) => r.exists !== false) && s.unavailable.length) this.store.setState({ unavailable: [] });
+  }
+
   async checkAvailable(itemId: string): Promise<boolean> {
     const s = this.store.getState();
     const f = s.files.find((x) => x.id === itemId);

@@ -32,6 +32,8 @@ export interface MediaProvider {
   deleteCollection?(collectionId: string): Promise<void>;
   /** Re-check that an item's file still exists (drive connected). */
   checkAvailable?(itemId: string): Promise<boolean>;
+  /** Re-validate every authorized root (drive connected?) and re-register reachable ones. */
+  refreshRoots?(): Promise<void>;
   /** Local thumbnail generation (desktop). Resolves to an asset URL or null. */
   ensureThumbnail?(itemId: string): Promise<string | null>;
   purgeThumbnails?(): Promise<void>;
