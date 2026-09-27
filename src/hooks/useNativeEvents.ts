@@ -5,6 +5,10 @@ import { useSettingsStore } from "@/state/settingsStore";
 import { usePrivacyStore } from "@/state/privacyStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useModeStore } from "@/state/modeStore";
+import { notify } from "@/state/toastStore";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("native");
 
 /**
  * Native ↔ frontend glue that must exist exactly once:
@@ -45,6 +49,37 @@ export function useNativeEvents() {
     if (!config.isTauri) return;
     void import("@tauri-apps/api/core").then(({ invoke }) => invoke("gpu_set_preferred", { luid: preferredGpu }).catch(() => undefined));
   }, [preferredGpu]);
+
+  // Autostart registration is applied wherever the setting changes and VERIFIED
+  // against the plugin: if Windows refused, the setting reverts so the UI never
+  // claims a registration that does not exist.
+  const launchOnLogin = useSettingsStore((s) => s.startup.launchOnLogin);
+  useEffect(() => {
+    if (!config.isTauri) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const autostart = await import("@tauri-apps/plugin-autostart");
+        const enabled = await autostart.isEnabled();
+        if (enabled !== launchOnLogin) {
+          if (launchOnLogin) await autostart.enable();
+          else await autostart.disable();
+        }
+        const actual = await autostart.isEnabled();
+        if (!cancelled && actual !== launchOnLogin) {
+          useSettingsStore.getState().setStartup({ launchOnLogin: actual });
+          notify.warn("Autostart not applied", actual ? "Windows kept NEXUS registered at login." : "Windows refused the login registration.");
+        }
+      } catch (err) {
+        log.warn("autostart apply failed", { error: String(err) });
+        if (!cancelled) {
+          useSettingsStore.getState().setStartup({ launchOnLogin: false });
+          notify.warn("Autostart unavailable", "Could not change the login registration on this machine.");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [launchOnLogin]);
 
   // Re-grant the chosen background image to the asset scope (grants are per-process).
   const backgroundImage = useSettingsStore((s) => s.appearance.backgroundImage);

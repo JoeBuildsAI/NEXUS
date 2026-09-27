@@ -66,6 +66,7 @@ await sim({ providerExceptions: true });
 await nav("Home"); await page.waitForTimeout(900); await shot("chaos-home");
 await nav("Gaming"); await page.waitForTimeout(900); await shot("chaos-gaming");
 await nav("Media"); await page.waitForTimeout(900); await shot("chaos-media");
+await nav("Communications"); await page.waitForTimeout(900); await shot("chaos-comms");
 await sim({ providerExceptions: false });
 
 // 5. Offline everything

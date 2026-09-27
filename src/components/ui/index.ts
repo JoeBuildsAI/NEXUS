@@ -7,3 +7,4 @@ export { Tabs, type TabItem } from "./Tabs";
 export { LiveChart } from "./LiveChart";
 export { ErrorBoundary, sanitizeErrorMessage } from "./ErrorBoundary";
 export { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+export { ErrorNotice } from "./ErrorNotice";

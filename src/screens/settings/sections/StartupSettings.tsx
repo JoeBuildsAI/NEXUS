@@ -1,7 +1,3 @@
-import { useEffect, useState } from "react";
-import { createLogger } from "@/lib/logger";
-
-const log = createLogger("startup");
 import { SettingsSection, SettingRow } from "../SettingsControls";
 import { Toggle } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
@@ -13,26 +9,8 @@ import { config } from "@/core/config";
  */
 export function StartupSettingsSection() {
   const { startup, setStartup } = useSettingsStore();
-  const [applying, setApplying] = useState(false);
-
-  useEffect(() => {
-    if (!config.isTauri) return;
-    setApplying(true);
-    (async () => {
-      try {
-        const autostart = await import("@tauri-apps/plugin-autostart");
-        const enabled = await autostart.isEnabled();
-        if (enabled !== startup.launchOnLogin) {
-          if (startup.launchOnLogin) await autostart.enable();
-          else await autostart.disable();
-        }
-      } catch (err) {
-        log.warn("autostart apply failed", { error: String(err) });
-      } finally {
-        setApplying(false);
-      }
-    })();
-  }, [startup.launchOnLogin]);
+  // Registration itself happens globally (useNativeEvents) so it applies no matter
+  // where the toggle lives and is verified against the real autostart state.
 
   return (
     <SettingsSection title="Startup" description="Control how NEXUS starts with Windows.">
@@ -44,11 +22,7 @@ export function StartupSettingsSection() {
             : "Applied on the desktop build. (Preview mode stores the preference.)"
         }
       >
-        <Toggle
-          checked={startup.launchOnLogin}
-          disabled={applying}
-          onChange={(v) => setStartup({ launchOnLogin: v })}
-        />
+        <Toggle checked={startup.launchOnLogin} onChange={(v) => setStartup({ launchOnLogin: v })} />
       </SettingRow>
       <SettingRow label="Start minimized" description="When launched at login, stay in the tray instead of opening the window.">
         <Toggle checked={startup.startMinimized} onChange={(v) => setStartup({ startMinimized: v })} />

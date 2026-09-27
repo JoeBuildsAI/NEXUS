@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, FolderPlus, ShieldOff } from "lucide-react";
-import { Tabs, type TabItem, Button } from "@/components/ui";
+import { Tabs, type TabItem, Button, ErrorNotice } from "@/components/ui";
 import { MediaLibrary } from "./MediaLibrary";
 import { VideoWorkspace } from "./VideoWorkspace";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -75,6 +75,7 @@ export function MediaScreen() {
       </div>
 
       <div className="mx-auto flex min-h-0 w-full max-w-[1880px] flex-1 flex-col overflow-y-auto px-12 pb-10 2xl:px-16">
+        {error && !offline && <div className="mb-6"><ErrorNotice title="Library unavailable" body="NEXUS couldn't read the media library. Players keep working." error={error} onRetry={reload} /></div>}
         {offline ? (
           <EmptyState eyebrow="Media" title="Source disconnected" body="The authorized location is not reachable. Reconnect the drive or authorize a different folder. Your index and workspace are preserved." action={<div className="flex gap-2"><Button variant="outline" size="sm" onClick={reload}>Retry</Button><Button variant="ghost" size="sm" onClick={() => { navigate("settings"); setSection("media"); }}>Media settings</Button></div>} />
         ) : tab === "workspace" ? (

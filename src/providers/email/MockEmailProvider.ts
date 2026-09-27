@@ -16,6 +16,9 @@ export class MockEmailProvider implements EmailProvider {
     if (!useDevStore.getState().emailConnected) {
       throw new ProviderOfflineError("Email", "Email is disconnected (simulated)");
     }
+    if (useDevStore.getState().providerExceptions) {
+      throw new Error("Simulated provider exception: email");
+    }
     // Dev panel: inject an incoming message per pulse.
     const pulse = useDevStore.getState().emailPulse;
     while (this.seenPulse < pulse) {

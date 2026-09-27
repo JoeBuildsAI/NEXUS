@@ -10,7 +10,7 @@ import { MessageDetail } from "./MessageDetail";
 import { InboxSummaryPanel } from "./InboxSummaryPanel";
 import { SubscriptionsPanel } from "./SubscriptionsPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Tabs, type TabItem, Button } from "@/components/ui";
+import { Tabs, type TabItem, Button, ErrorNotice } from "@/components/ui";
 import { notify } from "@/state/toastStore";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +63,7 @@ export function CommunicationsScreen() {
   if (error && isOffline(error)) {
     return <EmptyState eyebrow="Communications" title="Offline" body="The mail service is unreachable. Cached messages return when the connection does." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Integrations</Button>} />;
   }
+  const loadFailed = !!error && !isOffline(error);
   if (mode === "none" && !loading && (data?.length ?? 0) === 0) {
     return <EmptyState eyebrow="Communications" title="No account connected" body="Connect Outlook or Gmail when you're ready. Until then this space stays quiet." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Connect an account</Button>} />;
   }
@@ -86,6 +87,7 @@ export function CommunicationsScreen() {
       </div>
 
       <div className="mx-auto min-h-0 w-full max-w-[1880px] flex-1 overflow-y-auto px-12 pb-16 2xl:px-16">
+        {loadFailed && <div className="mb-8"><ErrorNotice title="Inbox unavailable" body="NEXUS couldn't read your messages." error={error} onRetry={reload} /></div>}
         {filter === "subscriptions" ? (
           <SubscriptionsPanel />
         ) : (
