@@ -39,7 +39,11 @@ export function sampleLifeData(today: DayKey, now = Date.now()): LifeDump {
     tmpl("wt-pull", "Pull", "Pull", [["ex-row", set(6, 8, 165), 120], ["ex-pullup", set(6, 10, null), 90], ["ex-curl", set(10, 12, 35), 60]]),
     tmpl("wt-legs", "Legs", "Legs", [["ex-squat", set(5, 6, 245), 150], ["ex-rdl", set(8, 10, 185), 120], ["ex-legpress", set(10, 12, 320), 90], ["ex-calf", set(12, 15, 140), 60]]),
   ];
-  d.programs = [mk({ id: "prog-ppl", name: "Push · Pull · Legs", mode: "weekly", weekly: [null, "wt-push", "wt-pull", "wt-legs", null, "wt-push", "wt-pull"], rotation: [], anchor: week, manual: {}, enabled: true }) as FitnessProgram];
+  // Weekly PPL arranged so that today is a Push day (matches the sample "Gym · Push" event).
+  const wd = new Date(`${today}T00:00:00`).getDay();
+  const cycle: (string | null)[] = ["wt-push", "wt-pull", "wt-legs", null, "wt-push", "wt-pull", null];
+  const weekly = Array.from({ length: 7 }, (_, i) => cycle[((i - wd) % 7 + 7) % 7] ?? null);
+  d.programs = [mk({ id: "prog-ppl", name: "Push · Pull · Legs", mode: "weekly", weekly, rotation: [], anchor: week, manual: {}, enabled: true }) as FitnessProgram];
   // Two finished sessions for history / previous values
   const s1 = startSession(d.workoutTemplates[0]!, addDays(today, -7), now - 7 * 86400_000 - 3_600_000);
   for (const e of s1.exercises) for (const st of e.sets) { st.done = true; st.reps = 9; st.weight = st.weight == null ? null : st.weight - 5; }

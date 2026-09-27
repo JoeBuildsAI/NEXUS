@@ -19,6 +19,9 @@ import { useModeStore } from "@/state/modeStore";
 import { useCleanupStore } from "@/state/cleanupStore";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useNativeEvents } from "@/hooks/useNativeEvents";
+import { useReminders } from "@/hooks/useReminders";
+import { useAutoBackup } from "@/hooks/useAutoBackup";
+import { useLifeStore } from "@/state/lifeStore";
 import { setupActions } from "@/core/actions/setup";
 import { getProviders } from "@/providers";
 import { isDevBuild } from "@/state/devStore";
@@ -37,6 +40,9 @@ export function App() {
 
   useGlobalHotkeys();
   useNativeEvents();
+  useReminders();
+  useAutoBackup();
+  useEffect(() => { void useLifeStore.getState().load(); }, []);
 
   const gameRunning = useModeStore((s) => s.gameRunning);
 

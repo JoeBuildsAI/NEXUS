@@ -2,7 +2,7 @@ import { isObj, isStr, vArr, vBool, vNum, vOneOf, vStr } from "./persistence";
 import type {
   AISettings, AppearanceSettings, GamingSettings, MediaSettings, PrivacySettings, ProfileSettings,
   ShortcutSettings, StartupSettings, SystemSettings, WindowSettings,
-} from "./settingsStore";
+ LifeSettings, DataSettings } from "./settingsStore";
 
 export interface SettingsData {
   profile: ProfileSettings;
@@ -15,6 +15,8 @@ export interface SettingsData {
   ai: AISettings;
   shortcuts: ShortcutSettings;
   window: WindowSettings;
+  life: LifeSettings;
+  data: DataSettings;
 }
 
 export const SETTINGS_VERSION = 3;
@@ -24,7 +26,7 @@ export function sanitizeSettings(persisted: unknown, defaults: SettingsData): Se
   const p = isObj(persisted) ? persisted : {};
   const sec = (k: keyof SettingsData): Record<string, unknown> => (isObj(p[k]) ? (p[k] as Record<string, unknown>) : {});
   const d = defaults;
-  const a = sec("appearance"), pr = sec("profile"), st = sec("startup"), g = sec("gaming"), m = sec("media"), pv = sec("privacy"), sy = sec("system"), ai = sec("ai"), sh = sec("shortcuts"), w = sec("window");
+  const a = sec("appearance"), pr = sec("profile"), st = sec("startup"), g = sec("gaming"), m = sec("media"), pv = sec("privacy"), sy = sec("system"), ai = sec("ai"), sh = sec("shortcuts"), w = sec("window"), lf = sec("life"), dt = sec("data");
   return {
     profile: {
       name: vStr(pr.name, d.profile.name, 40),
@@ -87,6 +89,23 @@ export function sanitizeSettings(persisted: unknown, defaults: SettingsData): Se
     },
     window: {
       closeBehavior: vOneOf(w.closeBehavior, ["tray", "exit"], d.window.closeBehavior),
+    },
+    life: {
+      reminders: vBool(lf.reminders, d.life.reminders),
+      remindEvents: vBool(lf.remindEvents, d.life.remindEvents),
+      remindWorkouts: vBool(lf.remindWorkouts, d.life.remindWorkouts),
+      remindRoutines: vBool(lf.remindRoutines, d.life.remindRoutines),
+      remindMeals: vBool(lf.remindMeals, d.life.remindMeals),
+      remindTasks: vBool(lf.remindTasks, d.life.remindTasks),
+      leadMinutes: vNum(lf.leadMinutes, d.life.leadMinutes, 0, 120),
+      quietStart: vNum(lf.quietStart, d.life.quietStart, 0, 1439),
+      quietEnd: vNum(lf.quietEnd, d.life.quietEnd, 0, 1439),
+      workoutMinute: vNum(lf.workoutMinute, d.life.workoutMinute, 0, 1439),
+    },
+    data: {
+      autoBackup: vBool(dt.autoBackup, d.data.autoBackup),
+      keepBackups: vNum(dt.keepBackups, d.data.keepBackups, 1, 60),
+      lastAutoBackupDay: typeof dt.lastAutoBackupDay === "string" ? dt.lastAutoBackupDay : null,
     },
   };
 }

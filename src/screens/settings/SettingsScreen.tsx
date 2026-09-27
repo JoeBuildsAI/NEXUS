@@ -12,6 +12,8 @@ import { SystemSettingsSection } from "./sections/SystemSettings";
 import { ShortcutsSettingsSection } from "./sections/ShortcutsSettings";
 import { IntegrationsSettings } from "./sections/IntegrationsSettings";
 import { AISettingsSection } from "./sections/AISettings";
+import { LifeSettingsSection } from "./sections/LifeSettings";
+import { DataSettings } from "./sections/DataSettings";
 
 const SECTIONS: { id: SectionId; label: string; C: () => JSX.Element }[] = [
   { id: "general", label: "General", C: GeneralSettings },
@@ -24,6 +26,8 @@ const SECTIONS: { id: SectionId; label: string; C: () => JSX.Element }[] = [
   { id: "shortcuts", label: "Shortcuts", C: ShortcutsSettingsSection },
   { id: "integrations", label: "Integrations", C: IntegrationsSettings },
   { id: "ai", label: "AI", C: AISettingsSection },
+  { id: "life", label: "Life", C: LifeSettingsSection },
+  { id: "data", label: "Data", C: DataSettings },
 ];
 
 /** Settings: a typographic index on the left, one section at a time on the right. */

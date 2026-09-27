@@ -84,6 +84,28 @@ export interface ShortcutSettings {
   screenShortcutsEnabled: boolean;
 }
 
+export interface LifeSettings {
+  /** Local reminders (in-app, and system notifications when permitted). */
+  reminders: boolean;
+  remindEvents: boolean;
+  remindWorkouts: boolean;
+  remindRoutines: boolean;
+  remindMeals: boolean;
+  remindTasks: boolean;
+  /** Minutes before an event to remind. */
+  leadMinutes: number;
+  /** Quiet hours: no reminders between these minutes of day (start may be > end, crossing midnight). */
+  quietStart: number;
+  quietEnd: number;
+  /** Default workout slot when a program schedules a session without a calendar event. */
+  workoutMinute: number;
+}
+export interface DataSettings {
+  autoBackup: boolean;
+  keepBackups: number;
+  lastAutoBackupDay: string | null;
+}
+
 export interface WindowSettings {
   /** What the titlebar close button does. */
   closeBehavior: "tray" | "exit";
@@ -102,6 +124,8 @@ interface SettingsState extends SettingsData {
   setAI: (patch: Partial<AISettings>) => void;
   setShortcuts: (patch: Partial<ShortcutSettings>) => void;
   setWindow: (patch: Partial<WindowSettings>) => void;
+  setLife: (patch: Partial<LifeSettings>) => void;
+  setData: (patch: Partial<DataSettings>) => void;
   setDevPanelOpen: (open: boolean) => void;
 }
 
@@ -128,6 +152,8 @@ export const DEFAULT_SETTINGS: SettingsData = {
   ai: { provider: "local", localCommandMode: true, inboxMode: "off" },
   shortcuts: { commandPalette: "Ctrl+Space", privacy: "Ctrl+Shift+`", screenPrefix: "ctrl", screenShortcutsEnabled: true },
   window: { closeBehavior: "tray" },
+  life: { reminders: false, remindEvents: true, remindWorkouts: true, remindRoutines: true, remindMeals: false, remindTasks: true, leadMinutes: 10, quietStart: 22 * 60, quietEnd: 7 * 60, workoutMinute: 17 * 60 + 30 },
+  data: { autoBackup: false, keepBackups: 7, lastAutoBackupDay: null },
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -145,6 +171,8 @@ export const useSettingsStore = create<SettingsState>()(
       setAI: (patch) => set((s) => ({ ai: { ...s.ai, ...patch } })),
       setShortcuts: (patch) => set((s) => ({ shortcuts: { ...s.shortcuts, ...patch } })),
       setWindow: (patch) => set((s) => ({ window: { ...s.window, ...patch } })),
+      setLife: (patch) => set((s) => ({ life: { ...s.life, ...patch } })),
+      setData: (patch) => set((s) => ({ data: { ...s.data, ...patch } })),
       setDevPanelOpen: (devPanelOpen) => set({ devPanelOpen }),
     }),
     {

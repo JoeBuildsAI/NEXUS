@@ -64,7 +64,7 @@ export function GeneralSettings() {
         const b = v.backup;
         const s = useSettingsStore.getState();
         // Imported files are untrusted input: coerce through the same schema as hydration.
-        const current = { profile: s.profile, appearance: s.appearance, startup: s.startup, gaming: s.gaming, media: s.media, privacy: s.privacy, system: s.system, ai: s.ai, shortcuts: s.shortcuts, window: s.window };
+        const current = { profile: s.profile, appearance: s.appearance, startup: s.startup, gaming: s.gaming, media: s.media, privacy: s.privacy, system: s.system, ai: s.ai, shortcuts: s.shortcuts, window: s.window, life: s.life, data: s.data };
         const clean = sanitizeSettings({ ...current, ...b.settings, profile: { ...current.profile, name: b.settings.profile.name || current.profile.name }, window: current.window }, current);
         s.setProfile({ name: clean.profile.name, subtitle: clean.profile.subtitle, clockFormat: clean.profile.clockFormat });
         s.setAppearance(clean.appearance);

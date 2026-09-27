@@ -140,7 +140,7 @@ function ActiveSession({ session }: { session: WorkoutSession }) {
           })}
         </div>
       </div>
-      <div>
+      <div className="lg:sticky lg:top-0 lg:self-start">
         <p className="label">Rest</p>
         <div className="rule mt-3 mb-4" />
         {rest ? (

@@ -103,9 +103,10 @@ export function addTotals(a: Totals, b: Totals): Totals {
   }
   return out;
 }
+/** Vacuous total: nothing unknown yet, so `complete` starts true and only known/unknown parts change it. */
 export function emptyTotals(): Totals {
   const out = {} as Totals;
-  for (const k of FACT_KEYS) out[k] = { value: 0, unknown: 0, complete: false, provenance: null };
+  for (const k of FACT_KEYS) out[k] = { value: 0, unknown: 0, complete: true, provenance: null };
   return out;
 }
 

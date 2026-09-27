@@ -81,6 +81,14 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 export const native = {
   available: () => config.isTauri,
 
+  // ---- personal-data database (paths / backups; the data itself goes through tauri-plugin-sql) ----
+  lifePaths: () => invoke<{ dbPath: string; backupDir: string; dbExists: boolean; dbBytes: number }>("life_paths"),
+  lifeBackupTarget: () => invoke<string>("life_backup_target"),
+  lifeBackups: () => invoke<{ path: string; name: string; bytes: number; modified: number }[]>("life_backups"),
+  lifePruneBackups: (keep: number) => invoke<number>("life_prune_backups", { keep }),
+  lifeValidateBackup: (path: string) => invoke<boolean>("life_validate_backup", { path }),
+  lifeQuarantine: () => invoke<string>("life_quarantine"),
+
   // ---- power ----
   async powerState(): Promise<PowerState> {
     if (!config.isTauri) return { supported: false, schemes: [], activeGuid: null };

@@ -8,6 +8,7 @@ import { groupByDay, layoutColumns, occurrencesInRange, occurrencesOnDay } from 
 import type { CalendarEvent, EventOccurrence } from "@/core/life/models";
 import { addDays, addMonths, daysBetween, daysInMonth, endOfMonth, formatDayLong, formatMinute, minuteOfDay, MONTH_NAMES, parseDay, relativeDayLabel, startOfMonth, startOfWeek, todayKey, WEEKDAY_SHORT, type DayKey } from "@/core/life/time";
 import { EventEditor, type EventDraft } from "./EventEditor";
+import { scheduledTemplateId } from "@/core/life/fitness";
 import { cn } from "@/lib/utils";
 
 const VIEWS: { id: CalendarView; label: string }[] = [{ id: "day", label: "Day" }, { id: "week", label: "Week" }, { id: "month", label: "Month" }, { id: "year", label: "Year" }, { id: "agenda", label: "Agenda" }];
@@ -31,6 +32,24 @@ export function CalendarScreen() {
   const [editor, setEditor] = useState<EventDraft | null>(null);
   useEffect(() => { void life.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Scheduled workouts (from the fitness program) appear as read-only derived
+  // occurrences unless the day already has a fitness event. Not persisted; owned by Fitness.
+  const program = life.programs.find((p) => p.enabled) ?? null;
+  const events = useMemo(() => {
+    if (!program) return life.events;
+    const derived: CalendarEvent[] = [];
+    const from = addDays(anchor, -45), to = addDays(anchor, 400);
+    const fitnessDays = new Set(life.events.filter((e) => e.category === "fitness" && !e.recurrence).map((e) => e.day));
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      const tid = scheduledTemplateId(program, d);
+      if (!tid || fitnessDays.has(d)) continue;
+      const t = life.workoutTemplates.find((x) => x.id === tid);
+      if (!t) continue;
+      derived.push({ id: `derived-workout-${d}`, createdAt: 0, updatedAt: 0, rev: 0, title: `Workout · ${t.name}`, day: d, startMinute: 17 * 60 + 30, endDay: d, endMinute: 18 * 60 + 45, allDay: false, timezone: "local", source: "local", category: "fitness", readOnly: true });
+    }
+    return [...life.events, ...derived];
+  }, [life.events, program, life.workoutTemplates, anchor]);
+
   // Keyboard: ← → move, T today, D/W/M/Y/A views, N new
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -52,6 +71,7 @@ export function CalendarScreen() {
 
   const openEvent = (o: EventOccurrence) => {
     const e = o.event;
+    if (e.id.startsWith("derived-workout-")) { useNavigationStore.getState().openLife("fitness"); return; }
     if (e.readOnly) return;
     setEditor({ id: e.id, title: e.title, day: e.day, startMinute: e.startMinute, endDay: e.endDay, endMinute: e.endMinute, allDay: e.allDay, category: e.category, location: e.location ?? "", description: e.description ?? "", recurrence: e.recurrence ?? null, occurrenceDay: o.day });
   };
@@ -81,11 +101,11 @@ export function CalendarScreen() {
       <div className="rule mt-3" />
 
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
-        {view === "day" && <DayView day={anchor} events={life.events} today={today} nowMinute={minuteOfDay(now)} hour12={hour12} onOpen={openEvent} onCreate={(day, minute) => setEditor(newDraft(day, minute))} onMove={(id, day, m) => void life.moveEvent(id, day, m)} />}
-        {view === "week" && <WeekView anchor={anchor} events={life.events} today={today} nowMinute={minuteOfDay(now)} hour12={hour12} onOpen={openEvent} onCreate={(day, minute) => setEditor(newDraft(day, minute))} onMove={(id, day, m) => void life.moveEvent(id, day, m)} onPickDay={(d) => { setAnchor(d); setView("day"); }} />}
-        {view === "month" && <MonthView anchor={anchor} events={life.events} today={today} onPickDay={(d) => { setAnchor(d); setView("day"); }} onOpen={openEvent} />}
-        {view === "year" && <YearView anchor={anchor} events={life.events} today={today} onPickMonth={(d) => { setAnchor(d); setView("month"); }} onPickDay={(d) => { setAnchor(d); setView("day"); }} />}
-        {view === "agenda" && <AgendaView anchor={anchor} events={life.events} today={today} hour12={hour12} onOpen={openEvent} />}
+        {view === "day" && <DayView day={anchor} events={events} today={today} nowMinute={minuteOfDay(now)} hour12={hour12} onOpen={openEvent} onCreate={(day, minute) => setEditor(newDraft(day, minute))} onMove={(id, day, m) => void life.moveEvent(id, day, m)} />}
+        {view === "week" && <WeekView anchor={anchor} events={events} today={today} nowMinute={minuteOfDay(now)} hour12={hour12} onOpen={openEvent} onCreate={(day, minute) => setEditor(newDraft(day, minute))} onMove={(id, day, m) => void life.moveEvent(id, day, m)} onPickDay={(d) => { setAnchor(d); setView("day"); }} />}
+        {view === "month" && <MonthView anchor={anchor} events={events} today={today} onPickDay={(d) => { setAnchor(d); setView("day"); }} onOpen={openEvent} />}
+        {view === "year" && <YearView anchor={anchor} events={events} today={today} onPickMonth={(d) => { setAnchor(d); setView("month"); }} onPickDay={(d) => { setAnchor(d); setView("day"); }} />}
+        {view === "agenda" && <AgendaView anchor={anchor} events={events} today={today} hour12={hour12} onOpen={openEvent} />}
       </div>
       {editor && <EventEditor draft={editor} onClose={() => setEditor(null)} />}
     </div>
