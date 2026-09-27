@@ -11,6 +11,7 @@ import { notify } from "@/state/toastStore";
 import type { ProviderHealth, ProviderHealthState, SteamStatus } from "@/core/types";
 import { cn } from "@/lib/utils";
 import { MailAccountsPanel } from "./MailAccountsPanel";
+import { XboxPanel } from "./XboxPanel";
 import { activity } from "@/state/activityStore";
 
 const STATE_TONE: Record<ProviderHealthState, "nominal" | "warning" | "neutral" | "attention" | "critical"> = {
@@ -56,6 +57,7 @@ export function IntegrationsSettings() {
       <SettingRow label="Media root" description="Authorized local folder or drive for the media workspace. Managed in Settings → Media.">
         <div className="flex items-center gap-2"><HardDrive size={15} className="text-white/40" /><Badge tone={dev.mediaConnected ? "accent" : "warning"}>{health?.find((h) => h.name === "Media")?.health.summary ?? "…"}</Badge></div>
       </SettingRow>
+      <XboxPanel />
       <MailAccountsPanel onChanged={reloadHealth} />
       <SettingRow label="Windows applications" description={config.isTauri ? "Discovered from the Start Menu and Windows built-ins. No disk scanning." : "Demo list in browser preview."}>
         <div className="flex items-center gap-2"><AppWindow size={15} className="text-white/40" /><Badge tone={config.isTauri ? "nominal" : "neutral"}>{apps ? `${apps.length} apps` : "…"}</Badge></div>

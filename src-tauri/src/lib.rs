@@ -2,6 +2,7 @@ mod apps;
 mod gpu;
 mod hardware;
 mod life_db;
+mod xbox;
 mod media;
 mod media_thumbs;
 mod oauth;
@@ -106,6 +107,8 @@ pub fn run() {
             life_db::life_prune_backups,
             life_db::life_validate_backup,
             life_db::life_quarantine,
+            xbox::xbox_inventory,
+            xbox::xbox_launch,
             gpu::gpu_set_preferred,
             session::session_read,
             session::session_write,

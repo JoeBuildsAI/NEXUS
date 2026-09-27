@@ -20,6 +20,7 @@ const STATUS_META: Record<Exclude<AchievementSourceStatus, "ok" | "demo">, { ico
   "not-configured": { icon: KeyRound, title: "Steam Web API not configured", body: "Add your Steam Web API key and SteamID64 in Integrations to see achievements and playtime.", action: "integrations" },
   "private-profile": { icon: ShieldOff, title: "Profile is private", body: "Set “Game details” to Public in Steam privacy settings to load achievements." },
   "no-achievements": { icon: Info, title: "No achievements", body: "This game does not expose Steam achievements." },
+  unsupported: { icon: Info, title: "Achievements unavailable", body: "Xbox PC titles are discovered and launched locally. Achievements and playtime need Xbox Live access NEXUS does not have — nothing is estimated." },
   "network-error": { icon: WifiOff, title: "Steam is unreachable", body: "Achievements will load when the network is available." },
   "api-error": { icon: Info, title: "Steam API error", body: "The Steam Web API returned an unexpected response. NEXUS will retry shortly." },
 };

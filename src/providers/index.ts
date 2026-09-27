@@ -40,6 +40,7 @@ function lifeIndex(): LifeIndexEntry[] {
   return out.slice(0, 5000);
 }
 import { MockAppProvider } from "./apps/MockAppProvider";
+import { XboxGameProvider } from "./xbox/XboxGameProvider";
 import { TauriAppProvider } from "./apps/TauriAppProvider";
 
 /**
@@ -61,6 +62,8 @@ export interface Providers {
   readonly media: MediaProvider;
   readonly email: EmailProvider;
   readonly apps: AppProvider;
+  /** Xbox / Microsoft Store PC games (desktop only; local discovery, honest capabilities). */
+  readonly xbox: XboxGameProvider;
   readonly assistant: AssistantProvider;
   /** Optional inbox intelligence — "none" until a provider is configured (never faked). */
   readonly intelligence: InboxIntelligenceProvider;
@@ -110,6 +113,7 @@ export function getProviders(): Providers {
     media,
     email,
     apps,
+    xbox: new XboxGameProvider(),
     intelligence: new NoIntelligenceProvider(() => useSettingsStore.getState().ai.inboxMode),
     assistant: new LocalCommandProvider({
       getApps: () => apps.getApps(),

@@ -68,14 +68,15 @@ export function setupActions(): void {
       handler: async ({ args }) => {
         const gameId = args.gameId;
         if (!gameId) return { ok: false, message: "No game specified" };
-        const { steam } = getProviders();
-        const game = await steam.getGameDetails(gameId);
+        const { steam, xbox } = getProviders();
+        const isXbox = gameId.startsWith("xbox:");
+        const game = isXbox ? await xbox.getGameDetails(gameId) : await steam.getGameDetails(gameId);
         const title = game?.title ?? gameId;
         if (game && !game.installed) {
           notify.warn(`${title} is not installed`, "Install it from your launcher first.");
           return { ok: false, message: "Not installed" };
         }
-        const ok = await steam.launchGame(gameId);
+        const ok = isXbox ? await xbox.launchGame(gameId) : await steam.launchGame(gameId);
         if (ok) {
           useGameSessionStore.getState().begin(gameId, title);
           activity.record("game-launched", `Launched ${title}`, { gameId });

@@ -70,9 +70,11 @@ export const useLibraryStore = create<LibraryState>()(
         if (loading) return;
         if (!force && loadedAt && Date.now() - loadedAt < LIST_TTL) return;
         set({ loading: true });
-        const { steam } = getProviders();
+        const { steam, xbox } = getProviders();
         try {
-          const games = [...(await steam.getGames())];
+          // Unified PLAY library: Steam + locally discovered Xbox PC titles. Provider gaps stay explicit.
+          const [steamGames, xboxGames] = await Promise.all([steam.getGames(), xbox.getGames().catch(() => [])]);
+          const games = [...steamGames, ...xboxGames];
           const withMode = steam as { mode?: () => Promise<"real" | "demo"> };
           const mode = typeof withMode.mode === "function" ? await withMode.mode() : "demo";
           // Keep only cached details for games still present; reconcile core fields.
@@ -100,13 +102,13 @@ export const useLibraryStore = create<LibraryState>()(
         });
         if (wanted.length === 0) return;
         set((s) => ({ inflight: [...s.inflight, ...wanted] }));
-        const { steam } = getProviders();
+        const { steam, xbox } = getProviders();
         const queue = [...wanted];
         const worker = async () => {
           while (queue.length) {
             const id = queue.shift()!;
             try {
-              const value = await steam.getGameDetails(id);
+              const value = id.startsWith("xbox:") ? await xbox.getGameDetails(id) : await steam.getGameDetails(id);
               if (value) get().setDetails(id, value);
             } catch (err) {
               log.warn("Details fetch failed", { id, error: String(err) });
@@ -119,10 +121,10 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       refreshDetails: async (id) => {
-        const { steam } = getProviders();
+        const { steam, xbox } = getProviders();
         steam.invalidate?.();
         try {
-          const value = await steam.getGameDetails(id);
+          const value = id.startsWith("xbox:") ? await xbox.getGameDetails(id) : await steam.getGameDetails(id);
           if (value) get().setDetails(id, value);
           return value;
         } catch {

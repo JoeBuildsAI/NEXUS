@@ -41,7 +41,9 @@ export type AchievementSourceStatus =
   | "no-achievements"
   | "network-error"
   | "api-error"
-  | "demo";
+  | "demo"
+  /** The provider cannot expose achievements at all (e.g. Xbox PC titles without Xbox Live access). */
+  | "unsupported";
 
 export interface GameAchievements {
   readonly gameId: string;
