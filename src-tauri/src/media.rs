@@ -135,6 +135,19 @@ fn classify(ext: &str) -> Option<&'static str> {
 /// Register a user-selected folder as an authorized root. The path must exist
 /// and be a directory; it is canonicalized and added to the asset protocol
 /// scope so the WebView can stream files from it (and only it).
+/// Folders that make no sense as media roots and must never be exposed to the
+/// WebView: Windows itself, program installs, machine-wide app data, NEXUS data.
+pub fn is_forbidden_root(canon: &Path) -> bool {
+    let c = canon.to_string_lossy().to_lowercase().trim_end_matches('\\').to_string();
+    let mut blocked: Vec<String> = vec![];
+    for var in ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "APPDATA", "LOCALAPPDATA"] {
+        if let Ok(v) = std::env::var(var) {
+            blocked.push(v.to_lowercase().trim_end_matches('\\').to_string());
+        }
+    }
+    blocked.iter().any(|b| !b.is_empty() && (c == *b || c.starts_with(&format!("{b}\\"))))
+}
+
 #[tauri::command]
 pub fn media_register_root(app: tauri::AppHandle, state: tauri::State<MediaState>, path: String) -> Result<AuthorizedRootInfo, String> {
     let p = PathBuf::from(path.trim());
@@ -142,6 +155,9 @@ pub fn media_register_root(app: tauri::AppHandle, state: tauri::State<MediaState
         return Err("Folder does not exist or is not a directory.".into());
     }
     let canon = normalize(&p.canonicalize().map_err(|e| e.to_string())?);
+    if is_forbidden_root(&canon) {
+        return Err("System and application folders can't be used as media locations.".into());
+    }
     let _ = app.asset_protocol_scope().allow_directory(&canon, true);
     state.roots.lock().map_err(|e| e.to_string())?.insert(canon.clone());
     Ok(AuthorizedRootInfo { id: root_id(&canon), path: canon.to_string_lossy().to_string(), kind: drive_kind(&canon), exists: true })
@@ -302,8 +318,11 @@ fn now_ms() -> u64 {
 mod tests {
     use super::*;
 
+    static FIXTURE_SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
     fn fixture() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("nexus-media-fixture-{}-{}", std::process::id(), now_ms()));
+        let seq = FIXTURE_SEQ.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("nexus-media-fixture-{}-{}-{}", std::process::id(), now_ms(), seq));
         std::fs::create_dir_all(dir.join("Clips").join("Nested")).unwrap();
         std::fs::create_dir_all(dir.join(".hidden")).unwrap();
         std::fs::write(dir.join("a.mp4"), b"x").unwrap();
@@ -347,5 +366,42 @@ mod tests {
         assert!(!is_within(&dir, &dir.join("..")));
         assert!(!is_within(&dir, &std::env::temp_dir()));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn junctions_are_not_followed() {
+        // A directory junction inside the root pointing outside must be skipped.
+        let dir = fixture();
+        let outside = std::env::temp_dir().join(format!("nexus-media-outside-{}", std::process::id()));
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("escaped.mp4"), b"x").unwrap();
+        let link = dir.join("Link");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J", &link.to_string_lossy(), &outside.to_string_lossy()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if made {
+            let cancel = AtomicBool::new(false);
+            let res = scan(&dir, "r", &cancel, |_| {});
+            assert!(!res.files.iter().any(|f| f.name == "escaped"), "junction target was indexed");
+            let _ = std::fs::remove_dir(&link);
+        }
+        let _ = std::fs::remove_dir_all(&outside);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn system_folders_are_forbidden_roots() {
+        if let Ok(root) = std::env::var("SystemRoot") {
+            assert!(is_forbidden_root(Path::new(&root)));
+            assert!(is_forbidden_root(&Path::new(&root).join("System32")));
+        }
+        if let Ok(pf) = std::env::var("ProgramFiles") {
+            assert!(is_forbidden_root(Path::new(&pf)));
+        }
+        assert!(!is_forbidden_root(Path::new("X:\\Videos")));
+        assert!(!is_forbidden_root(Path::new("D:\\")));
     }
 }

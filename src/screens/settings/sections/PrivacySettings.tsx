@@ -13,7 +13,7 @@ export function PrivacySettingsSection() {
   return (
     <SettingsSection title="Privacy" description="The privacy hotkey is immediate: media pauses first, then the workspace is hidden.">
       <SettingRow label="Privacy hotkey" description="Global — works even when NEXUS is not focused (desktop build).">
-        <code className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-xs text-white/80">Ctrl + Shift + `</code>
+        <code className="font-mono text-[13px] text-white/80">Ctrl + Shift + `</code>
       </SettingRow>
       <SettingRow label="Privacy action" description="What happens after media is paused.">
         <Select<PrivacyAction>
@@ -35,7 +35,7 @@ export function PrivacySettingsSection() {
       <SettingRow label="Test privacy mode" description={last ? `Last activated ${formatRelativeTime(last)}.` : "Fire the full privacy sequence now."}>
         <Button size="sm" variant="outline" onClick={() => activate("test")}><ShieldOff size={13} /> Test privacy mode</Button>
       </SettingRow>
-      <div className="py-4 text-xs leading-relaxed text-white/35">
+      <div className="py-5 text-[13px] leading-relaxed text-white/35">
         Media filenames never appear on Home or in activity. Removable drives are never scanned without authorization and are excluded from cleanup. Clear media history from Settings → Media.
       </div>
     </SettingsSection>

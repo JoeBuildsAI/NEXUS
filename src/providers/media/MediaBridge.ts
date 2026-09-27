@@ -67,27 +67,36 @@ export class TauriMediaBridge implements MediaBridge {
   }
   async scanRoot(path: string, onProgress: (p: MediaScanProgress) => void): Promise<NativeScanResult> {
     const { listen } = await import("@tauri-apps/api/event");
-    const rootId = await this.invoke<string>("media_scan_root", { path });
-    return new Promise<NativeScanResult>((resolve, reject) => {
-      let unProgress: (() => void) | null = null;
-      let unComplete: (() => void) | null = null;
-      const cleanup = () => {
-        unProgress?.();
-        unComplete?.();
-      };
-      void listen<MediaScanProgress>("media:scan-progress", (e) => {
-        if (e.payload.rootId === rootId) onProgress(e.payload);
-      }).then((u) => (unProgress = u));
-      void listen<NativeScanResult>("media:scan-complete", (e) => {
-        if (e.payload.rootId !== rootId) return;
-        cleanup();
-        resolve(e.payload);
-      }).then((u) => (unComplete = u));
-      setTimeout(() => {
-        cleanup();
-        reject(new Error("Scan timed out"));
-      }, 120_000);
+    // Attach listeners BEFORE starting the scan: a tiny folder can complete
+    // before a post-invoke listener would be registered. Events are matched
+    // by rootId, which we only learn from the invoke, so buffer until then.
+    let rootId: string | null = null;
+    let settled = false;
+    let resolveFn!: (r: NativeScanResult) => void;
+    let rejectFn!: (e: Error) => void;
+    const done = new Promise<NativeScanResult>((res, rej) => { resolveFn = res; rejectFn = rej; });
+    const pending: NativeScanResult[] = [];
+    const unProgress = await listen<MediaScanProgress>("media:scan-progress", (e) => {
+      if (rootId && e.payload.rootId === rootId) onProgress(e.payload);
     });
+    const unComplete = await listen<NativeScanResult>("media:scan-complete", (e) => {
+      if (!rootId) { pending.push(e.payload); return; }
+      if (e.payload.rootId === rootId && !settled) { settled = true; resolveFn(e.payload); }
+    });
+    const cleanup = () => { unProgress(); unComplete(); };
+    const timer = setTimeout(() => { if (!settled) { settled = true; rejectFn(new Error("Scan timed out")); } }, 120_000);
+    try {
+      rootId = await this.invoke<string>("media_scan_root", { path });
+      const early = pending.find((p) => p.rootId === rootId);
+      if (early && !settled) { settled = true; resolveFn(early); }
+      return await done;
+    } catch (e) {
+      if (!settled) { settled = true; rejectFn(e instanceof Error ? e : new Error(String(e))); }
+      return done;
+    } finally {
+      clearTimeout(timer);
+      cleanup();
+    }
   }
   cancelScan() {
     return this.invoke<void>("media_cancel_scan");

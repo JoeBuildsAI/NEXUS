@@ -154,20 +154,12 @@ pub fn launch_app(registry: tauri::State<AppRegistry>, app_id: String) -> Result
     Ok(entry.name)
 }
 
-#[cfg(target_os = "windows")]
+/// ShellExecute the discovered path (resolves .lnk shortcuts and .exe alike).
+/// No `cmd` in the loop: the path is handed to the shell API verbatim.
 fn launch_path(path: &str) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    // `start ""` resolves .lnk shortcuts and .exe alike via the shell.
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", path])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn launch_path(_path: &str) -> Result<(), String> {
-    Err("launch_app is only implemented on Windows".into())
+    let p = std::path::Path::new(path);
+    if !p.is_file() {
+        return Err("Application is no longer present at its discovered path.".into());
+    }
+    open::that_detached(p).map_err(|e| e.to_string())
 }

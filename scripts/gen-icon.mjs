@@ -1,5 +1,9 @@
-// Generates a 1024x1024 PNG app icon for NEXUS (no external deps).
-// Deep charcoal background, cyan-steel ring, and a stylized "N".
+// Generates a 1024x1024 PNG app icon for NEXUS (no external deps), then
+// `npx tauri icon scripts/.icon/source.png` produces every platform size.
+//
+// The mark: near-black rounded square, a hairline inner edge, and the NEXUS "N"
+// reduced to three strokes — two white stems, one diagonal at 55% — matching
+// src/components/shell/NexusMark.tsx. Monochrome, geometric, legible at 16px.
 import { deflateSync } from "node:zlib";
 import { writeFileSync, mkdirSync } from "node:fs";
 
@@ -9,7 +13,6 @@ const buf = Buffer.alloc(S * S * 4);
 function set(x, y, r, g, b, a) {
   if (x < 0 || y < 0 || x >= S || y >= S) return;
   const i = (y * S + x) * 4;
-  // simple src-over blend onto existing
   const da = buf[i + 3] / 255;
   const sa = a / 255;
   const outA = sa + da * (1 - sa);
@@ -20,59 +23,63 @@ function set(x, y, r, g, b, a) {
   buf[i + 3] = Math.round(outA * 255);
 }
 
-// Background: rounded-rect radial gradient
+// Rounded-square background with anti-aliased corners (Windows-style radius).
+const R = 224;
+function insideRounded(x, y) {
+  const px = Math.min(Math.max(x, R), S - 1 - R);
+  const py = Math.min(Math.max(y, R), S - 1 - R);
+  const d = Math.hypot(x - px, y - py);
+  return Math.max(0, Math.min(1, R - d + 0.5));
+}
 const cx = S / 2;
 const cy = S / 2;
 for (let y = 0; y < S; y++) {
   for (let x = 0; x < S; x++) {
-    const d = Math.hypot(x - cx, y - cy) / (S / 2);
-    const t = Math.min(1, d);
-    const r = Math.round(16 * (1 - t) + 5 * t);
-    const g = Math.round(28 * (1 - t) + 7 * t);
-    const b = Math.round(38 * (1 - t) + 10 * t);
-    set(x, y, r, g, b, 255);
+    const cov = insideRounded(x, y);
+    if (cov <= 0) continue;
+    // Very subtle top-light: #0f0f11 at top → #050506 at bottom.
+    const t = y / S;
+    const v = Math.round(15 * (1 - t) + 5 * t);
+    const glow = Math.max(0, 1 - Math.hypot(x - cx, y - cy * 0.6) / (S * 0.75)) * 6;
+    set(x, y, v + glow, v + glow, v + glow + 2, Math.round(255 * cov));
+  }
+}
+// Hairline inner edge (1.5px, ~7% white) just inside the rounded boundary.
+for (let y = 0; y < S; y++) {
+  for (let x = 0; x < S; x++) {
+    const px = Math.min(Math.max(x, R), S - 1 - R);
+    const py = Math.min(Math.max(y, R), S - 1 - R);
+    const d = Math.hypot(x - px, y - py);
+    const edge = Math.abs(d - (R - 14));
+    if (edge < 2) set(x, y, 255, 255, 255, Math.round(18 * (1 - edge / 2)));
   }
 }
 
-// Accent ring
-function ring(radius, width, r, g, b, a) {
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const d = Math.hypot(x - cx, y - cy);
-      const edge = Math.abs(d - radius);
-      if (edge < width) {
-        const falloff = 1 - edge / width;
-        set(x, y, r, g, b, Math.round(a * falloff));
-      }
-    }
-  }
-}
-ring(360, 10, 94, 208, 230, 220);
-ring(300, 4, 94, 208, 230, 90);
-
-// Draw a bold "N" using thick strokes
+// Anti-aliased thick line with round caps.
 function line(x0, y0, x1, y1, thick, r, g, b, a) {
-  const steps = Math.round(Math.hypot(x1 - x0, y1 - y0));
-  for (let s = 0; s <= steps; s++) {
-    const px = x0 + ((x1 - x0) * s) / steps;
-    const py = y0 + ((y1 - y0) * s) / steps;
-    for (let dy = -thick; dy <= thick; dy++) {
-      for (let dx = -thick; dx <= thick; dx++) {
-        if (dx * dx + dy * dy <= thick * thick) {
-          set(Math.round(px + dx), Math.round(py + dy), r, g, b, a);
-        }
-      }
+  const minX = Math.floor(Math.min(x0, x1) - thick - 2), maxX = Math.ceil(Math.max(x0, x1) + thick + 2);
+  const minY = Math.floor(Math.min(y0, y1) - thick - 2), maxY = Math.ceil(Math.max(y0, y1) + thick + 2);
+  const dx = x1 - x0, dy = y1 - y0;
+  const len2 = dx * dx + dy * dy;
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const t = Math.max(0, Math.min(1, ((x - x0) * dx + (y - y0) * dy) / len2));
+      const d = Math.hypot(x - (x0 + t * dx), y - (y0 + t * dy));
+      const cov = Math.max(0, Math.min(1, thick - d + 0.5));
+      if (cov > 0) set(x, y, r, g, b, Math.round(a * cov));
     }
   }
 }
-const th = 34;
-const top = 360;
-const bot = 664;
-const lx = 392;
-const rx = 632;
-line(lx, bot, lx, top, th, 255, 255, 255, 245); // left vertical
-line(rx, bot, rx, top, th, 255, 255, 255, 245); // right vertical
-line(lx, top, rx, bot, th, 94, 208, 230, 255); // diagonal accent
+
+// The N: stems at 31% / 69%, from 30% to 70% height. Stroke ≈ 5.5% of size.
+const th = 28;
+const top = 318;
+const bot = 706;
+const lx = 336;
+const rx = 688;
+line(lx, top, rx, bot, th, 255, 255, 255, 140); // diagonal (55%)
+line(lx, bot, lx, top, th, 255, 255, 255, 250); // left stem
+line(rx, bot, rx, top, th, 255, 255, 255, 250); // right stem
 
 // Encode PNG
 function crc32(bytes) {
@@ -86,8 +93,7 @@ function crc32(bytes) {
 function chunk(type, data) {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length);
-  const typeBuf = Buffer.from(type, "ascii");
-  const body = Buffer.concat([typeBuf, data]);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
   const crc = Buffer.alloc(4);
   crc.writeUInt32BE(crc32(body));
   return Buffer.concat([len, body, crc]);
@@ -96,21 +102,14 @@ const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const ihdr = Buffer.alloc(13);
 ihdr.writeUInt32BE(S, 0);
 ihdr.writeUInt32BE(S, 4);
-ihdr[8] = 8; // bit depth
-ihdr[9] = 6; // RGBA
-// filter type 0 per scanline
+ihdr[8] = 8;
+ihdr[9] = 6;
 const raw = Buffer.alloc((S * 4 + 1) * S);
 for (let y = 0; y < S; y++) {
   raw[y * (S * 4 + 1)] = 0;
   buf.copy(raw, y * (S * 4 + 1) + 1, y * S * 4, (y + 1) * S * 4);
 }
-const idat = deflateSync(raw, { level: 9 });
-const png = Buffer.concat([
-  sig,
-  chunk("IHDR", ihdr),
-  chunk("IDAT", idat),
-  chunk("IEND", Buffer.alloc(0)),
-]);
+const png = Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw, { level: 9 })), chunk("IEND", Buffer.alloc(0))]);
 
 mkdirSync("scripts/.icon", { recursive: true });
 writeFileSync("scripts/.icon/source.png", png);

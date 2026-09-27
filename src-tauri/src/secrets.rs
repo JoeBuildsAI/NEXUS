@@ -22,6 +22,32 @@ pub fn read_secret(key: &str) -> Option<String> {
     entry(key).ok()?.get_password().ok().filter(|s| !s.trim().is_empty())
 }
 
+/// Shape checks so a mis-pasted value is rejected before it is stored.
+/// Steam Web API keys are 32 hex characters; SteamID64 is 17 digits.
+pub fn validate_format(key: &str, value: &str) -> Result<(), String> {
+    match key {
+        "steam.apiKey" if value.len() == 32 && value.chars().all(|c| c.is_ascii_hexdigit()) => Ok(()),
+        "steam.apiKey" => Err("A Steam Web API key is 32 hexadecimal characters.".into()),
+        "steam.steamId" if value.len() == 17 && value.chars().all(|c| c.is_ascii_digit()) => Ok(()),
+        "steam.steamId" => Err("A SteamID64 is 17 digits.".into()),
+        _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_malformed_credentials_and_unknown_keys() {
+        assert!(validate_format("steam.apiKey", "0123456789ABCDEF0123456789ABCDEF").is_ok());
+        assert!(validate_format("steam.apiKey", "not-a-key").is_err());
+        assert!(validate_format("steam.steamId", "76561198000000000").is_ok());
+        assert!(validate_format("steam.steamId", "joseph").is_err());
+        assert!(entry("email.password").is_err(), "only allowlisted keys may be stored");
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretStatus {
@@ -38,6 +64,7 @@ pub fn secret_set(key: String, value: String) -> Result<SecretStatus, String> {
     if v.len() > 512 {
         return Err("secret too long".into());
     }
+    validate_format(&key, v)?;
     entry(&key)?.set_password(v).map_err(|e| e.to_string())?;
     Ok(SecretStatus { key, configured: true })
 }

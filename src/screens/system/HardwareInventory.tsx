@@ -1,112 +1,102 @@
-import { Cpu, Gauge, HardDrive, MemoryStick, Monitor, Usb } from "lucide-react";
-import { Badge } from "@/components/ui";
-import { useAsync } from "@/hooks/useAsync";
-import { native } from "@/providers/system/nativeBridge";
+import { useHardware } from "@/hooks/useHardware";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { config } from "@/core/config";
 import { formatBytes } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
+/** Split "NVIDIA GeForce RTX 5090" → ["NVIDIA", "GEFORCE RTX 5090"]. */
+function splitVendor(name: string): [string, string] {
+  const m = /^(NVIDIA|AMD|Intel)\s+(.*)$/i.exec(name.trim());
+  return m ? [m[1]!.toUpperCase(), m[2]!.replace(/\(TM\)|\(R\)/gi, "").trim().toUpperCase()] : ["", name.toUpperCase()];
+}
+
+/** Detected hardware as a spec sheet. No scores, no invented figures. */
 export function HardwareInventory() {
-  const { data, loading } = useAsync(() => native.hardware(), []);
+  const hw = useHardware();
   const snapshot = useTelemetryStore((s) => s.snapshot);
 
   if (!config.isTauri) {
     return (
-      <div className="rounded-2xl border border-dashed border-white/[0.08] p-10 text-center">
-        <p className="font-display text-xl tracking-cinematic text-white/70">HARDWARE INVENTORY</p>
-        <p className="mt-2 text-sm text-white/40">Available in the desktop build, where NEXUS can read Windows hardware information.</p>
-        {snapshot && <p className="mt-4 text-xs text-white/30">Demo telemetry reports: {snapshot.cpu.name} · {snapshot.cpu.cores} cores · {formatBytes(snapshot.memory.totalBytes, 0)}{snapshot.gpu ? ` · ${snapshot.gpu.name}` : ""}</p>}
+      <div className="py-10">
+        <p className="text-micro tracking-cinematic text-white/35">Hardware</p>
+        <p className="mt-3 font-display text-display-md uppercase tracking-wide text-white/70">Desktop build only</p>
+        <p className="mt-3 max-w-md text-sm text-white/40">The installed application reads real Windows hardware information here.</p>
       </div>
     );
   }
-  if (loading && !data) return <p className="text-sm text-white/40">Reading hardware…</p>;
-  if (!data) return <p className="text-sm text-white/40">Hardware information unavailable.</p>;
+  if (!hw) return <p className="text-micro text-white/30">Reading hardware</p>;
 
-  const fixed = data.drives.filter((d) => d.kind === "fixed");
-  const removable = data.drives.filter((d) => d.kind !== "fixed");
+  const gpus = hw.gpus.filter((g) => g.name);
+  const primaryGpu = gpus.find((g) => !/intel|amd radeon\(tm\) graphics/i.test(g.name ?? "")) ?? gpus[0];
+  const fixed = hw.drives.filter((d) => d.kind === "fixed");
+  const removable = hw.drives.filter((d) => d.kind !== "fixed");
 
   return (
-    <div className="grid grid-cols-1 gap-x-14 gap-y-10 lg:grid-cols-2">
-      <div className="space-y-8">
-        <Block icon={<Cpu size={14} />} title="Processor">
-          <Row k="Model" v={data.cpuName} />
-          <Row k="Cores" v={`${data.physicalCores ?? "?"} physical · ${data.logicalCores} logical`} />
-        </Block>
-        <Block icon={<MemoryStick size={14} />} title="Memory">
-          <Row k="Installed" v={formatBytes(data.totalMemoryBytes, 1)} />
-          {snapshot && <Row k="In use" v={`${formatBytes(snapshot.memory.usedBytes, 1)} (${snapshot.memory.usagePercent}%)`} />}
-        </Block>
-        <Block icon={<Gauge size={14} />} title="Graphics">
-          {data.gpus.length === 0 && <p className="text-sm text-white/40">No display adapter reported.</p>}
-          {data.gpus.map((g, i) => (
-            <div key={i} className="space-y-1.5">
-              <Row k="Adapter" v={g.name ?? "Unknown"} />
-              <Row k="VRAM" v={g.vramTotalMb ? formatBytes(g.vramTotalMb * 1024 ** 2, 0) : "Unknown"} />
-              {g.driverVersion && <Row k="Driver" v={g.driverVersion} />}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                <Cap label="Utilization" ok={g.utilizationSupported} />
-                <Cap label="Temperature" ok={g.temperatureSupported} />
-                <Cap label="VRAM usage" ok={g.memorySupported} />
-              </div>
-              <p className="text-[11px] text-white/30">Live GPU counters need a vendor-specific source; NEXUS reports “unsupported” rather than estimating.</p>
+    <div className="grid grid-cols-1 gap-x-20 gap-y-16 lg:grid-cols-2">
+      <div className="space-y-16">
+        {primaryGpu && (
+          <Spec label="Graphics">
+            {(() => { const [vendor, model] = splitVendor(primaryGpu.name!); return (
+              <>
+                {vendor && <p className="font-display text-[15px] tracking-wide3 text-white/45">{vendor}</p>}
+                <p className="mt-1 font-display text-display-md font-semibold tracking-wide text-white">{model}</p>
+              </>
+            ); })()}
+            <p className="mt-3 font-mono text-[13px] tabular text-white/50">{primaryGpu.vramTotalMb ? `${Math.round(primaryGpu.vramTotalMb / 1024)} GB` : "VRAM unknown"}{primaryGpu.driverVersion ? ` · driver ${primaryGpu.driverVersion}` : ""}</p>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-micro">
+              <Cap label="Utilization" ok={primaryGpu.utilizationSupported} /><Cap label="Temperature" ok={primaryGpu.temperatureSupported} /><Cap label="VRAM usage" ok={primaryGpu.memorySupported} />
             </div>
-          ))}
-        </Block>
-        <Block icon={<Monitor size={14} />} title="Windows">
-          <Row k="Edition" v={`${data.osName} ${data.osVersion}`.trim()} />
-          <Row k="Build" v={data.kernelVersion || "—"} />
-          <Row k="Architecture" v={data.arch} />
-          <Row k="Machine" v={data.hostname} />
-        </Block>
+            {gpus.length > 1 && <p className="mt-4 text-[12px] text-white/35">Also present: {gpus.filter((g) => g !== primaryGpu).map((g) => g.name).join(", ")}</p>}
+          </Spec>
+        )}
+        <Spec label="Processor">
+          <p className="font-display text-display-md font-semibold tracking-wide text-white">{hw.cpuName.replace(/\s+\d+-Core Processor$/i, "").toUpperCase()}</p>
+          <p className="mt-3 font-mono text-[13px] tabular text-white/50">{hw.physicalCores ?? "—"} cores · {hw.logicalCores} threads{snapshot ? ` · ${snapshot.cpu.usagePercent}% now` : ""}</p>
+        </Spec>
+        <Spec label="Memory">
+          <p className="font-display text-display-md font-semibold tracking-wide text-white">{formatBytes(hw.totalMemoryBytes, 0)}</p>
+          {snapshot && <p className="mt-3 font-mono text-[13px] tabular text-white/50">{formatBytes(snapshot.memory.usedBytes, 1)} in use · {snapshot.memory.usagePercent}%</p>}
+        </Spec>
+        <Spec label="Windows">
+          <p className="text-[15px] text-white/85">{`${hw.osName} ${hw.osVersion}`.trim()}</p>
+          <p className="mt-1 font-mono text-[12px] text-white/40">{hw.kernelVersion ? `build ${hw.kernelVersion} · ` : ""}{hw.arch} · {hw.hostname}</p>
+        </Spec>
       </div>
 
-      <div className="space-y-8">
-        <Block icon={<HardDrive size={14} />} title={`Fixed drives · ${fixed.length}`}>
-          {fixed.map((d) => <Drive key={d.mountPoint} d={d} />)}
-        </Block>
-        <Block icon={<Usb size={14} />} title={`Removable / other · ${removable.length}`}>
-          {removable.length === 0 && <p className="text-sm text-white/35">None connected.</p>}
-          {removable.map((d) => <Drive key={d.mountPoint} d={d} />)}
-          {removable.length > 0 && (
-            <p className="mt-2 text-[11px] leading-relaxed text-white/30">
-              Shown for inventory only. Display is not authorization: Storage Analyzer and cleanup never inspect removable content, and the media workspace only reads folders you explicitly authorize.
-            </p>
-          )}
-        </Block>
+      <div className="space-y-16">
+        <Spec label={`Storage · ${fixed.length} fixed`}>
+          <div className="divide-y divide-white/[0.05]">{fixed.map((d) => <Drive key={d.mountPoint} d={d} />)}</div>
+        </Spec>
+        <Spec label={`Removable · ${removable.length}`}>
+          {removable.length === 0 ? <p className="text-sm text-white/30">None connected.</p> : <div className="divide-y divide-white/[0.05]">{removable.map((d) => <Drive key={d.mountPoint} d={d} removable />)}</div>}
+          <p className="mt-4 max-w-md text-[12px] leading-relaxed text-white/30">Inventory only. Storage analysis and cleanup never inspect removable content; the media workspace reads only folders you authorize.</p>
+        </Spec>
       </div>
     </div>
   );
 }
 
-function Block({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Spec({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <p className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-cinematic text-white/30"><span className="text-accent/60">{icon}</span>{title}</p>
-      <div className="space-y-1.5">{children}</div>
+      <p className="label mb-4">{label}</p>
+      {children}
     </section>
   );
 }
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex items-baseline gap-4 text-sm">
-      <span className="w-28 shrink-0 text-white/35">{k}</span>
-      <span className="truncate text-white/80" title={v}>{v}</span>
-    </div>
-  );
-}
 function Cap({ label, ok }: { label: string; ok: boolean }) {
-  return <Badge tone={ok ? "nominal" : "neutral"}>{label} · {ok ? "supported" : "unsupported"}</Badge>;
+  return <span className={ok ? "text-white/70" : "text-white/30"}>{label} · {ok ? "supported" : "unsupported"}</span>;
 }
-function Drive({ d }: { d: { mountPoint: string; label: string; kind: string; totalBytes: number; freeBytes: number; fileSystem: string | null } }) {
+function Drive({ d, removable }: { d: { mountPoint: string; label: string; totalBytes: number; freeBytes: number; fileSystem: string | null }; removable?: boolean }) {
   const used = d.totalBytes - d.freeBytes;
   const pct = d.totalBytes ? (used / d.totalBytes) * 100 : 0;
   return (
-    <div className="py-1.5">
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="text-white/80">{d.mountPoint} <span className="text-white/40">{d.label}</span> {d.kind !== "fixed" && <Badge tone="attention" className="ml-2">{d.kind}</Badge>}</span>
-        <span className="font-mono text-xs text-white/45">{formatBytes(used, 0)} / {formatBytes(d.totalBytes, 0)}{d.fileSystem ? ` · ${d.fileSystem}` : ""}</span>
+    <div className="py-4">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[15px] text-white/85">{d.mountPoint} <span className="text-white/40">{d.label}</span>{removable && <span className="ml-3 text-micro text-status-attention/70">removable</span>}</span>
+        <span className="font-mono text-[12px] tabular text-white/45">{formatBytes(used, 0)} <span className="text-white/25">/ {formatBytes(d.totalBytes, 0)}</span>{d.fileSystem ? <span className="text-white/25"> · {d.fileSystem}</span> : null}</span>
       </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-accent/60" style={{ width: `${pct}%` }} /></div>
+      <div className="mt-2.5 h-px bg-white/[0.08]"><div className={cn("h-full", pct > 88 ? "bg-status-warning" : "bg-white/70")} style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }

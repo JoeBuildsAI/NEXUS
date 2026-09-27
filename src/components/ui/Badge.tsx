@@ -3,13 +3,14 @@ import { cn } from "@/lib/utils";
 
 type Tone = "neutral" | "accent" | "nominal" | "attention" | "warning" | "critical";
 
+/** Quiet status chips. Monochrome by default; color only for real states. */
 const tones: Record<Tone, string> = {
-  neutral: "bg-white/[0.06] text-white/60 border-white/10",
-  accent: "bg-accent/10 text-accent border-accent/25",
-  nominal: "bg-status-nominal/10 text-status-nominal border-status-nominal/25",
-  attention: "bg-status-attention/10 text-status-attention border-status-attention/25",
-  warning: "bg-status-warning/10 text-status-warning border-status-warning/25",
-  critical: "bg-status-critical/10 text-status-critical border-status-critical/25",
+  neutral: "text-white/55 bg-white/[0.05]",
+  accent: "text-white/85 bg-white/[0.09]",
+  nominal: "text-status-nominal/90 bg-status-nominal/[0.08]",
+  attention: "text-status-attention/90 bg-status-attention/[0.09]",
+  warning: "text-status-warning/90 bg-status-warning/[0.09]",
+  critical: "text-status-critical/90 bg-status-critical/[0.1]",
 };
 
 export function Badge({
@@ -26,12 +27,12 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] text-[10.5px] font-medium uppercase tracking-wide2 leading-none",
         tones[tone],
         className,
       )}
     >
-      {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+      {dot && <span className="h-1 w-1 rounded-full bg-current" />}
       {children}
     </span>
   );

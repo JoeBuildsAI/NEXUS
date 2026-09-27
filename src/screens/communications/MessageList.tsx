@@ -1,15 +1,6 @@
-import type { Message, MessageCategory } from "@/core/types";
+import type { Message } from "@/core/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_DOT: Record<MessageCategory, string> = {
-  important: "bg-status-attention",
-  newsletter: "bg-accent/60",
-  subscription: "bg-[#9f8cff]",
-  receipt: "bg-status-nominal",
-  social: "bg-[#e6a15e]",
-  other: "bg-white/30",
-};
 
 interface Props {
   messages: readonly Message[];
@@ -17,52 +8,33 @@ interface Props {
   onSelect: (m: Message) => void;
 }
 
+/** Sender · subject · preview · time. Unread is obvious but quiet. */
 export function MessageList({ messages, selectedId, onSelect }: Props) {
   return (
-    <div className="overflow-hidden rounded-xl">
-      <div className="divide-y divide-white/[0.04]">
-        {messages.map((m) => (
+    <div className="divide-y divide-white/[0.05]" role="list">
+      {messages.map((m) => {
+        const active = selectedId === m.id;
+        return (
           <button
             key={m.id}
+            role="listitem"
             onClick={() => onSelect(m)}
-            className={cn(
-              "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
-              selectedId === m.id ? "bg-accent/[0.08]" : "hover:bg-white/[0.03]",
-            )}
+            className={cn("group relative grid w-full grid-cols-[10px_1fr_auto] items-baseline gap-4 py-3.5 pl-1 pr-3 text-left transition-colors", active ? "bg-white/[0.035]" : "hover:bg-white/[0.02]")}
           >
-            <span
-              className={cn(
-                "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                m.read ? "bg-transparent" : CATEGORY_DOT[m.category],
-              )}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <span
-                  className={cn(
-                    "truncate text-sm",
-                    m.read ? "text-white/55" : "font-medium text-white/90",
-                  )}
-                >
-                  {m.sender}
-                </span>
-                <span className="shrink-0 text-[11px] text-white/30">
-                  {formatRelativeTime(m.timestamp)}
-                </span>
-              </div>
-              <p
-                className={cn(
-                  "truncate text-[13px]",
-                  m.read ? "text-white/45" : "text-white/75",
-                )}
-              >
-                {m.subject}
-              </p>
-              <p className="truncate text-xs text-white/30">{m.preview}</p>
-            </div>
+            <span className={cn("mt-1.5 h-1.5 w-1.5 rounded-full", m.read ? "bg-transparent" : m.category === "important" ? "bg-white" : "bg-white/40")} />
+            <span className="min-w-0">
+              <span className="flex items-baseline gap-3">
+                <span className={cn("truncate text-[14px]", m.read ? "text-white/55" : "text-white/95")}>{m.sender}</span>
+                {m.category === "important" && !m.read && <span className="shrink-0 text-micro text-white/40">attention</span>}
+              </span>
+              <span className={cn("mt-0.5 block truncate text-[13.5px]", m.read ? "text-white/40" : "text-white/75")}>{m.subject}</span>
+              <span className="mt-0.5 block truncate text-[12px] text-white/28">{m.preview}</span>
+            </span>
+            <span className="font-mono text-[11px] tabular text-white/30">{formatRelativeTime(m.timestamp)}</span>
+            {active && <span className="absolute inset-y-3 left-[-12px] w-px bg-white" />}
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }

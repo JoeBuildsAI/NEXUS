@@ -1,7 +1,8 @@
-import { Minus, Square, X, Zap } from "lucide-react";
+import { Minus, Square, X } from "lucide-react";
 import { config } from "@/core/config";
 import { useModeStore } from "@/state/modeStore";
-import { Badge } from "@/components/ui";
+import { useGameSessionStore } from "@/state/gameSessionStore";
+import { NexusMark } from "./NexusMark";
 
 async function windowAction(action: "minimize" | "toggleMaximize" | "close") {
   try {
@@ -15,81 +16,44 @@ async function windowAction(action: "minimize" | "toggleMaximize" | "close") {
   }
 }
 
-/** Borderless custom titlebar. The center strip is the OS drag region. */
+/** Borderless titlebar: wordmark, quiet state text, window controls. */
 export function TitleBar() {
   const mode = useModeStore((s) => s.current);
   const gameRunning = useModeStore((s) => s.gameRunning);
-  const setGameRunning = useModeStore((s) => s.setGameRunning);
+  const sessionTitle = useGameSessionStore((s) => s.title);
+  const endSession = useGameSessionStore((s) => s.end);
 
   return (
-    <div className="drag-region flex h-9 shrink-0 items-center justify-between px-3 select-none">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-5 w-5 items-center justify-center rounded-md bg-accent/15">
-          <Zap size={12} className="text-accent" />
-        </div>
-        <span className="font-display text-xs font-semibold tracking-[0.3em] text-white/80">
-          NEXUS
+    <div className="drag-region flex h-10 shrink-0 select-none items-center justify-between px-4">
+      <div className="flex items-center gap-3">
+        <NexusMark size={14} className="text-white/80" />
+        <span className="font-display text-[11px] font-semibold tracking-[0.34em] text-white/70">NEXUS</span>
+        <span className="hidden items-center gap-3 text-micro text-white/30 sm:flex">
+          {config.demoMode && <span>demo</span>}
+          {mode !== "normal" && <span className="text-white/60">{mode} mode</span>}
+          {gameRunning && (
+            <button onClick={endSession} className="no-drag text-white/60 transition-colors hover:text-white" title="A game session is active; NEXUS runs with a reduced footprint. Click to end.">
+              session · {sessionTitle ?? "game"} <span className="text-white/30">· end</span>
+            </button>
+          )}
         </span>
-        {config.demoMode && (
-          <Badge tone="accent" className="ml-1">
-            DEMO
-          </Badge>
-        )}
-        {mode !== "normal" && (
-          <Badge tone="warning" dot className="uppercase">
-            {mode} MODE
-          </Badge>
-        )}
-        {gameRunning && (
-          <button
-            onClick={() => setGameRunning(false)}
-            title="A game session is active; ambient effects are reduced. Click to end the session."
-            className="no-drag"
-          >
-            <Badge tone="accent" dot className="uppercase hover:bg-accent/20">
-              Game session · end
-            </Badge>
-          </button>
-        )}
       </div>
 
-      <div className="no-drag flex items-center gap-1">
-        <WinButton onClick={() => windowAction("minimize")} label="Minimize">
-          <Minus size={14} />
-        </WinButton>
-        <WinButton onClick={() => windowAction("toggleMaximize")} label="Maximize">
-          <Square size={11} />
-        </WinButton>
-        <WinButton
-          onClick={() => windowAction("close")}
-          label="Close"
-          danger
-        >
-          <X size={14} />
-        </WinButton>
+      <div className="no-drag flex items-center">
+        <WinButton onClick={() => windowAction("minimize")} label="Minimize"><Minus size={13} /></WinButton>
+        <WinButton onClick={() => windowAction("toggleMaximize")} label="Maximize"><Square size={10} /></WinButton>
+        <WinButton onClick={() => windowAction("close")} label="Close" danger><X size={13} /></WinButton>
       </div>
     </div>
   );
 }
 
-function WinButton({
-  children,
-  onClick,
-  label,
-  danger,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  label: string;
-  danger?: boolean;
-}) {
+function WinButton({ children, onClick, label, danger }: { children: React.ReactNode; onClick: () => void; label: string; danger?: boolean }) {
   return (
     <button
       aria-label={label}
       onClick={onClick}
-      className={`flex h-6 w-8 items-center justify-center rounded-md text-white/50 transition-colors hover:text-white ${
-        danger ? "hover:bg-status-critical/80" : "hover:bg-white/10"
-      }`}
+      className={`flex h-7 w-9 items-center justify-center rounded-sm text-white/35 transition-colors hover:text-white ${danger ? "hover:bg-status-critical/70" : "hover:bg-white/[0.08]"}`}
     >
       {children}
     </button>

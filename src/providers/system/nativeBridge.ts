@@ -151,18 +151,22 @@ export const native = {
   async storageAnalyze(drive: string, steamLibraries: string[], onProgress: (c: { category: string; bytes: number }) => void): Promise<NativeAnalysis | null> {
     if (!config.isTauri) return null;
     const { listen } = await import("@tauri-apps/api/event");
+    // Listeners first, then start — the analysis thread may finish quickly.
     const unProgress = await listen<{ category: string; bytes: number }>("storage:progress", (e) => onProgress(e.payload));
-    return new Promise<NativeAnalysis | null>((resolve) => {
-      let unComplete: (() => void) | null = null;
-      const finish = (v: NativeAnalysis | null) => {
-        unProgress();
-        unComplete?.();
-        resolve(v);
-      };
-      void listen<NativeAnalysis>("storage:complete", (e) => finish(e.payload)).then((u) => (unComplete = u));
-      invoke<void>("storage_analyze", { drive, steamLibraries }).catch(() => finish(null));
-      setTimeout(() => finish(null), 120_000);
-    });
+    let finish!: (v: NativeAnalysis | null) => void;
+    const done = new Promise<NativeAnalysis | null>((resolve) => { finish = resolve; });
+    const unComplete = await listen<NativeAnalysis>("storage:complete", (e) => finish(e.payload));
+    const timer = setTimeout(() => finish(null), 120_000);
+    try {
+      await invoke<void>("storage_analyze", { drive, steamLibraries });
+      return await done;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+      unProgress();
+      unComplete();
+    }
   },
   async storageCancel(): Promise<void> {
     if (!config.isTauri) return;

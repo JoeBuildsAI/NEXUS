@@ -72,20 +72,20 @@ export function MediaSettingsSection() {
 
   return (
     <SettingsSection title="Media" description="Private local media. NEXUS only ever reads folders you authorize here.">
-      <div className="py-4">
-        <div className="flex items-center justify-between">
+      <div className="py-5">
+        <div className="flex items-start justify-between gap-8">
           <div>
-            <p className="text-sm text-white/85">Authorized media locations</p>
-            <p className="mt-0.5 text-xs text-white/40">Internal or removable — but only because you selected it. Removable drives are never scanned automatically and are excluded from cleanup.</p>
+            <p className="text-[15px] text-white/85">Authorized media locations</p>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-white/40">Internal or removable — but only because you selected it. Removable drives are never scanned automatically and are excluded from cleanup.</p>
           </div>
           {health && <Badge tone={health.state === "available" ? "nominal" : health.state === "not-configured" ? "neutral" : "warning"}>{health.summary}</Badge>}
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-5">
           {roots.map((r) => {
             const disconnected = r.exists === false;
             return (
-              <div key={r.id} className="flex items-center gap-3 rounded-xl border border-white/[0.07] px-4 py-3">
+              <div key={r.id} className="flex items-center gap-4 border-b border-white/[0.05] py-3.5">
                 <span className="text-white/40">{disconnected ? <Unplug size={16} className="text-status-attention" /> : r.kind === "removable" ? <Usb size={16} /> : <HardDrive size={16} />}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-xs text-white/80" data-selectable="true">{r.path}</p>
@@ -104,13 +104,13 @@ export function MediaSettingsSection() {
             );
           })}
           {roots.length === 0 && (
-            <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-5 text-center text-xs text-white/35">
-              <Lock size={14} className="mx-auto mb-2 text-white/25" />
+            <div className="py-4 text-[13px] text-white/35">
+              <Lock size={13} className="mb-2 text-white/25" />
               No locations authorized. {config.demoMode && "The workspace shows the demo library until you add one."}
             </div>
           )}
         </div>
-        <Button size="sm" variant="primary" className="mt-3" disabled={busy != null} onClick={() => void authorize()}>
+        <Button size="sm" variant="primary" className="mt-5" disabled={busy != null} onClick={() => void authorize()}>
           <FolderPlus size={14} /> {busy === "add" ? "Authorizing…" : "Add folder"}
         </Button>
         {scan && !scan.done && (

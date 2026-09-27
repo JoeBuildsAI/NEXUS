@@ -27,24 +27,30 @@ const removable: DriveInfo = {
 };
 const network: DriveInfo = { ...fixed, mountPoint: "Z:\\", kind: "network" };
 
-describe("storage safety", () => {
-  it("excludes removable drives from automatic scanning by default", () => {
+describe("storage safety — removable drive guarantee", () => {
+  it("only fixed drives are ever eligible for analysis/cleanup", () => {
     const eligible = eligibleDrivesForScan([fixed, removable, network]);
     expect(eligible.map((d) => d.mountPoint)).toEqual(["C:\\"]);
   });
 
-  it("includes a removable drive only after explicit opt-in", () => {
-    const eligible = eligibleDrivesForScan([fixed, removable], ["X:\\"]);
-    expect(eligible.map((d) => d.mountPoint)).toContain("X:\\");
+  it("there is no opt-in path: the function accepts no override", () => {
+    expect(eligibleDrivesForScan.length).toBe(1);
+    expect(assertScanAllowed.length).toBe(1);
   });
 
-  it("throws when scanning a removable drive without opt-in", () => {
+  it("throws for removable and network drives", () => {
     expect(() => assertScanAllowed(removable)).toThrow(/removable/i);
-    expect(() => assertScanAllowed(removable, ["X:\\"])).not.toThrow();
+    expect(() => assertScanAllowed(network)).toThrow(/network/i);
+    expect(() => assertScanAllowed(fixed)).not.toThrow();
   });
 
-  it("refuses to scan network drives", () => {
-    expect(() => assertScanAllowed(network)).toThrow(/network/i);
+  it("media authorization of a removable root grants nothing to storage", async () => {
+    // Simulate the user authorizing X:\ for media; storage eligibility must be unchanged.
+    const { useMediaLibraryStore } = await import("@/state/mediaLibraryStore");
+    useMediaLibraryStore.getState().addRoot({ id: "root-x", path: "X:\\", kind: "removable", authorizedAt: Date.now(), exists: true });
+    expect(eligibleDrivesForScan([fixed, removable]).some((d) => d.mountPoint === "X:\\")).toBe(false);
+    expect(() => assertScanAllowed(removable)).toThrow();
+    useMediaLibraryStore.getState().removeRoot("root-x");
   });
 });
 

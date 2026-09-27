@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, ChevronRight, Clock, Play, Sparkles, Trophy, HardDrive } from "lucide-react";
+import { ArrowUpRight, Play } from "lucide-react";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useAsync } from "@/hooks/useAsync";
@@ -11,80 +11,82 @@ import type { ActionId } from "@/core/actions/types";
 import { completionPercent, type GameDetails } from "@/core/types";
 import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { isOffline } from "@/core/errors";
+import { DEMO_CLEANUP_CANDIDATES } from "@/core/demo/storage";
 import { cn } from "@/lib/utils";
 
-/* ---------- shared section header ---------- */
+/* ---------- section label ---------- */
 export function SectionLabel({ children, action, onAction }: { children: React.ReactNode; action?: string; onAction?: () => void }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <p className="text-[10px] uppercase tracking-cinematic text-white/30">{children}</p>
+    <div className="mb-4 flex items-baseline justify-between">
+      <p className="label">{children}</p>
       {action && (
-        <button onClick={onAction} className="group flex items-center gap-1 text-[11px] text-white/35 transition-colors hover:text-accent">
+        <button onClick={onAction} className="group flex items-center gap-1 text-micro text-white/30 transition-colors hover:text-white">
           {action}
-          <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+          <ArrowUpRight size={11} className="transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />
         </button>
       )}
     </div>
   );
 }
 
-/* ---------- Continue playing hero ---------- */
+/* ---------- Continue playing ---------- */
 export function ContinuePlaying() {
   const navigate = useNavigationStore((s) => s.navigate);
   const selectGame = useNavigationStore((s) => s.selectGame);
+  const [imgFailed, setImgFailed] = useState(false);
   const { data, error } = useAsync<GameDetails | null>(async () => {
     const { steam } = getProviders();
     const games = await steam.getGames();
-    const last = [...games].filter((g) => g.lastPlayed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0];
+    const last = [...games].filter((g) => g.installed).sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))[0];
     return last ? steam.getGameDetails(last.id) : null;
   }, []);
 
   if (error && isOffline(error)) {
     return (
       <div>
-        <SectionLabel>Continue</SectionLabel>
-        <div className="rounded-2xl border border-dashed border-white/[0.08] p-6 text-sm text-white/40">
-          <p className="text-white/70">Steam offline</p>
-          <p className="mt-1 text-xs">Connect Steam in Integrations when this machine is ready.</p>
-        </div>
+        <SectionLabel>Continue playing</SectionLabel>
+        <p className="font-display text-display-sm text-white/70">Steam not connected</p>
+        <p className="mt-1 text-sm text-white/35">NEXUS will detect Steam automatically when available.</p>
       </div>
     );
   }
-  if (!data) return <div className="h-[168px] animate-pulse rounded-2xl bg-white/[0.02]" />;
+  if (!data) return <div className="h-[220px] animate-pulse rounded-md bg-white/[0.02]" />;
 
   const pct = completionPercent(data.achievements);
+  const hasArt = !!data.heroUrl && !imgFailed;
   return (
     <div>
-      <SectionLabel action="Gaming" onAction={() => navigate("gaming")}>Continue</SectionLabel>
+      <SectionLabel action="Gaming" onAction={() => navigate("gaming")}>Continue playing</SectionLabel>
       <motion.button
-        whileHover={{ y: -2 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        whileHover="hover"
         onClick={() => { navigate("gaming"); selectGame(data.id); }}
-        className="group relative block w-full overflow-hidden rounded-2xl text-left"
-        style={{ minHeight: 168 }}
+        className="group relative block w-full overflow-hidden rounded-md text-left"
+        style={{ minHeight: 220 }}
       >
-        <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${data.coverColor} 0%, ${data.heroColor} 60%, #05070a 100%)` }} />
-        <div className="absolute inset-0 bg-grid opacity-10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-void-950/80 via-void-950/40 to-transparent" />
-        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full opacity-30 blur-3xl transition-opacity group-hover:opacity-50" style={{ background: data.coverColor }} />
+        {/* Artwork bleeds into black */}
+        <div className="absolute inset-0 bg-black">
+          <motion.div variants={{ hover: { scale: 1.03 } }} transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }} className="absolute inset-0">
+            {hasArt ? (
+              <img src={data.heroUrl!} alt="" onError={() => setImgFailed(true)} className="h-full w-full object-cover opacity-80" />
+            ) : (
+              <div className="absolute inset-0" style={{ background: `radial-gradient(70% 110% at 88% 15%, ${data.coverColor} 0%, transparent 60%)`, opacity: 0.4 }} />
+            )}
+          </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+        </div>
 
-        <div className="relative flex h-full flex-col justify-between p-6">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide2 text-white/50">
-            <Clock size={11} /> Last played {data.lastPlayed ? formatRelativeTime(data.lastPlayed) : "—"}
+        <div className="relative flex h-full min-h-[220px] flex-col justify-end p-7">
+          <p className="text-micro text-white/40">{data.lastPlayed ? `Last played ${formatRelativeTime(data.lastPlayed)}` : "Installed"}</p>
+          <h3 className="mt-2 font-display text-display-md font-semibold tracking-wide text-white">{data.title}</h3>
+          <div className="mt-3 flex items-center gap-5 font-mono text-[12.5px] tabular text-white/55">
+            {data.playtimeMinutes > 0 && <span>{formatPlaytime(data.playtimeMinutes)}</span>}
+            {data.achievements.total > 0 && <span>{data.achievements.unlocked} / {data.achievements.total}</span>}
+            {data.achievements.total > 0 && <span className="text-white/85">{pct}%</span>}
           </div>
-          <div className="mt-6 flex items-end justify-between gap-6">
-            <div>
-              <h3 className="font-display text-3xl font-bold tracking-wide text-white">{data.title}</h3>
-              <div className="mt-2 flex items-center gap-4 text-sm text-white/60">
-                <span>{formatPlaytime(data.playtimeMinutes)}</span>
-                <span className="flex items-center gap-1.5"><Trophy size={13} className="text-ember" /> {data.achievements.unlocked} / {data.achievements.total}</span>
-                <span className="font-mono text-accent">{pct}%</span>
-              </div>
-            </div>
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-void-950 shadow-glow transition-transform group-hover:scale-105">
-              <Play size={20} className="ml-0.5" fill="currentColor" />
-            </span>
-          </div>
+          <span className="absolute bottom-7 right-7 flex h-11 w-11 items-center justify-center rounded-full bg-white text-black opacity-90 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105">
+            <Play size={16} className="ml-0.5" fill="currentColor" />
+          </span>
         </div>
       </motion.button>
     </div>
@@ -99,21 +101,19 @@ export function CommsSurface() {
     <div>
       <SectionLabel action="Inbox" onAction={() => navigate("communications")}>Communications</SectionLabel>
       {error ? (
-        <p className="text-sm text-white/40"><span className="text-white/70">Email disconnected.</span> Mock inbox unavailable.</p>
+        <p className="text-sm text-white/40">Offline. Connect an account when you're ready.</p>
       ) : !data ? (
-        <div className="h-16 animate-pulse rounded-lg bg-white/[0.02]" />
+        <div className="h-14 animate-pulse rounded bg-white/[0.02]" />
       ) : (
-        <button onClick={() => navigate("communications")} className="group block w-full text-left">
-          <div className="flex items-baseline gap-3">
-            <span className="font-display text-5xl font-semibold tabular-nums text-white/95">{data.unread}</span>
-            <span className="text-sm text-white/45">unread</span>
-            <ArrowUpRight size={14} className="ml-auto text-white/20 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white/60" />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {data.important > 0 && <span className="text-status-attention">{data.important} potentially important</span>}
-            {data.newsletters > 0 && <span className="text-white/45">{data.newsletters} newsletters</span>}
-            {data.receipts > 0 && <span className="text-white/45">{data.receipts} receipts</span>}
-          </div>
+        <button onClick={() => navigate("communications")} className="block text-left">
+          <p className="font-display text-display-lg font-semibold tabular text-white">{data.unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></p>
+          <p className="mt-2 text-[13px] text-white/45">
+            {data.important > 0 && <span className="text-white/75">{data.important} require attention</span>}
+            {data.important > 0 && (data.newsletters > 0 || data.receipts > 0) && <span className="text-white/25"> · </span>}
+            {data.newsletters > 0 && <span>{data.newsletters} newsletters</span>}
+            {data.newsletters > 0 && data.receipts > 0 && <span className="text-white/25"> · </span>}
+            {data.receipts > 0 && <span>{data.receipts} receipts</span>}
+          </p>
         </button>
       )}
     </div>
@@ -126,83 +126,52 @@ export function StorageSurface() {
   const setTab = useNavigationStore((s) => s.setSystemTab);
   const storage = useTelemetryStore((s) => s.snapshot?.storage);
   const drives = useMemo(() => storage?.filter((d) => d.kind === "fixed") ?? [], [storage]);
+  const reviewable = DEMO_CLEANUP_CANDIDATES.filter((c) => c.risk !== "destructive").reduce((s, c) => s + c.bytes, 0);
   const go = () => { navigate("system"); setTab("storage"); };
   return (
     <div>
       <SectionLabel action="Analyze" onAction={go}>Storage</SectionLabel>
-      {drives.length === 0 ? (
-        <p className="text-sm text-white/35">No fixed drives reported.</p>
-      ) : (
-        <button onClick={go} className="block w-full space-y-3 text-left">
+      <button onClick={go} className="block w-full text-left">
+        <p className="font-display text-display-lg font-semibold tabular text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable</span></p>
+        <div className="mt-4 space-y-2.5">
           {drives.slice(0, 3).map((d) => {
             const used = d.totalBytes - d.freeBytes;
             const pct = d.totalBytes ? (used / d.totalBytes) * 100 : 0;
-            const pressure = pct > 88;
             return (
-              <div key={d.mountPoint}>
-                <div className="flex items-baseline justify-between text-sm">
-                  <span className="flex items-center gap-2 text-white/75"><HardDrive size={13} className="text-white/30" />{d.mountPoint} <span className="text-white/35">{d.label}</span></span>
-                  <span className="font-mono text-xs text-white/50">{formatBytes(used, 0)} <span className="text-white/25">/ {formatBytes(d.totalBytes, 0)}</span></span>
-                </div>
-                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div className={cn("h-full rounded-full transition-all duration-700", pressure ? "bg-status-warning" : "bg-status-nominal/80")} style={{ width: `${pct}%` }} />
-                </div>
+              <div key={d.mountPoint} className="grid grid-cols-[44px_1fr_auto] items-center gap-4">
+                <span className="font-mono text-[12px] text-white/50">{d.mountPoint}</span>
+                <div className="relative h-px bg-white/[0.08]"><div className={cn("absolute inset-y-0 left-0", pct > 88 ? "bg-status-warning" : "bg-white/70")} style={{ width: `${pct}%` }} /></div>
+                <span className="font-mono text-[11px] tabular text-white/35">{formatBytes(d.freeBytes, 0)} free</span>
               </div>
             );
           })}
-        </button>
-      )}
+        </div>
+      </button>
     </div>
   );
 }
 
 /* ---------- Assistant insights ---------- */
-const TONE_DOT = { neutral: "bg-white/30", accent: "bg-accent", attention: "bg-status-attention", warning: "bg-status-warning" } as const;
+const TONE_DOT = { neutral: "bg-white/25", accent: "bg-white/70", attention: "bg-status-attention", warning: "bg-status-warning" } as const;
 
 export function InsightsSurface() {
   const insights = useInsights();
   return (
     <div>
-      <SectionLabel>
-        <span className="flex items-center gap-1.5"><Sparkles size={11} className="text-accent/70" /> NEXUS suggests</span>
-      </SectionLabel>
-      <ul className="space-y-2.5">
+      <SectionLabel>NEXUS</SectionLabel>
+      <ul className="space-y-3">
         {insights.slice(0, 4).map((ins) => (
-          <li key={ins.id} className="flex items-start gap-3 text-sm">
-            <span className={cn("mt-2 h-1.5 w-1.5 shrink-0 rounded-full", TONE_DOT[ins.tone])} />
-            <p className="flex-1 leading-relaxed text-white/65">{ins.text}</p>
+          <li key={ins.id} className="flex items-baseline gap-3 text-[14px]">
+            <span className={cn("mt-1.5 h-1 w-1 shrink-0 rounded-full", TONE_DOT[ins.tone])} />
+            <p className="flex-1 leading-relaxed text-white/60">{ins.text}</p>
             {ins.action && (
-              <button
-                onClick={() => void actionRegistry.execute(ins.action!.actionId as ActionId, { args: ins.action!.args ?? {} })}
-                className="shrink-0 rounded-md border border-white/[0.08] px-2 py-0.5 text-[11px] text-white/50 transition-colors hover:border-accent/40 hover:text-accent"
-              >
+              <button onClick={() => void actionRegistry.execute(ins.action!.actionId as ActionId, { args: ins.action!.args ?? {} })} className="shrink-0 text-micro text-white/35 transition-colors hover:text-white">
                 {ins.action.label}
               </button>
             )}
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-/* ---------- Media (privacy-safe) ---------- */
-export function MediaSurface() {
-  const navigate = useNavigationStore((s) => s.navigate);
-  return (
-    <div>
-      <SectionLabel action="Open" onAction={() => navigate("media")}>Media</SectionLabel>
-      <button onClick={() => navigate("media")} className="group flex w-full items-center gap-4 text-left">
-        <div className="grid w-24 shrink-0 grid-cols-3 gap-0.5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="aspect-video rounded-[2px] bg-white/[0.06] transition-colors group-hover:bg-accent/20" />
-          ))}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm text-white/75">Six-player workspace</p>
-          <p className="text-xs text-white/35">Private · nothing from the library is shown here</p>
-        </div>
-      </button>
     </div>
   );
 }

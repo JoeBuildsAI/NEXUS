@@ -1,3 +1,4 @@
+import { APP_VERSION } from "@/core/version";
 import { useState } from "react";
 import { Check, ClipboardCopy, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui";
@@ -36,7 +37,7 @@ async function collect(): Promise<string> {
   }
   const roots = useMediaLibraryStore.getState().roots;
   return renderDiagnostics({
-    appVersion: "0.1.0",
+    appVersion: APP_VERSION,
     runtime: config.isTauri ? "desktop" : "browser",
     demoMode: config.demoMode,
     os: hw ? { name: hw.osName, version: hw.osVersion, arch: hw.arch } : null,
@@ -70,18 +71,18 @@ export function DiagnosticsPanel() {
   };
 
   return (
-    <div className="py-4">
-      <div className="flex items-center justify-between">
+    <div className="py-5">
+      <div className="flex items-start justify-between gap-8">
         <div>
-          <p className="flex items-center gap-2 text-sm text-white/85"><Stethoscope size={14} className="text-accent/70" /> Diagnostics</p>
-          <p className="mt-0.5 text-xs text-white/40">Provider states, Steam detection, GPU capability, autostart and hotkey registration. Sanitized: never includes API keys, media paths or history.</p>
+          <p className="flex items-center gap-2 text-[15px] text-white/85"><Stethoscope size={14} className="text-white/40" /> Diagnostics</p>
+          <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-white/40">Provider states, Steam detection, GPU capability, autostart and hotkey registration. Sanitized: never includes API keys, media paths or history.</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onClick={reload}>Refresh</Button>
           <Button size="sm" variant="outline" onClick={() => void copy()} disabled={!data}>{copied ? <Check size={13} /> : <ClipboardCopy size={13} />} Copy diagnostics</Button>
         </div>
       </div>
-      <pre className="mt-3 max-h-72 overflow-auto rounded-xl border border-white/[0.07] bg-void-950/50 p-4 font-mono text-[11px] leading-relaxed text-white/60" data-selectable="true">
+      <pre className="mt-5 max-h-72 overflow-auto rounded-sm bg-white/[0.02] p-5 font-mono text-[11.5px] leading-relaxed text-white/55" data-selectable="true">
         {loading && !data ? "Collecting…" : data}
       </pre>
     </div>

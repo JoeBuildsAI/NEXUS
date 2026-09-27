@@ -2,6 +2,7 @@ import type { AuthorizedRoot, MediaCollection, MediaItem, MediaScanProgress, Pro
 import { ProviderOfflineError } from "@/core/errors";
 import { generatedPalette } from "@/core/steam/artwork";
 import { useMediaLibraryStore, type IndexedFile } from "@/state/mediaLibraryStore";
+import { useModeStore } from "@/state/modeStore";
 import { createLogger } from "@/lib/logger";
 import type { MediaBridge } from "./MediaBridge";
 import type { MediaProvider } from "./MediaProvider";
@@ -112,6 +113,8 @@ export class LocalMediaProvider implements MediaProvider {
 
   async scanRoot(rootId: string, onProgress?: (p: MediaScanProgress) => void): Promise<void> {
     await this.ensureRegistered();
+    // GAME SESSION ACTIVE: never index while a game is running.
+    if (useModeStore.getState().gameRunning) throw new Error("Indexing is paused while a game session is active.");
     const s = this.store.getState();
     const root = s.roots.find((r) => r.id === rootId);
     if (!root) throw new Error("Unknown media root");

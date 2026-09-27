@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Clock, Download } from "lucide-react";
+import { motion } from "framer-motion";
 import type { Game } from "@/core/types";
 import { formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -10,73 +10,58 @@ interface GameCardProps {
   onClick: () => void;
 }
 
-/** Generated artwork: stable gradient + monogram, used when no image is available. */
+/**
+ * Generated artwork when no image exists: a deep monochrome field with a
+ * single light source and the title set large — intentional, not a placeholder.
+ */
 export function GeneratedCover({ game, large }: { game: Game; large?: boolean }) {
   return (
-    <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 30% 0%, ${game.coverColor} 0%, ${game.heroColor} 55%, #07090d 100%)` }}>
-      <div className="absolute inset-0 bg-grid opacity-[0.12]" />
-      <div className="absolute inset-0 nx-noise opacity-[0.06]" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={cn("font-display font-bold text-white/[0.07]", large ? "text-[220px]" : "text-6xl")}>{game.title.charAt(0)}</span>
+    <div className="absolute inset-0 bg-[#050505]">
+      <div className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 75% 0%, ${game.coverColor} 0%, transparent 62%)`, opacity: 0.6 }} />
+      <div className="absolute inset-0 nx-noise opacity-[0.05]" />
+      <div className={cn("absolute inset-x-0 top-0 overflow-hidden p-4", large && "p-8")}>
+        <span className={cn("block font-display font-semibold uppercase leading-[0.92] tracking-tight text-white/[0.08] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]", large ? "text-[88px]" : "text-[28px]")}>
+          {game.title}
+        </span>
       </div>
-      <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+      <div className="absolute inset-x-0 top-0 h-px bg-white/[0.07]" />
     </div>
   );
 }
 
-/** Cover-art tile: real artwork when available, generated fallback otherwise. */
+/** Cover tile. Artwork dominates; metadata reveals on hover. */
 export function GameCard({ game, completion, onClick }: GameCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImg = !!game.coverUrl && !imgFailed;
   return (
-    <button
+    <motion.button
       onClick={onClick}
-      className="no-drag group relative block aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/[0.06] text-left transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-glow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+      whileHover="hover"
+      className="no-drag group relative block aspect-[3/4] w-full overflow-hidden rounded-md bg-black text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+      aria-label={game.title}
     >
-      <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
+      <motion.div className="absolute inset-0" variants={{ hover: { scale: 1.04 } }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}>
         <GeneratedCover game={game} />
-        {showImg && (
-          <img
-            src={game.coverUrl!}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-      </div>
+        {showImg && <img src={game.coverUrl!} alt="" loading="lazy" decoding="async" onError={() => setImgFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
+      </motion.div>
 
-      <div className={cn("absolute inset-x-0 bottom-0 bg-gradient-to-t from-void-950 via-void-950/70 to-transparent", showImg ? "h-1/2" : "h-2/3")} />
+      {/* Light response */}
+      <motion.div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" variants={{ hover: { opacity: 1 } }} initial={{ opacity: showImg ? 0.55 : 0.9 }} transition={{ duration: 0.4 }} />
+      <motion.div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/0" variants={{ hover: { boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)" } }} transition={{ duration: 0.3 }} />
 
-      {!game.installed && (
-        <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-void-950/80 px-2 py-0.5 text-[10px] text-white/60">
-          <Download size={10} /> Not installed
-        </span>
-      )}
+      {!game.installed && <span className="absolute right-2.5 top-2.5 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] uppercase tracking-wide2 text-white/55 backdrop-blur">Not installed</span>}
 
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <h3 className="text-sm font-semibold leading-tight text-white drop-shadow">{game.title}</h3>
-        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/55">
-          {game.playtimeMinutes > 0 && (
-            <>
-              <Clock size={11} />
-              <span>{formatPlaytime(game.playtimeMinutes)}</span>
-            </>
-          )}
-          {game.lastPlayed && (
-            <>
-              {game.playtimeMinutes > 0 && <span className="text-white/25">·</span>}
-              <span>{formatRelativeTime(game.lastPlayed)}</span>
-            </>
-          )}
+      <motion.div className="absolute inset-x-0 bottom-0 p-3.5" variants={{ hover: { y: 0, opacity: 1 } }} initial={{ y: showImg ? 6 : 0, opacity: showImg ? 0 : 1 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+        <h3 className="text-[13.5px] font-medium leading-tight text-white">{game.title}</h3>
+        <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] tabular text-white/50">
+          {game.playtimeMinutes > 0 && <span>{formatPlaytime(game.playtimeMinutes)}</span>}
+          {game.lastPlayed && <span>{formatRelativeTime(game.lastPlayed)}</span>}
+          {completion != null && completion > 0 && <span className="ml-auto text-white/80">{completion}%</span>}
         </div>
         {completion != null && completion > 0 && (
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${completion}%` }} />
-          </div>
+          <div className="mt-2 h-px bg-white/15"><div className="h-full bg-white" style={{ width: `${completion}%` }} /></div>
         )}
-      </div>
-    </button>
+      </motion.div>
+    </motion.button>
   );
 }

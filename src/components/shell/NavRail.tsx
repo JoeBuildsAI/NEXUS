@@ -1,13 +1,4 @@
-import {
-  Gamepad2,
-  LayoutDashboard,
-  Mail,
-  MonitorCog,
-  Play,
-  Search,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
+import { Gamepad2, House, Mail, MonitorCog, Play, Search, Settings, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigationStore, type Screen } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
@@ -22,14 +13,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { screen: "home", label: "Home", icon: LayoutDashboard, key: "1" },
+  { screen: "home", label: "Home", icon: House, key: "1" },
   { screen: "gaming", label: "Gaming", icon: Gamepad2, key: "2" },
   { screen: "media", label: "Media", icon: Play, key: "3" },
   { screen: "system", label: "System", icon: MonitorCog, key: "4" },
-  { screen: "communications", label: "Comms", icon: Mail, key: "5" },
+  { screen: "communications", label: "Communications", icon: Mail, key: "5" },
 ];
 
-/** Integrated vertical navigation rail with animated active indicator. */
+/**
+ * Icon-only rail. Labels reveal on hover of the rail; the active item is white
+ * with a single hairline indicator that travels between items.
+ */
 export function NavRail() {
   const screen = useNavigationStore((s) => s.screen);
   const navigate = useNavigationStore((s) => s.navigate);
@@ -38,16 +32,14 @@ export function NavRail() {
   const tone = HEALTH_META[health].tone;
 
   return (
-    <nav className="relative flex w-[84px] shrink-0 flex-col items-center gap-1 py-3">
-      <div className="absolute inset-y-6 right-0 w-px bg-gradient-to-b from-transparent via-white/[0.06] to-transparent" />
-
+    <nav className="group/rail relative z-20 flex w-[68px] shrink-0 flex-col items-center py-2" aria-label="Primary">
       <button
         onClick={openPalette}
-        aria-label="Open command palette (Ctrl+Space)"
-        title="Command palette · Ctrl+Space"
-        className="no-drag group mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-white/50 transition-all hover:border-accent/40 hover:text-accent hover:shadow-glow-sm"
+        aria-label="Command palette (Ctrl+Space)"
+        title="Ctrl+Space"
+        className="no-drag mb-4 flex h-10 w-10 items-center justify-center rounded-md text-white/40 transition-colors duration-200 hover:bg-white/[0.06] hover:text-white"
       >
-        <Search size={17} />
+        <Search size={17} strokeWidth={1.75} />
       </button>
 
       <div className="flex flex-1 flex-col items-center gap-1">
@@ -56,23 +48,18 @@ export function NavRail() {
         ))}
       </div>
 
-      <div className="mb-3 flex flex-col items-center gap-1" title={`System ${HEALTH_META[health].label}`}>
-        <span
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            tone === "nominal" && "bg-status-nominal shadow-[0_0_10px_rgba(94,230,161,0.9)]",
-            tone === "attention" && "bg-status-attention shadow-[0_0_10px_rgba(230,207,94,0.9)]",
-            tone === "warning" && "bg-status-warning shadow-[0_0_10px_rgba(230,161,94,0.9)]",
-            tone === "critical" && "bg-status-critical shadow-[0_0_10px_rgba(230,94,111,0.9)]",
-          )}
-        />
-      </div>
-
-      <NavButton
-        item={{ screen: "settings", label: "Settings", icon: Settings, key: "6" }}
-        active={screen === "settings"}
-        onClick={() => navigate("settings")}
+      <span
+        className={cn(
+          "mb-4 h-1 w-1 rounded-full",
+          tone === "nominal" && "bg-white/40",
+          tone === "attention" && "bg-status-attention",
+          tone === "warning" && "bg-status-warning",
+          tone === "critical" && "bg-status-critical",
+        )}
+        title={`System ${HEALTH_META[health].label}`}
       />
+
+      <NavButton item={{ screen: "settings", label: "Settings", icon: Settings, key: "6" }} active={screen === "settings"} onClick={() => navigate("settings")} />
     </nav>
   );
 }
@@ -84,23 +71,27 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
       onClick={onClick}
       aria-label={item.label}
       aria-current={active ? "page" : undefined}
-      title={`${item.label} · Ctrl+${item.key}`}
       className={cn(
-        "no-drag group relative flex h-14 w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors",
-        active ? "text-accent" : "text-white/40 hover:text-white/85",
+        "no-drag relative flex h-12 w-12 items-center justify-center rounded-md transition-colors duration-200",
+        active ? "text-white" : "text-white/35 hover:text-white/80",
       )}
     >
       {active && (
-        <motion.div
+        <motion.span
           layoutId="nav-active"
-          className="absolute inset-0 rounded-xl bg-accent/[0.08]"
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}
-        >
-          <span className="absolute -left-[15px] top-1/2 h-6 w-[2px] -translate-y-1/2 rounded-full bg-accent shadow-[0_0_10px_rgba(94,208,230,0.9)]" />
-        </motion.div>
+          className="absolute left-[-10px] top-1/2 h-5 w-px -translate-y-1/2 bg-white"
+          transition={{ type: "spring", stiffness: 520, damping: 40 }}
+        />
       )}
-      <Icon size={19} className="relative z-10 transition-transform group-hover:scale-105" />
-      <span className="relative z-10 text-[9px] font-medium uppercase tracking-wide2">{item.label}</span>
+      <Icon size={19} strokeWidth={active ? 2 : 1.6} className="relative" />
+      {/* Hover label */}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-[56px] whitespace-nowrap rounded-sm bg-[#0e0e10] px-2.5 py-1 text-[11.5px] tracking-wide text-white/85 opacity-0 shadow-lift transition-all duration-150 group-hover/rail:delay-75 [button:hover>&]:opacity-100 [button:hover>&]:translate-x-0 -translate-x-1"
+      >
+        {item.label}
+        <span className="ml-2 font-mono text-[10px] text-white/35">⌃{item.key}</span>
+      </span>
     </button>
   );
 }

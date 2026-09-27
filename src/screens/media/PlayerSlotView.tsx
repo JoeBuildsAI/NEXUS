@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Focus, Maximize2, Pause, Play, Plus, RefreshCw, Volume2, VolumeX, X } from "lucide-react";
 import type { MediaItem, PlayerSlot } from "@/core/types";
 import { useMediaStore } from "@/state/mediaStore";
@@ -13,7 +14,7 @@ interface Props {
   className?: string;
 }
 
-/** A single video player within the workspace grid. */
+/** A player floating on black. Controls only exist while the pointer is over it. */
 export function PlayerSlotView({ slot, item, onAssign, large, className }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { setSlotPlaying, setSlotMuted, setSlotVolume, clearSlot, requestSeek, setFocusIndex, setLayout } = useMediaStore();
@@ -29,11 +30,8 @@ export function PlayerSlotView({ slot, item, onAssign, large, className }: Props
     if (slot.playing) void v.play().catch(() => setSlotPlaying(slot.index, false));
     else v.pause();
   }, [slot.playing, slot.index, setSlotPlaying]);
-
   useEffect(() => { if (videoRef.current) videoRef.current.muted = slot.muted; }, [slot.muted]);
   useEffect(() => { if (videoRef.current) videoRef.current.volume = slot.volume; }, [slot.volume]);
-
-  // Apply broadcast seeks (sync) or targeted seeks.
   useEffect(() => {
     if (!seekRequest || seekRequest.seq === lastSeq.current) return;
     lastSeq.current = seekRequest.seq;
@@ -41,35 +39,28 @@ export function PlayerSlotView({ slot, item, onAssign, large, className }: Props
     const v = videoRef.current;
     if (v && Number.isFinite(seekRequest.time)) v.currentTime = Math.min(seekRequest.time, v.duration || seekRequest.time);
   }, [seekRequest, slot.index]);
-
   useEffect(() => { setErrored(item?.available === false); setProgress(0); }, [item?.id, item?.available]);
 
   if (!item) {
     return (
-      <button
-        onClick={() => onAssign(slot.index)}
-        className={cn("group relative flex items-center justify-center rounded-xl border border-dashed border-white/[0.08] bg-white/[0.012] transition-colors hover:border-accent/30 hover:bg-accent/[0.03]", large ? "" : "aspect-video", className)}
-      >
-        <div className="flex flex-col items-center gap-2 text-white/25 transition-colors group-hover:text-accent/70">
-          <Plus size={large ? 28 : 20} />
-          <span className="text-[11px] uppercase tracking-wide2">Player {slot.index + 1}</span>
-        </div>
-      </button>
+      <motion.button layout onClick={() => onAssign(slot.index)} className={cn("group relative flex items-center justify-center rounded-sm bg-white/[0.015] transition-colors hover:bg-white/[0.035]", large ? "" : "aspect-video", className)} aria-label={`Load player ${slot.index + 1}`}>
+        <span className="absolute left-3 top-2.5 font-mono text-[10px] text-white/20">P{slot.index + 1}</span>
+        <Plus size={large ? 24 : 18} strokeWidth={1.5} className="text-white/20 transition-colors group-hover:text-white/60" />
+      </motion.button>
     );
   }
 
   const pct = duration ? (progress / duration) * 100 : 0;
 
   return (
-    <div className={cn("group relative overflow-hidden rounded-xl bg-black ring-1 ring-white/[0.06] transition-shadow hover:ring-white/15", large ? "" : "aspect-video", className)}>
+    <motion.div layout className={cn("group relative overflow-hidden rounded-sm bg-black", large ? "" : "aspect-video", className)}>
       {errored ? (
-        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center text-white/35" style={{ background: item.thumbnailColor }}>
-          <RefreshCw size={18} />
-          <p className="text-xs uppercase tracking-wide2">{item.available === false ? "Media source unavailable" : item.playability === "potentially-unsupported" ? `${item.ext?.toUpperCase()} not playable here` : "Source unavailable"}</p>
-          <p className="max-w-[220px] truncate text-[11px] text-white/45">{item.title}</p>
-          <div className="flex gap-3 text-[11px]">
-            <button onClick={() => onAssign(slot.index)} className="text-accent hover:underline">Replace</button>
-            <button onClick={() => clearSlot(slot.index)} className="text-white/50 hover:underline">Clear</button>
+        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center" style={{ background: `radial-gradient(80% 80% at 50% 50%, ${item.thumbnailColor}22, #000)` }}>
+          <p className="text-micro text-white/40">{item.available === false ? "Source unavailable" : item.playability === "potentially-unsupported" ? `${item.ext?.toUpperCase()} not playable here` : "Source unavailable"}</p>
+          <p className="max-w-[220px] truncate text-[12px] text-white/50">{item.title}</p>
+          <div className="mt-1 flex gap-4 text-micro">
+            <button onClick={() => onAssign(slot.index)} className="text-white/70 hover:text-white">Replace</button>
+            <button onClick={() => clearSlot(slot.index)} className="text-white/40 hover:text-white">Clear</button>
           </div>
         </div>
       ) : (
@@ -87,61 +78,52 @@ export function PlayerSlotView({ slot, item, onAssign, large, className }: Props
         />
       )}
 
-      {/* Top bar */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-        <span className="truncate text-xs font-medium text-white/90">
-          <span className="mr-2 font-mono text-[10px] text-white/40">P{slot.index + 1}</span>{item.title}
-        </span>
-        <div className="pointer-events-auto flex gap-0.5">
-          <IconBtn onClick={() => onAssign(slot.index)} label="Replace"><RefreshCw size={13} /></IconBtn>
-          <IconBtn onClick={() => clearSlot(slot.index)} label="Clear"><X size={14} /></IconBtn>
+      {/* Top: title + replace/clear (hover only) */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-3 py-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <span className="truncate text-[12px] text-white/85"><span className="mr-2 font-mono text-[10px] text-white/35">P{slot.index + 1}</span>{item.title}</span>
+        <div className="pointer-events-auto flex">
+          <IconBtn onClick={() => onAssign(slot.index)} label="Replace"><RefreshCw size={12} /></IconBtn>
+          <IconBtn onClick={() => clearSlot(slot.index)} label="Clear"><X size={13} /></IconBtn>
         </div>
       </div>
 
-      {/* Bottom controls */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Bottom: seek + transport (hover only) */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2 pt-8 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         <input
           type="range"
           min={0}
           max={duration || 0}
           step={0.1}
           value={progress}
+          aria-label="Seek"
           onChange={(e) => { const t = Number(e.target.value); setProgress(t); requestSeek(t, slot.index); }}
-          className="mb-1.5 h-1 w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent"
-          style={{ background: `linear-gradient(90deg, rgba(94,208,230,0.9) ${pct}%, rgba(255,255,255,0.15) ${pct}%)` }}
+          className="mb-1.5 h-px w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+          style={{ background: `linear-gradient(90deg, rgba(255,255,255,0.9) ${pct}%, rgba(255,255,255,0.18) ${pct}%)` }}
         />
-        <div className="flex items-center gap-1.5">
-          <IconBtn onClick={() => setSlotPlaying(slot.index, !slot.playing)} label={slot.playing ? "Pause" : "Play"}>
-            {slot.playing ? <Pause size={15} /> : <Play size={15} />}
-          </IconBtn>
-          <IconBtn onClick={() => setSlotMuted(slot.index, !slot.muted)} label={slot.muted ? "Unmute" : "Mute"}>
-            {slot.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-          </IconBtn>
-          <input
-            type="range" min={0} max={1} step={0.05} value={slot.volume}
-            onChange={(e) => setSlotVolume(slot.index, Number(e.target.value))}
-            className="h-1 w-14 cursor-pointer appearance-none rounded-full bg-white/20 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-          />
-          <span className="ml-1 font-mono text-[10px] tabular-nums text-white/60">{formatDuration(progress)} / {formatDuration(duration)}</span>
-          <div className="ml-auto flex gap-0.5">
-            <IconBtn onClick={() => { setFocusIndex(slot.index); setLayout("focus"); }} label="Focus"><Focus size={14} /></IconBtn>
-            <IconBtn onClick={() => void videoRef.current?.requestFullscreen?.()} label="Fullscreen"><Maximize2 size={14} /></IconBtn>
+        <div className="flex items-center gap-1">
+          <IconBtn onClick={() => setSlotPlaying(slot.index, !slot.playing)} label={slot.playing ? "Pause" : "Play"}>{slot.playing ? <Pause size={14} /> : <Play size={14} />}</IconBtn>
+          <IconBtn onClick={() => setSlotMuted(slot.index, !slot.muted)} label={slot.muted ? "Unmute" : "Mute"}>{slot.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}</IconBtn>
+          <input type="range" min={0} max={1} step={0.05} value={slot.volume} aria-label="Volume" onChange={(e) => setSlotVolume(slot.index, Number(e.target.value))} className="h-px w-12 cursor-pointer appearance-none rounded-full bg-white/25 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white" />
+          <span className="ml-2 font-mono text-[10px] tabular text-white/50">{formatDuration(progress)} / {formatDuration(duration)}</span>
+          <div className="ml-auto flex">
+            <IconBtn onClick={() => { setFocusIndex(slot.index); setLayout("focus"); }} label="Focus"><Focus size={13} /></IconBtn>
+            <IconBtn onClick={() => void videoRef.current?.requestFullscreen?.()} label="Fullscreen"><Maximize2 size={13} /></IconBtn>
           </div>
         </div>
       </div>
 
       {!slot.playing && !errored && (
-        <button onClick={() => setSlotPlaying(slot.index, true)} className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100" aria-label="Play">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur"><Play size={20} className="ml-0.5" /></span>
+        <button onClick={() => setSlotPlaying(slot.index, true)} className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-label="Play">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-black"><Play size={16} className="ml-0.5" fill="currentColor" /></span>
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }
 
-function IconBtn({ children, onClick, label, className }: { children: React.ReactNode; onClick: () => void; label: string; className?: string }) {
+function IconBtn({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} aria-label={label} title={label} className={cn("flex h-7 w-7 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/15 hover:text-white", className)}>
+    <button onClick={onClick} aria-label={label} title={label} className="flex h-7 w-7 items-center justify-center rounded-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white">
       {children}
     </button>
   );

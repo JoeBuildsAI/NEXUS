@@ -1,73 +1,84 @@
 import { motion } from "framer-motion";
-import { NexusStatus } from "./NexusStatus";
+import { InstrumentLedger } from "./InstrumentLedger";
 import { TelemetryWave } from "./TelemetryWave";
-import { ActivityStrip } from "./ActivityStrip";
-import {
-  CommsSurface,
-  ContinuePlaying,
-  InsightsSurface,
-  MediaSurface,
-  StorageSurface,
-} from "./HomeSurfaces";
+import { CommsSurface, ContinuePlaying, InsightsSurface, StorageSurface } from "./HomeSurfaces";
 import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
 import { ErrorBoundary } from "@/components/ui";
-import { useClock, formatDateLong, formatTime, greeting } from "@/hooks/useClock";
+import { useClock, greeting } from "@/hooks/useClock";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useTelemetryStore } from "@/state/telemetryStore";
+import { HEALTH_META } from "@/core/safety/health";
+import { cn } from "@/lib/utils";
 
-const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.05 } } };
-const rise = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } } };
+const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } } };
+const rise = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } } };
+
+const TONE_TEXT = {
+  nominal: "text-white/85",
+  attention: "text-status-attention",
+  warning: "text-status-warning",
+  critical: "text-status-critical",
+} as const;
 
 /**
- * Home / command center. Information is embedded into the environment with
- * strong hierarchy: identity + time → NEXUS status → live telemetry → context.
+ * Home. Black environment; hierarchy from type, scale and light.
+ *   WELCOME, JOSEPH             19:42
+ *   NEXUS · SYSTEM NOMINAL      SATURDAY · SEPTEMBER 26
+ *   instrumentation ─────────── telemetry wave
+ *   continue playing (artwork)  communications / storage
+ *   NEXUS suggestions
  */
 export function HomeScreen() {
   const now = useClock();
   const name = useSettingsStore((s) => s.profile.name) || "Joseph";
+  const health = useTelemetryStore((s) => s.snapshot?.health);
+  const meta = health ? HEALTH_META[health] : null;
+
+  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }).toUpperCase().replace(",", " ·");
 
   return (
     <div className="h-full overflow-y-auto">
-      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1500px] flex-col px-10 pb-10 pt-8 2xl:max-w-[1700px] 2xl:px-14 2xl:pt-12">
-        {/* Identity row */}
-        <motion.header variants={rise} className="flex items-start justify-between gap-8">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1560px] flex-col px-12 pb-16 pt-10 2xl:max-w-[1760px] 2xl:px-16 2xl:pt-14">
+        {/* Hero */}
+        <motion.header variants={rise} className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1fr_auto]">
           <div>
-            <p className="text-[11px] uppercase tracking-cinematic text-accent/70">{greeting(now)}</p>
-            <h1 className="mt-2 font-display text-[clamp(2.4rem,4vw,4rem)] font-bold leading-none tracking-wide2 text-white text-glow">
+            <p className="text-micro tracking-cinematic text-white/35">{greeting(now)}</p>
+            <h1 className="mt-4 font-display text-display-xl font-semibold text-white text-glow">
               WELCOME, {name.toUpperCase()}
             </h1>
-            <p className="mt-3 text-sm text-white/40">{formatDateLong(now)}</p>
+            <div className="mt-8 flex items-baseline gap-4">
+              <span className="font-display text-[13px] font-semibold tracking-[0.34em] text-white/50">NEXUS</span>
+              <span className="h-3 w-px bg-white/15" />
+              <span className={cn("font-display text-[13px] tracking-[0.3em]", meta ? TONE_TEXT[meta.tone] : "text-white/30")}>
+                {meta ? `SYSTEM ${meta.label.toUpperCase()}` : "CALIBRATING"}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-4">
-            <p className="font-mono text-[clamp(2.5rem,4.5vw,4.5rem)] font-light leading-none tabular-nums tracking-tight text-white/90">
-              {formatTime(now)}
-            </p>
-            <ModeSwitcher />
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <p className="font-mono text-display-xl font-light leading-none tabular tracking-tight text-white">{time}</p>
+            <p className="text-micro tracking-wide3 text-white/40">{date}</p>
+            <div className="mt-2"><ModeSwitcher /></div>
           </div>
         </motion.header>
 
-        {/* Status + wave */}
-        <motion.section variants={rise} className="mt-12 grid grid-cols-1 gap-12 lg:grid-cols-[minmax(380px,32%)_1fr]">
-          <NexusStatus />
-          <div className="flex flex-col justify-end">
-            <TelemetryWave height={150} />
-            <div className="hairline-t mt-4" />
-            <div className="mt-3">
-              <ActivityStrip />
-            </div>
+        {/* Instrumentation */}
+        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-10 lg:grid-cols-[minmax(420px,38%)_1fr]">
+          <InstrumentLedger />
+          <div className="flex flex-col justify-end"><TelemetryWave height={150} /></div>
+        </motion.section>
+
+        {/* Context — asymmetric */}
+        <motion.section variants={rise} className="mt-20 grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[1.35fr_1fr]">
+          <ErrorBoundary inline label="Continue playing"><ContinuePlaying /></ErrorBoundary>
+          <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-1">
+            <ErrorBoundary inline label="Communications"><CommsSurface /></ErrorBoundary>
+            <ErrorBoundary inline label="Storage"><StorageSurface /></ErrorBoundary>
           </div>
         </motion.section>
 
-        {/* Context */}
-        <motion.section variants={rise} className="mt-14 grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-10">
-            <ErrorBoundary inline label="Continue playing"><ContinuePlaying /></ErrorBoundary>
-            <ErrorBoundary inline label="Suggestions"><InsightsSurface /></ErrorBoundary>
-          </div>
-          <div className="space-y-10 lg:border-l lg:border-white/[0.05] lg:pl-12">
-            <ErrorBoundary inline label="Communications"><CommsSurface /></ErrorBoundary>
-            <ErrorBoundary inline label="Storage"><StorageSurface /></ErrorBoundary>
-            <ErrorBoundary inline label="Media"><MediaSurface /></ErrorBoundary>
-          </div>
+        <motion.section variants={rise} className="mt-16 max-w-3xl">
+          <ErrorBoundary inline label="Suggestions"><InsightsSurface /></ErrorBoundary>
         </motion.section>
       </motion.div>
     </div>

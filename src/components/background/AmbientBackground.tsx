@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
+import { useNavigationStore } from "@/state/navigationStore";
 import { ENVIRONMENTS, MODE_MOOD } from "./environments";
 
 interface Particle {
@@ -27,9 +28,11 @@ export function AmbientBackground() {
   const appearance = useSettingsStore((s) => s.appearance);
   const mode = useModeStore((s) => s.current);
   const gameRunning = useModeStore((s) => s.gameRunning);
+  const screen = useNavigationStore((s) => s.screen);
 
   const spec = ENVIRONMENTS[appearance.environment];
-  const mood = MODE_MOOD[mode];
+  // Media screen blacks out the environment regardless of mode.
+  const mood = screen === "media" ? MODE_MOOD.media : MODE_MOOD[mode];
   const perf = appearance.backgroundPerformance;
   const still = appearance.reducedMotion || !appearance.animationsEnabled;
 
@@ -148,15 +151,18 @@ export function AmbientBackground() {
     let ty = window.innerHeight / 2;
     let cx = tx;
     let cy = ty;
-    const onMove = (e: MouseEvent) => {
-      tx = e.clientX;
-      ty = e.clientY;
-    };
+    // Only animate while the light is still catching up; idle cursor = zero work.
     const tick = () => {
       cx += (tx - cx) * 0.08;
       cy += (ty - cy) * 0.08;
       el.style.transform = `translate3d(${cx - 300}px, ${cy - 300}px, 0)`;
-      raf = requestAnimationFrame(tick);
+      if (Math.abs(tx - cx) > 0.3 || Math.abs(ty - cy) > 0.3) raf = requestAnimationFrame(tick);
+      else raf = 0;
+    };
+    const onMove = (e: MouseEvent) => {
+      tx = e.clientX;
+      ty = e.clientY;
+      if (!raf) raf = requestAnimationFrame(tick);
     };
     window.addEventListener("mousemove", onMove, { passive: true });
     raf = requestAnimationFrame(tick);
@@ -206,7 +212,7 @@ export function AmbientBackground() {
           ref={cursorRef}
           className="absolute left-0 top-0 h-[600px] w-[600px] rounded-full"
           style={{
-            background: `radial-gradient(circle, rgba(${spec.particleColor.join(",")},0.07) 0%, transparent 60%)`,
+            background: `radial-gradient(circle, rgba(${spec.particleColor.join(",")},0.045) 0%, transparent 60%)`,
             willChange: "transform",
           }}
         />

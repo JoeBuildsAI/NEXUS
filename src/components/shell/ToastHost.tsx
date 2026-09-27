@@ -1,64 +1,44 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Check, Info, X, Zap } from "lucide-react";
+import { X } from "lucide-react";
 import { useToastStore, type ToastTone } from "@/state/toastStore";
 import { cn } from "@/lib/utils";
 
-const TONE: Record<ToastTone, { bar: string; icon: React.ReactNode }> = {
-  neutral: { bar: "bg-white/40", icon: <Info size={14} /> },
-  accent: { bar: "bg-accent", icon: <Zap size={14} /> },
-  success: { bar: "bg-status-nominal", icon: <Check size={14} /> },
-  warning: { bar: "bg-status-attention", icon: <AlertTriangle size={14} /> },
-  critical: { bar: "bg-status-critical", icon: <AlertTriangle size={14} /> },
+const TONE_DOT: Record<ToastTone, string> = {
+  neutral: "bg-white/40",
+  accent: "bg-white",
+  success: "bg-status-nominal",
+  warning: "bg-status-attention",
+  critical: "bg-status-critical",
 };
 
-/** Unified notification host. Mounted once at the app root. */
+/** Minimal notifications: a dot, small-caps title, optional line of detail. */
 export function ToastHost() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
 
   return (
-    <div className="pointer-events-none fixed bottom-6 right-6 z-[350] flex w-[360px] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-7 right-8 z-[350] flex w-[340px] flex-col items-end gap-2" aria-live="polite">
       <AnimatePresence initial={false}>
-        {toasts.map((t) => {
-          const tone = TONE[t.tone];
-          return (
-            <motion.div
-              key={t.id}
-              layout
-              initial={{ opacity: 0, x: 40, scale: 0.96 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 24, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 420, damping: 32 }}
-              className="pointer-events-auto glass-strong relative overflow-hidden rounded-xl shadow-panel"
-            >
-              <div className={cn("absolute inset-y-0 left-0 w-[3px]", tone.bar)} />
-              <div className="flex items-start gap-3 py-3 pl-4 pr-3">
-                <span className="mt-0.5 text-white/60">{tone.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white/90">{t.title}</p>
-                  {t.description && (
-                    <p className="mt-0.5 text-xs leading-relaxed text-white/45">{t.description}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => dismiss(t.id)}
-                  className="text-white/30 transition-colors hover:text-white"
-                  aria-label="Dismiss"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              {t.durationMs > 0 && (
-                <motion.div
-                  className={cn("absolute bottom-0 left-0 h-px opacity-50", tone.bar)}
-                  initial={{ width: "100%" }}
-                  animate={{ width: "0%" }}
-                  transition={{ duration: t.durationMs / 1000, ease: "linear" }}
-                />
-              )}
-            </motion.div>
-          );
-        })}
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ type: "spring", stiffness: 500, damping: 38 }}
+            className="pointer-events-auto glass-strong flex max-w-full items-start gap-3 rounded-md py-2.5 pl-3.5 pr-2.5"
+          >
+            <span className={cn("mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full", TONE_DOT[t.tone])} />
+            <div className="min-w-0 flex-1">
+              <p className="text-micro tracking-wide3 text-white/85">{t.title}</p>
+              {t.description && <p className="mt-1 text-[12.5px] leading-snug text-white/45">{t.description}</p>}
+            </div>
+            <button onClick={() => dismiss(t.id)} className="mt-px text-white/25 transition-colors hover:text-white" aria-label="Dismiss">
+              <X size={13} />
+            </button>
+          </motion.div>
+        ))}
       </AnimatePresence>
     </div>
   );

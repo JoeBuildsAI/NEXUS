@@ -1,5 +1,18 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * tailwind-merge must know our custom font-size tokens, otherwise it treats
+ * `text-micro` / `text-display-*` as colors and drops them when a text color
+ * is merged in.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["micro", "display-xl", "display-lg", "display-md", "display-sm"] }],
+    },
+  },
+});
 
 /** Merge Tailwind class names with conflict resolution. */
 export function cn(...inputs: ClassValue[]): string {

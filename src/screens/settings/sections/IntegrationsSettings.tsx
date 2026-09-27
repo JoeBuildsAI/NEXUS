@@ -157,16 +157,16 @@ function SteamPanel({ status, onChanged }: { status: SteamStatus | null; onChang
         </dd>
       </dl>
 
-      <div className={cn("mt-5 rounded-xl border border-white/[0.07] p-4", !desktop && "opacity-70")}>
-        <p className="flex items-center gap-2 text-xs uppercase tracking-wide2 text-white/40"><KeyRound size={12} /> Web API configuration</p>
-        <p className="mt-1 text-xs text-white/35">
+      <div className={cn("mt-8 border-t border-white/[0.06] pt-5", !desktop && "opacity-70")}>
+        <p className="flex items-center gap-2 text-micro text-white/45"><KeyRound size={11} /> Web API configuration</p>
+        <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-white/35">
           Get a key at steamcommunity.com/dev/apikey and your SteamID64 from your profile URL. Stored in Windows Credential Manager — never in settings files, localStorage, or logs, and never shown again after saving.
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={status?.apiConfigured ? "API key (configured — enter to replace)" : "Steam Web API key"} disabled={!desktop} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-accent/40 focus:outline-none" />
-          <input inputMode="numeric" autoComplete="off" value={steamId} onChange={(e) => setSteamId(e.target.value)} placeholder={status?.steamIdConfigured ? "SteamID64 (configured — enter to replace)" : "SteamID64 (17 digits)"} disabled={!desktop} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 font-mono text-sm text-white/85 placeholder:text-white/25 focus:border-accent/40 focus:outline-none" />
+        <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={status?.apiConfigured ? "API key (configured — enter to replace)" : "Steam Web API key"} disabled={!desktop} className="h-9 border-b border-white/12 bg-transparent font-mono text-sm text-white/90 placeholder:text-white/25 focus:border-white/60 focus:outline-none disabled:opacity-40" />
+          <input inputMode="numeric" autoComplete="off" value={steamId} onChange={(e) => setSteamId(e.target.value)} placeholder={status?.steamIdConfigured ? "SteamID64 (configured — enter to replace)" : "SteamID64 (17 digits)"} disabled={!desktop} className="h-9 border-b border-white/12 bg-transparent font-mono text-sm text-white/90 placeholder:text-white/25 focus:border-white/60 focus:outline-none disabled:opacity-40" />
         </div>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-5 flex items-center gap-3">
           <Button size="sm" variant="primary" disabled={!desktop || saving || (!apiKey.trim() && !steamId.trim())} onClick={() => void save()}><Check size={13} /> Save securely</Button>
           {(status?.apiConfigured || status?.steamIdConfigured) && <Button size="sm" variant="ghost" onClick={() => void clear()}><Trash2 size={13} /> Remove</Button>}
           {!desktop && <span className="text-xs text-white/35">Secure storage requires the desktop build.</span>}

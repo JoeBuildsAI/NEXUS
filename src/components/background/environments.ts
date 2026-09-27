@@ -4,9 +4,9 @@ import type { OperatingMode } from "@/core/types";
 export interface EnvironmentSpec {
   readonly label: string;
   readonly description: string;
-  /** Base radial gradient stops (top glow → base). */
+  /** Base radial gradient stops (top glow → base). All presets resolve to black. */
   readonly base: readonly [string, string, string];
-  /** Light field blob colors (rgba). */
+  /** Light field colors (rgba, very low alpha). */
   readonly lights: readonly string[];
   readonly particleColor: readonly [number, number, number];
   /** Baseline particle density multiplier. */
@@ -17,57 +17,61 @@ export interface EnvironmentSpec {
   readonly noise: boolean;
 }
 
+/**
+ * BLACK IS THE INTERFACE. Every preset bottoms out at #000; light fields are
+ * faint enough that content — not the background — carries the composition.
+ */
 export const ENVIRONMENTS: Record<EnvironmentPreset, EnvironmentSpec> = {
   nexus: {
     label: "NEXUS",
-    description: "Cool steel-cyan depth. The signature environment.",
-    base: ["rgba(30,58,74,0.6)", "rgba(10,14,20,0.92)", "#05070a"],
-    lights: ["rgba(56,180,207,0.13)", "rgba(94,110,230,0.10)", "rgba(40,120,150,0.08)"],
-    particleColor: [150, 210, 230],
-    density: 1,
-    speed: 1,
+    description: "Near-black with a cool, barely-there platinum haze. The signature.",
+    base: ["rgba(26,30,36,0.55)", "rgba(4,4,5,0.95)", "#000000"],
+    lights: ["rgba(140,160,180,0.05)", "rgba(90,100,130,0.045)", "rgba(60,80,100,0.035)"],
+    particleColor: [200, 210, 220],
+    density: 0.7,
+    speed: 0.8,
     grid: true,
     noise: true,
   },
   void: {
     label: "VOID",
-    description: "Near-black. Minimal light, maximum focus on content.",
-    base: ["rgba(14,16,22,0.7)", "rgba(6,7,10,0.95)", "#030405"],
-    lights: ["rgba(60,70,90,0.08)", "rgba(30,34,44,0.10)"],
-    particleColor: [180, 190, 210],
-    density: 0.45,
-    speed: 0.6,
+    description: "Absolute black. No haze, no grid. Content alone.",
+    base: ["rgba(8,8,9,0.6)", "rgba(2,2,2,0.98)", "#000000"],
+    lights: ["rgba(40,40,46,0.04)"],
+    particleColor: [190, 190, 200],
+    density: 0.25,
+    speed: 0.5,
     grid: false,
     noise: true,
   },
   aurora: {
     label: "AURORA",
-    description: "Slow drifting bands of teal, violet and emerald.",
-    base: ["rgba(28,70,72,0.55)", "rgba(12,16,26,0.92)", "#05070a"],
-    lights: ["rgba(64,220,190,0.14)", "rgba(140,90,230,0.13)", "rgba(60,200,120,0.09)", "rgba(90,140,255,0.10)"],
-    particleColor: [170, 230, 220],
-    density: 0.9,
-    speed: 1.3,
+    description: "Slow, deep drifts of teal and violet — very low key.",
+    base: ["rgba(18,40,44,0.5)", "rgba(4,5,8,0.95)", "#000000"],
+    lights: ["rgba(64,190,170,0.06)", "rgba(120,80,200,0.055)", "rgba(50,150,110,0.04)", "rgba(80,120,220,0.04)"],
+    particleColor: [170, 220, 210],
+    density: 0.7,
+    speed: 1.1,
     grid: false,
     noise: true,
   },
   neural: {
     label: "NEURAL",
-    description: "Connected nodes and faint synaptic links.",
-    base: ["rgba(40,44,74,0.55)", "rgba(10,12,22,0.93)", "#05060c"],
-    lights: ["rgba(120,110,255,0.12)", "rgba(80,160,255,0.10)"],
-    particleColor: [190, 190, 255],
-    density: 1.15,
-    speed: 0.8,
+    description: "Faint nodes and links — instrumentation at rest.",
+    base: ["rgba(24,26,40,0.5)", "rgba(4,4,8,0.95)", "#000000"],
+    lights: ["rgba(110,110,200,0.05)", "rgba(80,140,220,0.04)"],
+    particleColor: [190, 190, 230],
+    density: 0.95,
+    speed: 0.7,
     grid: true,
     noise: false,
   },
   minimal: {
     label: "MINIMAL",
-    description: "Clean gradient. No particles.",
-    base: ["rgba(24,30,40,0.6)", "rgba(10,13,18,0.95)", "#07090d"],
-    lights: ["rgba(90,120,150,0.08)"],
-    particleColor: [200, 210, 220],
+    description: "Clean gradient. No particles, no grid.",
+    base: ["rgba(14,16,20,0.55)", "rgba(4,4,5,0.97)", "#000000"],
+    lights: ["rgba(90,110,130,0.035)"],
+    particleColor: [200, 205, 210],
     density: 0,
     speed: 0,
     grid: false,
@@ -84,8 +88,9 @@ export interface ModeMood {
 
 export const MODE_MOOD: Record<OperatingMode, ModeMood> = {
   normal: { energy: 1, brightness: 1, tint: null },
-  gaming: { energy: 1.5, brightness: 1.25, tint: "rgba(230,161,94,0.045)" },
-  focus: { energy: 0.45, brightness: 0.6, tint: null },
-  media: { energy: 0.7, brightness: 0.45, tint: "rgba(0,0,0,0.25)" },
-  work: { energy: 0.8, brightness: 0.85, tint: "rgba(120,160,200,0.03)" },
+  gaming: { energy: 1.4, brightness: 1.15, tint: "rgba(217,160,102,0.025)" },
+  focus: { energy: 0.4, brightness: 0.5, tint: null },
+  // Media: the environment nearly disappears; content is the light source.
+  media: { energy: 0.3, brightness: 0.12, tint: "rgba(0,0,0,0.45)" },
+  work: { energy: 0.75, brightness: 0.8, tint: null },
 };

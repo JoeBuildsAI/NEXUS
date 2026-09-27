@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Lock, Power, RotateCcw, Rocket, Shield } from "lucide-react";
-import { Badge, Toggle, Button } from "@/components/ui";
+import { Toggle, Button } from "@/components/ui";
 import { useAsync } from "@/hooks/useAsync";
 import { getProviders } from "@/providers";
 import { native } from "@/providers/system/nativeBridge";
@@ -11,8 +11,6 @@ import { notify } from "@/state/toastStore";
 import { config } from "@/core/config";
 import type { StartupApp } from "@/core/types";
 import { cn } from "@/lib/utils";
-
-const IMPACT_TONE = { low: "nominal", medium: "attention", high: "warning", unknown: "neutral" } as const;
 
 type StartupClass = "protected" | "user" | "read-only";
 
@@ -64,61 +62,61 @@ export function StartupApps() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className={cn("flex items-center gap-2 text-xs", canManage ? "text-status-attention" : "text-white/40")}>
-        <Shield size={13} />
-        {canManage
-          ? "Startup management enabled — only current-user entries can be toggled; every change is recorded and reversible."
-          : config.isTauri
-            ? "Read-only. Enable “Allow startup changes” under Settings → System (with safety enabled) to manage entries."
-            : "Read-only in browser preview. The desktop build reads real Run keys and Startup folders."}
-        {!canManage && config.isTauri && <button onClick={() => { navigate("settings"); setSection("system"); }} className="text-accent hover:underline">Open settings</button>}
+    <div className="space-y-10">
+      <div className="flex flex-wrap items-baseline justify-between gap-6">
+        <div className="flex flex-wrap gap-x-8 gap-y-1 font-mono text-[12px] tabular text-white/40">
+          <span><span className="text-white/85">{apps.length}</span> entries</span>
+          <span><span className="text-white/85">{apps.filter((a) => a.enabled).length}</span> enabled</span>
+          <span><span className="text-white/85">{apps.filter((a) => a.cls === "protected").length}</span> protected</span>
+        </div>
+        <p className={cn("flex items-center gap-2 text-micro", canManage ? "text-status-attention/80" : "text-white/30")}>
+          <Shield size={11} />
+          {canManage ? "management enabled · current-user entries · reversible" : config.isTauri ? "read only · enable startup changes in Settings → System" : "read only · browser preview"}
+          {!canManage && config.isTauri && <button onClick={() => { navigate("settings"); setSection("system"); }} className="normal-case tracking-normal text-white/60 hover:text-white">Open settings</button>}
+        </p>
       </div>
 
       {changes.length > 0 && (
-        <div className="rounded-xl border border-accent/20 bg-accent/[0.04] p-4">
-          <p className="flex items-center gap-2 text-[10px] uppercase tracking-wide2 text-accent/70"><RotateCcw size={12} /> Changes made by NEXUS</p>
+        <div className="border-l border-white/20 pl-5">
+          <p className="flex items-center gap-2 text-micro text-white/45"><RotateCcw size={11} /> Changes made by NEXUS</p>
           <div className="mt-2 divide-y divide-white/[0.05]">
             {changes.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 py-2 text-sm">
+              <div key={c.id} className="flex items-center gap-4 py-2 text-[13.5px]">
                 <span className="flex-1 text-white/80">{c.name}</span>
-                <span className="text-xs text-white/40">was {c.previousEnabled ? "enabled" : "disabled"}</span>
-                <Button size="sm" variant="outline" onClick={() => void restore(c.id)}>Restore</Button>
+                <span className="text-[12px] text-white/40">was {c.previousEnabled ? "enabled" : "disabled"}</span>
+                <Button size="sm" variant="ghost" onClick={() => void restore(c.id)}>Restore</Button>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="divide-y divide-white/[0.04]">
-        <div className="grid grid-cols-[1fr_110px_130px_60px] gap-3 px-2 pb-2 text-[10px] uppercase tracking-wide2 text-white/30">
-          <span>Entry</span><span>Impact</span><span>Classification</span><span className="text-right">On</span>
+      <div>
+        <div className="grid grid-cols-[1fr_90px_110px_56px] gap-4 px-2 pb-2 text-micro text-white/30">
+          <span>Entry</span><span>Impact</span><span>Class</span><span className="text-right">On</span>
         </div>
+        <div className="rule" />
         {apps.map((app) => {
           const locked = !canManage || app.cls !== "user";
           return (
-            <div key={app.id} className="grid grid-cols-[1fr_110px_130px_60px] items-center gap-3 px-2 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/40"><Power size={15} /></span>
+            <div key={app.id} className="grid grid-cols-[1fr_90px_110px_56px] items-center gap-4 border-b border-white/[0.04] px-2 py-3.5">
+              <div className="flex min-w-0 items-center gap-4">
+                <Power size={14} className={app.enabled ? "text-white/60" : "text-white/20"} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-white/85">{app.name}</p>
-                  <p className="truncate font-mono text-[11px] text-white/30" title={app.command}>{app.command}</p>
+                  <p className="truncate text-[14px] text-white/85">{app.name}</p>
+                  <p className="truncate font-mono text-[11px] text-white/28" title={app.command}>{app.command}</p>
                   <p className="truncate text-[11px] text-white/30">{app.id.split(":")[0]!.toUpperCase()} · {app.why}</p>
                 </div>
               </div>
-              <span><Badge tone={IMPACT_TONE[app.impact]}>{app.impact}</Badge></span>
-              <span><Badge tone={app.cls === "protected" ? "critical" : app.cls === "read-only" ? "neutral" : "accent"}>{app.cls === "protected" ? "Protected" : app.cls === "read-only" ? "Read only" : "User"}</Badge></span>
+              <span className={cn("text-[12px] capitalize", app.impact === "high" ? "text-status-warning/80" : app.impact === "medium" ? "text-status-attention/80" : "text-white/45")}>{app.impact}</span>
+              <span className={cn("text-[12px]", app.cls === "protected" ? "text-white/40" : app.cls === "read-only" ? "text-white/40" : "text-white/85")}>{app.cls === "protected" ? "Protected" : app.cls === "read-only" ? "Read only" : "User"}</span>
               <div className="flex justify-end">
-                {locked ? (
-                  <span title={app.why} className="text-white/25"><Lock size={14} /></span>
-                ) : (
-                  <Toggle checked={app.enabled} disabled={busy === app.id} onChange={(v) => void toggle(app, v)} />
-                )}
+                {locked ? <span title={app.why} className="text-white/20"><Lock size={13} /></span> : <Toggle checked={app.enabled} disabled={busy === app.id} onChange={(v) => void toggle(app, v)} />}
               </div>
             </div>
           );
         })}
-        {apps.length === 0 && <p className="py-8 text-center text-sm text-white/35"><Rocket size={16} className="mx-auto mb-2" />No startup entries found.</p>}
+        {apps.length === 0 && <p className="py-10 text-center text-sm text-white/35"><Rocket size={16} className="mx-auto mb-2" />No startup entries found.</p>}
       </div>
     </div>
   );

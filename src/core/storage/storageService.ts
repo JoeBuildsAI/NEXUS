@@ -1,41 +1,26 @@
 import type { CleanupCandidate, CleanupPlan, DriveInfo } from "@/core/types";
 
 /**
- * Storage safety rules, enforced in the service layer (not just the UI).
+ * Storage safety rules, enforced in the service layer (not just the UI) and
+ * mirrored natively (`storage.rs` refuses removable drives outright).
  *
- * RULE 1: NEXUS must NEVER automatically scan removable drives. Only fixed
- * internal drives are eligible for automatic scanning/cleanup. Removable drives
- * require explicit per-drive opt-in.
+ * RULE 1: NEXUS NEVER scans or cleans removable or network drives. There is no
+ * opt-in. Media authorization is a separate permission domain and grants
+ * nothing here.
  *
  * RULE 2: Cleanup always follows DISCOVER → PROPOSE → APPROVE → EXECUTE. There is
- * no path from discovery straight to deletion; execution requires that every
- * candidate be individually approved, and destructive candidates require it too.
+ * no path from discovery straight to deletion.
  */
 
-/** Drives eligible for automatic scanning: fixed only, unless explicitly opted in. */
-export function eligibleDrivesForScan(
-  drives: readonly DriveInfo[],
-  optedInRemovable: readonly string[] = [],
-): DriveInfo[] {
-  return drives.filter(
-    (d) =>
-      d.kind === "fixed" ||
-      (d.kind === "removable" && optedInRemovable.includes(d.mountPoint)),
-  );
+/** Drives eligible for analysis/cleanup: fixed only. */
+export function eligibleDrivesForScan(drives: readonly DriveInfo[]): DriveInfo[] {
+  return drives.filter((d) => d.kind === "fixed");
 }
 
-/** Guard: throw if a scan is attempted against a non-eligible removable drive. */
-export function assertScanAllowed(
-  drive: DriveInfo,
-  optedInRemovable: readonly string[] = [],
-): void {
-  if (drive.kind === "removable" && !optedInRemovable.includes(drive.mountPoint)) {
-    throw new Error(
-      `Refusing to scan removable drive ${drive.mountPoint} without explicit opt-in.`,
-    );
-  }
-  if (drive.kind === "network") {
-    throw new Error(`Refusing to scan network drive ${drive.mountPoint}.`);
+/** Guard: throw if a scan is attempted against a non-fixed drive. */
+export function assertScanAllowed(drive: DriveInfo): void {
+  if (drive.kind !== "fixed") {
+    throw new Error(`Refusing to scan ${drive.kind} drive ${drive.mountPoint}. Only fixed drives are analyzed.`);
   }
 }
 
@@ -58,7 +43,5 @@ export function validateExecution(plan: CleanupPlan): string[] {
   if (approved.length === 0) {
     errors.push("No candidates approved for cleanup.");
   }
-  // Destructive candidates must be explicitly approved (they are, if in the
-  // approved set) AND surfaced for confirmation by the caller.
   return errors;
 }

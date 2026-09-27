@@ -1,6 +1,7 @@
+import { APP_VERSION } from "@/core/version";
 import { useRef, useState } from "react";
 import { Download, RotateCcw, Upload } from "lucide-react";
-import { SettingsSection, SettingRow } from "../SettingsControls";
+import { SettingsSection, SettingRow, TextInput } from "../SettingsControls";
 import { Toggle, Button, Badge } from "@/components/ui";
 import { useSettingsStore, type AppearanceSettings, type PrivacySettings, type ShortcutSettings, type StartupSettings, type SystemSettings, type GamingSettings, type AISettings } from "@/state/settingsStore";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
@@ -19,7 +20,7 @@ export function GeneralSettings() {
   const exportConfig = () => {
     const s = useSettingsStore.getState();
     const backup = createBackup({
-      appVersion: "0.1.0",
+      appVersion: APP_VERSION,
       settings: { profile: s.profile, appearance: s.appearance as unknown as Record<string, unknown>, startup: s.startup as unknown as Record<string, unknown>, gaming: s.gaming as unknown as Record<string, unknown>, media: { ...s.media }, privacy: s.privacy as unknown as Record<string, unknown>, system: s.system as unknown as Record<string, unknown>, ai: s.ai as unknown as Record<string, unknown>, shortcuts: s.shortcuts as unknown as Record<string, unknown> },
       processPrefs: useProcessPrefsStore.getState().prefs,
       trackedAchievements: useGamePrefsStore.getState().tracked,
@@ -79,7 +80,7 @@ export function GeneralSettings() {
   return (
     <SettingsSection title="General" description="Identity, core behavior, and configuration backup.">
       <SettingRow label="Your name" description="Used for the welcome greeting.">
-        <input value={profile.name} onChange={(e) => setProfile({ name: e.target.value })} className="h-9 w-44 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-sm text-white/85 focus:border-accent/40 focus:outline-none" />
+        <TextInput value={profile.name} onChange={(e) => setProfile({ name: e.target.value })} className="w-44" aria-label="Your name" />
       </SettingRow>
       <SettingRow label="Launch on login" description="Start NEXUS automatically after you sign in to Windows.">
         <Toggle checked={startup.launchOnLogin} onChange={(v) => setStartup({ launchOnLogin: v })} />
@@ -94,15 +95,15 @@ export function GeneralSettings() {
         <Button size="sm" variant="outline" onClick={() => setProfile({ onboardingComplete: false })}><RotateCcw size={13} /> Replay</Button>
       </SettingRow>
 
-      <div className="py-4">
-        <p className="text-sm text-white/85">Backup & restore</p>
-        <p className="mt-0.5 text-xs text-white/40">Versioned JSON with appearance, hotkeys, mode settings, process allowlist, game preferences and tracked achievements. Never includes API secrets, email credentials or private media history.</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="py-5">
+        <p className="text-[15px] text-white/85">Backup & restore</p>
+        <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-white/40">Versioned JSON with appearance, hotkeys, mode settings, process allowlist, game preferences and tracked achievements. Never includes API secrets, email credentials or private media history.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button size="sm" variant="outline" onClick={exportConfig}><Download size={13} /> Export configuration</Button>
           <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload size={13} /> Import configuration</Button>
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importConfig(f); e.target.value = ""; }} />
-          <label className="ml-2 flex items-center gap-2 text-xs text-white/45">
-            <input type="checkbox" checked={includeRoots} onChange={(e) => setIncludeRoots(e.target.checked)} className="accent-[#5ed0e6]" /> Include media root paths
+          <label className="ml-2 flex items-center gap-2 text-[12.5px] text-white/45">
+            <input type="checkbox" checked={includeRoots} onChange={(e) => setIncludeRoots(e.target.checked)} className="accent-white" /> Include media root paths
           </label>
         </div>
       </div>

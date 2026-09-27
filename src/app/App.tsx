@@ -55,6 +55,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // Suppress the WebView's generic context menu except where text editing/selection makes sense.
+    const onCtx = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, [data-selectable='true'], [contenteditable='true']")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("contextmenu", onCtx);
+    return () => window.removeEventListener("contextmenu", onCtx);
+  }, []);
+
+  useEffect(() => {
     if (!isDevBuild) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {

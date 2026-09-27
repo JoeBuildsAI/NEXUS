@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Inbox, Unplug } from "lucide-react";
-import { ScreenShell } from "@/components/layout/ScreenShell";
 import { useAsync } from "@/hooks/useAsync";
 import { getProviders } from "@/providers";
 import { useDevStore } from "@/state/devStore";
@@ -11,6 +9,7 @@ import { MessageList } from "./MessageList";
 import { MessageDetail } from "./MessageDetail";
 import { InboxSummaryPanel } from "./InboxSummaryPanel";
 import { SubscriptionsPanel } from "./SubscriptionsPanel";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Tabs, type TabItem, Button } from "@/components/ui";
 import { notify } from "@/state/toastStore";
 import { cn } from "@/lib/utils";
@@ -49,81 +48,62 @@ export function CommunicationsScreen() {
   const selected = messages.find((m) => m.id === selectedId) ?? null;
   useEffect(() => { if (selectedId && !selected) setSelectedId(null); }, [selectedId, selected]);
 
-  const act = async (fn: () => Promise<void>, toast?: string) => {
-    await fn();
-    if (toast) notify.neutral(toast);
-    reload();
-  };
-  const onSelect = (m: Message) => {
-    setSelectedId(m.id);
-    if (!m.read) void act(() => provider.markRead(m.id, true));
-  };
-
+  const act = async (fn: () => Promise<void>, toast?: string) => { await fn(); if (toast) notify.neutral(toast); reload(); };
+  const onSelect = (m: Message) => { setSelectedId(m.id); if (!m.read) void act(() => provider.markRead(m.id, true)); };
   const unread = (data ?? []).filter((m) => !m.read).length;
 
-  const accountFilter = accounts && accounts.length > 1 && (
-    <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
-      <button onClick={() => setAccount("all")} className={cn("rounded-md px-2.5 py-1 text-xs", account === "all" ? "bg-white/[0.08] text-white" : "text-white/45 hover:text-white/80")}>All accounts</button>
-      {accounts.map((a) => (
-        <button key={a.id} onClick={() => setAccount(a.id)} title={a.address} className={cn("rounded-md px-2.5 py-1 text-xs", account === a.id ? "bg-white/[0.08] text-white" : "text-white/45 hover:text-white/80")}>{a.displayName}</button>
-      ))}
-    </div>
-  );
-
   if (error && isOffline(error)) {
-    return (
-      <ScreenShell eyebrow="Unified" title="Communications">
-        <div className="flex min-h-[50vh] items-center justify-center text-center">
-          <div className="max-w-md">
-            <Unplug size={28} className="mx-auto text-white/30" />
-            <p className="mt-5 font-display text-2xl tracking-cinematic text-white/85">EMAIL DISCONNECTED</p>
-            <p className="mt-3 text-sm leading-relaxed text-white/45">No mail account is reachable. NEXUS will use the mock inbox on this machine; connect Gmail or Outlook in Integrations later.</p>
-            <Button variant="outline" className="mt-6" onClick={() => { navigate("settings"); setSection("integrations"); }}>Open Integrations</Button>
-          </div>
-        </div>
-      </ScreenShell>
-    );
+    return <EmptyState eyebrow="Communications" title="Offline" body="Connect an account when you're ready. NEXUS uses a mock inbox on this machine." action={<Button variant="outline" size="sm" onClick={() => { navigate("settings"); setSection("integrations"); }}>Integrations</Button>} />;
   }
 
   return (
-    <ScreenShell
-      eyebrow="Unified"
-      title="Communications"
-      subtitle={`${unread} unread across ${accounts?.length ?? 1} account${(accounts?.length ?? 1) === 1 ? "" : "s"}`}
-      wide
-      actions={<div className="flex flex-wrap items-center gap-2">{accountFilter}<Tabs tabs={TABS} value={filter} onChange={setFilter} /></div>}
-    >
-      {filter === "subscriptions" ? (
-        <SubscriptionsPanel />
-      ) : (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(360px,1fr)_1.4fr]">
-          <div className="flex min-h-0 flex-col gap-6">
-            <InboxSummaryPanel />
-            <div className="min-h-[50vh]">
-              {loading && !data ? (
-                <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-white/[0.02]" />)}</div>
-              ) : messages.length === 0 ? (
-                <div className="flex h-48 flex-col items-center justify-center gap-2 text-white/30">
-                  <Inbox size={26} />
-                  <p className="text-sm">Nothing here</p>
-                </div>
-              ) : (
-                <MessageList messages={messages} selectedId={selectedId} onSelect={onSelect} />
-              )}
+    <div className="flex h-full flex-col">
+      <div className="mx-auto flex w-full max-w-[1880px] flex-wrap items-end justify-between gap-6 px-12 pb-8 pt-10 2xl:px-16">
+        <div className="flex items-end gap-10">
+          <div>
+            <p className="text-micro tracking-cinematic text-white/35">Communications</p>
+            <h1 className="mt-3 font-display text-display-lg font-semibold tabular text-white">{unread}<span className="ml-3 font-sans text-base font-normal text-white/40">unread</span></h1>
+          </div>
+          <Tabs tabs={TABS} value={filter} onChange={setFilter} className="pb-2" />
+        </div>
+        {accounts && accounts.length > 1 && (
+          <div className="flex gap-5 pb-2 text-[12.5px]">
+            <button onClick={() => setAccount("all")} className={cn("transition-colors", account === "all" ? "text-white" : "text-white/35 hover:text-white/70")}>All accounts</button>
+            {accounts.map((a) => <button key={a.id} onClick={() => setAccount(a.id)} title={a.address} className={cn("transition-colors", account === a.id ? "text-white" : "text-white/35 hover:text-white/70")}>{a.displayName}</button>)}
+          </div>
+        )}
+      </div>
+
+      <div className="mx-auto min-h-0 w-full max-w-[1880px] flex-1 overflow-y-auto px-12 pb-16 2xl:px-16">
+        {filter === "subscriptions" ? (
+          <SubscriptionsPanel />
+        ) : (
+          <div className="grid grid-cols-1 gap-x-20 gap-y-10 lg:grid-cols-[minmax(380px,0.9fr)_1.3fr]">
+            <div className="space-y-10">
+              <InboxSummaryPanel />
+              <div>
+                <div className="rule mb-1" />
+                {loading && !data ? (
+                  <div className="space-y-2 pt-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-sm bg-white/[0.015]" />)}</div>
+                ) : messages.length === 0 ? (
+                  <p className="py-16 text-center text-micro text-white/30">Nothing here</p>
+                ) : (
+                  <MessageList messages={messages} selectedId={selectedId} onSelect={onSelect} />
+                )}
+              </div>
+            </div>
+            <div className="lg:sticky lg:top-0 lg:max-h-[calc(100vh-220px)]">
+              <MessageDetail
+                message={selected}
+                onMarkUnread={(m) => act(() => provider.markRead(m.id, false), "Marked unread")}
+                onArchive={(m) => { setSelectedId(null); void act(() => provider.archive(m.id), "Archived"); }}
+                onDelete={(m) => { setSelectedId(null); void act(() => provider.delete(m.id), "Deleted"); }}
+                onUnsubscribe={(m) => { setSelectedId(null); void act(() => provider.unsubscribe(m.id), `Unsubscribed · ${m.sender}`); }}
+              />
             </div>
           </div>
-
-          <div className="lg:sticky lg:top-0 lg:h-[calc(100vh-200px)]">
-            <MessageDetail
-              message={selected}
-              onMarkUnread={(m) => act(() => provider.markRead(m.id, false), "Marked unread")}
-              onArchive={(m) => { setSelectedId(null); void act(() => provider.archive(m.id), "Archived"); }}
-              onDelete={(m) => { setSelectedId(null); void act(() => provider.delete(m.id), "Deleted"); }}
-              onUnsubscribe={(m) => { setSelectedId(null); void act(() => provider.unsubscribe(m.id), `Unsubscribed from ${m.sender}`); }}
-            />
-          </div>
-        </div>
-      )}
-    </ScreenShell>
+        )}
+      </div>
+    </div>
   );
 }

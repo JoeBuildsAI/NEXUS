@@ -140,9 +140,10 @@ pub fn discover() -> SteamRaw {
 #[tauri::command]
 pub fn steam_discover(app: tauri::AppHandle) -> Result<SteamRaw, String> {
     let raw = discover();
-    // Allow the WebView to load Steam's local artwork cache (images only, one dir).
+    // Allow the WebView to load Steam's local artwork cache. Newer clients nest
+    // per-app folders (librarycache/<appid>/...), so the grant must be recursive.
     if let Some(cache) = &raw.artwork_cache_dir {
-        let _ = tauri::Manager::asset_protocol_scope(&app).allow_directory(Path::new(cache), false);
+        let _ = tauri::Manager::asset_protocol_scope(&app).allow_directory(Path::new(cache), true);
     }
     Ok(raw)
 }

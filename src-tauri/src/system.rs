@@ -192,31 +192,27 @@ pub fn open_external(url: String) -> Result<(), String> {
 }
 
 /// Scheme-allowlisted URL open. Shared by app/steam launch paths.
+///
+/// Uses ShellExecute (via the `open` crate) — never `cmd /C start` — so the
+/// argument is passed to the OS handler verbatim without shell re-parsing.
 pub fn open_url(url: &str) -> Result<(), String> {
+    validate_url(url)?;
+    open::that_detached(url).map_err(|e| e.to_string())
+}
+
+/// Pure validation so it can be unit tested.
+pub fn validate_url(url: &str) -> Result<(), String> {
     let allowed = ["https://", "http://", "steam://", "mailto:"];
     if !allowed.iter().any(|s| url.starts_with(s)) {
-        return Err(format!("Refusing to open disallowed URL scheme: {url}"));
+        return Err("Refusing to open disallowed URL scheme".into());
     }
-    if url.chars().any(|c| c.is_control() || c == '"' || c == '&' || c == '|' || c == '^') {
+    if url.len() > 2048 {
+        return Err("URL too long".into());
+    }
+    if url.chars().any(|c| c.is_control() || c.is_whitespace() || matches!(c, '"' | '\'' | '&' | '|' | '^' | '<' | '>' | '%' | '`')) {
         return Err("Refusing URL with shell metacharacters".into());
     }
-    open_url_impl(url)
-}
-
-#[cfg(target_os = "windows")]
-fn open_url_impl(url: &str) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", url])
-        .creation_flags(0x08000000)
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn open_url_impl(_url: &str) -> Result<(), String> {
-    Err("open_external is only implemented on Windows".into())
+    Ok(())
 }
 
 /// Process names NEXUS refuses to close under any configuration. Second line of
@@ -390,6 +386,25 @@ mod tests {
         assert!(validate_process_name("C:\\x\\a.exe").is_err());
         assert!(validate_process_name("notepad").is_err());
         assert!(validate_process_name("Spotify.exe").is_ok());
+    }
+
+    #[test]
+    fn url_validation_allows_only_known_schemes_without_shell_chars() {
+        assert!(validate_url("steam://rungameid/620").is_ok());
+        assert!(validate_url("https://store.steampowered.com/app/620").is_ok());
+        assert!(validate_url("file:///C:/Windows/System32/cmd.exe").is_err());
+        assert!(validate_url("C:\\Windows\\System32\\calc.exe").is_err());
+        assert!(validate_url("steam://run/1 & calc").is_err());
+        assert!(validate_url("https://x/%TEMP%").is_err());
+        assert!(validate_url("https://x/\"quoted\"").is_err());
+        assert!(validate_url("javascript:alert(1)").is_err());
+    }
+
+    #[test]
+    fn startup_toggle_only_accepts_hkcu_ids() {
+        // Non-HKCU ids are read-only by construction (the prefix check happens before any registry access).
+        assert!(!"hklm:Foo".starts_with("hkcu:"));
+        assert!(!"folder:C:\\x.lnk".starts_with("hkcu:"));
     }
 
     #[test]

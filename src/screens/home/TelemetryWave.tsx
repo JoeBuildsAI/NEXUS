@@ -1,16 +1,19 @@
 import { useEffect, useRef } from "react";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useModeStore } from "@/state/modeStore";
 
 /**
- * Wide, ambient real-time telemetry visualization: CPU and memory history drawn
- * as soft layered waves with a moving scan cursor. Canvas, rAF-only while
- * visible, respects reduced motion (static render).
+ * Ambient telemetry: CPU / memory / GPU history as thin white lines with a
+ * slow scan line. Canvas; rAF only while visible and not in a game session;
+ * static render under reduced motion.
  */
-export function TelemetryWave({ height = 110 }: { height?: number }) {
+export function TelemetryWave({ height = 120 }: { height?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const history = useTelemetryStore((s) => s.history);
   const reduced = useSettingsStore((s) => s.appearance.reducedMotion || !s.appearance.telemetryAnimation);
+  const gameRunning = useModeStore((s) => s.gameRunning);
+  const still = reduced || gameRunning;
   const histRef = useRef(history);
   histRef.current = history;
 
@@ -35,62 +38,58 @@ export function TelemetryWave({ height = 110 }: { height?: number }) {
 
       const hist = histRef.current;
       const series = [
-        { data: hist.map((x) => x.cpu.usagePercent), color: "94,208,230", alpha: 0.9 },
-        { data: hist.map((x) => x.memory.usagePercent), color: "94,230,161", alpha: 0.55 },
-        { data: hist.map((x) => x.gpu?.usagePercent ?? 0), color: "159,140,255", alpha: 0.45 },
+        { data: hist.map((x) => x.cpu.usagePercent), alpha: 0.85, width: 1.25 },
+        { data: hist.map((x) => x.memory.usagePercent), alpha: 0.35, width: 1 },
+        { data: hist.map((x) => x.gpu?.usagePercent ?? 0), alpha: 0.2, width: 1 },
       ];
 
-      // Baseline grid
-      ctx.strokeStyle = "rgba(255,255,255,0.04)";
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
       ctx.lineWidth = 1;
-      for (const y of [0.25, 0.5, 0.75]) {
+      for (const y of [0.5]) {
         ctx.beginPath();
         ctx.moveTo(0, h * y);
         ctx.lineTo(w, h * y);
         ctx.stroke();
       }
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.beginPath();
+      ctx.moveTo(0, h - 0.5);
+      ctx.lineTo(w, h - 0.5);
+      ctx.stroke();
 
       const N = 60;
       for (const s of series) {
         if (s.data.length < 2) continue;
         const pts = s.data.slice(-N);
-        const step = w / (N - 1);
-        const offset = N - pts.length;
+        // Spread whatever history exists across the full width; the line
+        // densifies as the buffer fills rather than creeping in from the right.
+        const step = w / (pts.length - 1);
+        const offset = 0;
         ctx.beginPath();
         pts.forEach((v, i) => {
           const x = (i + offset) * step;
-          const y = h - (Math.min(100, v) / 100) * (h * 0.85) - h * 0.05;
+          const y = h - (Math.min(100, v) / 100) * (h * 0.82) - h * 0.04;
           if (i === 0) ctx.moveTo(x, y);
           else {
             const px = (i - 1 + offset) * step;
             const pv = pts[i - 1]!;
-            const py = h - (Math.min(100, pv) / 100) * (h * 0.85) - h * 0.05;
+            const py = h - (Math.min(100, pv) / 100) * (h * 0.82) - h * 0.04;
             const cx = (px + x) / 2;
             ctx.bezierCurveTo(cx, py, cx, y, x, y);
           }
         });
-        ctx.strokeStyle = `rgba(${s.color},${s.alpha})`;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = `rgba(${s.color},0.6)`;
-        ctx.shadowBlur = 10;
+        ctx.strokeStyle = `rgba(255,255,255,${s.alpha})`;
+        ctx.lineWidth = s.width;
         ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Fill
-        const grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, `rgba(${s.color},${0.18 * s.alpha})`);
-        grad.addColorStop(1, `rgba(${s.color},0)`);
-        ctx.lineTo(w, h);
-        ctx.lineTo(offset * step, h);
-        ctx.closePath();
-        ctx.fillStyle = grad;
-        ctx.fill();
       }
 
-      // Scan cursor
-      if (!reduced) {
-        const x = (t % 900) / 900 * w;
-        ctx.fillStyle = "rgba(94,208,230,0.18)";
+      if (!still) {
+        const x = ((t % 1400) / 1400) * w;
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, "rgba(255,255,255,0)");
+        g.addColorStop(0.5, "rgba(255,255,255,0.09)");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
         ctx.fillRect(x, 0, 1, h);
         t += 1;
         raf = requestAnimationFrame(draw);
@@ -103,29 +102,28 @@ export function TelemetryWave({ height = 110 }: { height?: number }) {
       else draw();
     };
     document.addEventListener("visibilitychange", onVis);
-    const ro = new ResizeObserver(() => { if (reduced) draw(); });
+    const ro = new ResizeObserver(() => still && draw());
     ro.observe(canvas);
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVis);
       ro.disconnect();
     };
-  }, [reduced]);
+  }, [still]);
 
-  // Re-render statically on new data when reduced.
+  // Static re-render on new samples when not animating.
   useEffect(() => {
-    if (!reduced) return;
-    const c = ref.current;
-    if (c) c.dispatchEvent(new Event("resize"));
-  }, [history.length, reduced]);
+    if (!still) return;
+    ref.current?.dispatchEvent(new Event("resize"));
+  }, [history.length, still]);
 
   return (
     <div className="relative w-full" style={{ height }}>
       <canvas ref={ref} className="h-full w-full" />
-      <div className="pointer-events-none absolute left-0 top-0 flex gap-4 text-[10px] uppercase tracking-wide2">
-        <span className="text-accent/70">CPU</span>
-        <span className="text-status-nominal/70">Memory</span>
-        <span className="text-[#9f8cff]/70">GPU</span>
+      <div className="pointer-events-none absolute left-0 top-0 flex gap-4 text-micro">
+        <span className="text-white/60">CPU</span>
+        <span className="text-white/35">Memory</span>
+        <span className="text-white/25">GPU</span>
       </div>
     </div>
   );

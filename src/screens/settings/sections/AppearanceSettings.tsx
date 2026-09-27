@@ -9,27 +9,22 @@ export function AppearanceSettings() {
   const { appearance, setAppearance } = useSettingsStore();
   return (
     <SettingsSection title="Appearance" description="Environment, motion and glass.">
-      <div className="py-4">
-        <p className="text-sm text-white/85">Environment</p>
-        <p className="mt-0.5 text-xs text-white/40">The ambient scene behind everything. Modes subtly shift its energy.</p>
-        <div className="mt-4 grid grid-cols-5 gap-2.5">
+      <div className="py-5">
+        <p className="text-[15px] text-white/85">Environment</p>
+        <p className="mt-1 text-[13px] text-white/40">The ambient scene behind everything. Modes shift its energy; Media blacks it out.</p>
+        <div className="mt-5 grid grid-cols-5 gap-3">
           {(Object.keys(ENVIRONMENTS) as EnvironmentPreset[]).map((key) => {
             const env = ENVIRONMENTS[key];
             const active = appearance.environment === key;
             return (
-              <button
-                key={key}
-                onClick={() => setAppearance({ environment: key })}
-                title={env.description}
-                className={cn("group relative overflow-hidden rounded-xl border p-2.5 text-left transition-all", active ? "border-accent/50 shadow-glow-sm" : "border-white/[0.08] hover:border-white/20")}
-              >
-                <div className="relative h-14 overflow-hidden rounded-md" style={{ background: `radial-gradient(120% 90% at 50% 0%, ${env.base[0]}, ${env.base[1]} 55%, ${env.base[2]})` }}>
+              <button key={key} onClick={() => setAppearance({ environment: key })} title={env.description} aria-pressed={active} className="group text-left">
+                <div className={cn("relative h-16 overflow-hidden rounded-sm bg-black transition-shadow duration-300", active ? "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7)]" : "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] group-hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]")} style={{ background: `radial-gradient(120% 90% at 50% 0%, ${env.base[0]}, ${env.base[1]} 55%, ${env.base[2]})` }}>
                   {env.lights.slice(0, 2).map((c, i) => (
-                    <span key={i} className="absolute h-10 w-10 rounded-full blur-md" style={{ background: c, left: `${20 + i * 40}%`, top: `${30 + i * 20}%`, opacity: 3 }} />
+                    <span key={i} className="absolute h-12 w-12 rounded-full blur-lg" style={{ background: c, left: `${15 + i * 45}%`, top: `${20 + i * 25}%`, opacity: 4 }} />
                   ))}
+                  {active && <Check size={11} className="absolute right-1.5 top-1.5 text-white" />}
                 </div>
-                <p className="mt-2 text-[11px] font-medium tracking-wide2 text-white/80">{env.label}</p>
-                {active && <Check size={12} className="absolute right-2 top-2 text-accent" />}
+                <p className={cn("mt-2 text-micro transition-colors", active ? "text-white" : "text-white/40 group-hover:text-white/70")}>{env.label}</p>
               </button>
             );
           })}

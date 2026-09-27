@@ -4,98 +4,100 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Deep charcoal / black cinematic base
+        // NEXUS BLACK — the environment is black; hierarchy comes from luminance.
         void: {
-          DEFAULT: "#05070a",
-          950: "#05070a",
-          900: "#0a0d12",
-          850: "#0e1218",
-          800: "#12171f",
-          700: "#1a212b",
-          600: "#242e3b",
+          DEFAULT: "#000000",
+          950: "#000000",
+          900: "#050505",
+          850: "#080808",
+          800: "#0b0b0c",
+          700: "#0e0e10",
+          600: "#111113",
+          500: "#16161a",
         },
-        // Restrained accent — a cool, expensive cyan-steel
+        surface: {
+          0: "#000000",
+          1: "#080808",
+          2: "#0e0e10",
+          3: "#141416",
+          4: "#1a1a1e",
+        },
+        // Accent is restrained: a cool platinum. Used sparingly for focus/active.
         accent: {
-          DEFAULT: "#5ed0e6",
-          50: "#eafafd",
-          100: "#c9f1f8",
-          200: "#9fe6f2",
-          300: "#6fd7e9",
-          400: "#5ed0e6",
-          500: "#38b4cf",
-          600: "#2790a8",
-          700: "#226f82",
-          800: "#204e5c",
-          900: "#1c3742",
+          DEFAULT: "#cfd6dd",
+          50: "#f7f8fa",
+          100: "#eef1f4",
+          200: "#dfe4e9",
+          300: "#cfd6dd",
+          400: "#b4bdc7",
+          500: "#8f9aa6",
+          600: "#6b7682",
+          700: "#4d5661",
+          800: "#343a42",
+          900: "#22262c",
         },
-        // Warm secondary accent for gaming / energy states
+        // Warm highlight reserved for gaming/achievement moments.
         ember: {
-          DEFAULT: "#e6a15e",
-          400: "#e6a15e",
-          500: "#d4863b",
-        },
-        glass: {
-          border: "rgba(255,255,255,0.08)",
-          surface: "rgba(255,255,255,0.04)",
+          DEFAULT: "#d9a066",
+          400: "#d9a066",
+          500: "#c48a4f",
         },
         status: {
-          nominal: "#5ee6a1",
-          attention: "#e6cf5e",
-          warning: "#e6a15e",
-          critical: "#e65e6f",
+          nominal: "#9fd6b0",
+          attention: "#d8b866",
+          warning: "#d9a066",
+          critical: "#d96b6b",
         },
       },
       fontFamily: {
-        sans: [
-          "Inter",
-          "SF Pro Display",
-          "Segoe UI",
-          "system-ui",
-          "sans-serif",
-        ],
-        mono: ["JetBrains Mono", "SF Mono", "Consolas", "monospace"],
+        sans: ["Inter", "Segoe UI", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "Consolas", "monospace"],
         display: ["Space Grotesk", "Inter", "Segoe UI", "sans-serif"],
       },
-      letterSpacing: {
-        cinematic: "0.35em",
-        wide2: "0.15em",
+      fontSize: {
+        // Editorial display scale
+        "display-xl": ["clamp(3rem, 5.5vw, 5.5rem)", { lineHeight: "0.95", letterSpacing: "0.02em" }],
+        "display-lg": ["clamp(2.25rem, 3.6vw, 3.5rem)", { lineHeight: "1", letterSpacing: "0.02em" }],
+        "display-md": ["clamp(1.6rem, 2.2vw, 2.25rem)", { lineHeight: "1.05", letterSpacing: "0.01em" }],
+        "display-sm": ["1.375rem", { lineHeight: "1.15" }],
+        micro: ["0.6875rem", { lineHeight: "1.2", letterSpacing: "0.08em" }],
       },
-      backdropBlur: {
-        xs: "2px",
+      letterSpacing: {
+        cinematic: "0.32em",
+        wide2: "0.14em",
+        wide3: "0.22em",
+      },
+      borderRadius: {
+        none: "0",
+        sm: "3px",
+        DEFAULT: "6px",
+        md: "6px",
+        lg: "10px",
+        xl: "14px",
+        "2xl": "18px",
+        "3xl": "22px",
       },
       boxShadow: {
-        glow: "0 0 40px -12px rgba(94,208,230,0.35)",
-        "glow-sm": "0 0 20px -8px rgba(94,208,230,0.3)",
-        panel: "0 20px 60px -20px rgba(0,0,0,0.7)",
-        "inset-line": "inset 0 1px 0 0 rgba(255,255,255,0.06)",
+        // Occlusion, not glow.
+        occlude: "0 30px 80px -30px rgba(0,0,0,0.9), 0 8px 24px -12px rgba(0,0,0,0.8)",
+        lift: "0 12px 40px -18px rgba(0,0,0,0.85)",
+        glow: "0 0 0 1px rgba(255,255,255,0.06)",
+        "glow-sm": "0 0 0 1px rgba(255,255,255,0.05)",
+        panel: "0 20px 60px -20px rgba(0,0,0,0.85)",
+        "inset-line": "inset 0 1px 0 0 rgba(255,255,255,0.05)",
       },
       keyframes: {
-        "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        "scan": {
-          "0%": { transform: "translateY(-100%)" },
-          "100%": { transform: "translateY(100%)" },
-        },
-        "pulse-slow": {
-          "0%, 100%": { opacity: "0.4" },
-          "50%": { opacity: "1" },
-        },
-        "float": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
-        "shimmer": {
-          "100%": { transform: "translateX(100%)" },
-        },
+        "fade-in": { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
+        "pulse-slow": { "0%, 100%": { opacity: "0.4" }, "50%": { opacity: "1" } },
+        shimmer: { "100%": { transform: "translateX(100%)" } },
       },
       animation: {
         "fade-in": "fade-in 0.6s ease-out",
-        scan: "scan 4s linear infinite",
         "pulse-slow": "pulse-slow 3s ease-in-out infinite",
-        float: "float 6s ease-in-out infinite",
         shimmer: "shimmer 2s infinite",
+      },
+      transitionTimingFunction: {
+        nexus: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },
