@@ -1,0 +1,219 @@
+import type { GameDetails, Achievement } from "@/core/types";
+
+const now = Date.now();
+const min = 60 * 1000;
+const hour = 60 * min;
+const day = 24 * hour;
+
+function ach(
+  id: string,
+  name: string,
+  description: string,
+  unlocked: boolean,
+  globalPercent: number,
+  hidden = false,
+  unlockedDaysAgo?: number,
+): Achievement {
+  return {
+    id,
+    name,
+    description,
+    unlocked,
+    unlockedAt: unlocked ? now - (unlockedDaysAgo ?? 3) * day : null,
+    globalPercent,
+    iconUrl: null,
+    hidden,
+  };
+}
+
+/**
+ * Realistic demo game library. Kept behind the provider layer — never import
+ * this directly into UI components.
+ */
+export const DEMO_GAMES: readonly GameDetails[] = [
+  {
+    id: "wwht",
+    title: "We Were Here Too",
+    steamAppId: 864050,
+    launcher: "steam",
+    installed: true,
+    installSizeBytes: 3.2 * 1024 ** 3,
+    playtimeMinutes: 14 * 60 + 25,
+    lastPlayed: now - 6 * hour,
+    coverColor: "#2a3d5c",
+    heroColor: "#16283f",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["Co-op", "Puzzle", "Adventure"],
+    developer: "Total Mayhem Games",
+    publisher: "Total Mayhem Games",
+    summary:
+      "A co-op puzzle adventure of miscommunication set in a frozen castle. Two players must escape by solving asymmetric puzzles using only their voices.",
+    achievements: {
+      gameId: "wwht",
+      unlocked: 17,
+      total: 20,
+      achievements: [
+        ach("wwht_1", "First Contact", "Establish communication with your partner.", true, 82, false, 20),
+        ach("wwht_2", "The Library", "Escape the library.", true, 64, false, 14),
+        ach("wwht_3", "Chess Masters", "Complete the chess puzzle.", true, 41, false, 9),
+        ach("wwht_4", "The Throne", "Reach the throne room.", true, 33, false, 2),
+        ach("wwht_5", "Kings & Pawns", "Win as the King.", false, 22, false),
+        ach("wwht_6", "Perfect Harmony", "Finish without a single miscommunication.", false, 6, true),
+        ach("wwht_7", "Speedrunner", "Complete the game in under 90 minutes.", false, 9, false),
+      ],
+    },
+  },
+  {
+    id: "cp2077",
+    title: "Cyberpunk 2077",
+    steamAppId: 1091500,
+    launcher: "steam",
+    installed: true,
+    installSizeBytes: 112 * 1024 ** 3,
+    playtimeMinutes: 96 * 60 + 12,
+    lastPlayed: now - 3 * day,
+    coverColor: "#e6d13a",
+    heroColor: "#3a2f0a",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["RPG", "Open World", "Action"],
+    developer: "CD PROJEKT RED",
+    publisher: "CD PROJEKT RED",
+    summary:
+      "An open-world action-adventure RPG set in Night City, a megalopolis obsessed with power, glamour and body modification.",
+    achievements: {
+      gameId: "cp2077",
+      unlocked: 31,
+      total: 44,
+      achievements: [
+        ach("cp_1", "The Fool", "Complete the prologue.", true, 91, false, 40),
+        ach("cp_2", "Autojock", "Buy all vehicles.", false, 12, false),
+        ach("cp_3", "The Devil", "Reach the corporate ending.", true, 24, true, 30),
+        ach("cp_4", "Gun Fu", "Kill 3 enemies in quick succession with a pistol.", true, 58, false, 12),
+        ach("cp_5", "Breakthrough", "Complete a Breach Protocol with all daemons.", false, 19, false),
+        ach("cp_6", "The Jungle", "Reach Street Cred level 50.", false, 28, false),
+      ],
+    },
+  },
+  {
+    id: "bg3",
+    title: "Baldur's Gate 3",
+    steamAppId: 1086940,
+    launcher: "steam",
+    installed: true,
+    installSizeBytes: 138 * 1024 ** 3,
+    playtimeMinutes: 142 * 60 + 40,
+    lastPlayed: now - 1 * day,
+    coverColor: "#8c2f2f",
+    heroColor: "#2f1414",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["RPG", "Turn-Based", "Co-op"],
+    developer: "Larian Studios",
+    publisher: "Larian Studios",
+    summary:
+      "Gather your party and return to the Forgotten Realms in a tale of fellowship and betrayal, sacrifice and survival, and the lure of absolute power.",
+    achievements: {
+      gameId: "bg3",
+      unlocked: 12,
+      total: 54,
+      achievements: [
+        ach("bg3_1", "Nautiloid Escape", "Escape the nautiloid.", true, 88, false, 25),
+        ach("bg3_2", "Act One Complete", "Finish the first act.", true, 47, false, 10),
+        ach("bg3_3", "Descent Into Avernus", "Reach the second act.", true, 39, false, 4),
+        ach("bg3_4", "Critical Hit", "Land a natural 20 attack roll.", true, 72, false, 1),
+        ach("bg3_5", "The Absolute", "Complete the campaign.", false, 21, true),
+        ach("bg3_6", "Honour Mode", "Beat the game in Honour Mode.", false, 3, false),
+      ],
+    },
+  },
+  {
+    id: "hd2",
+    title: "Helldivers 2",
+    steamAppId: 553850,
+    launcher: "steam",
+    installed: true,
+    installSizeBytes: 43 * 1024 ** 3,
+    playtimeMinutes: 61 * 60,
+    lastPlayed: now - 2 * day,
+    coverColor: "#e6b13a",
+    heroColor: "#3a2c0a",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["Co-op", "Shooter", "Action"],
+    developer: "Arrowhead Game Studios",
+    publisher: "PlayStation Publishing",
+    summary:
+      "A galaxy-spanning war for freedom and managed democracy. Spread liberty across the galaxy as an elite Helldiver in explosive co-op combat.",
+    achievements: {
+      gameId: "hd2",
+      unlocked: 23,
+      total: 35,
+      achievements: [
+        ach("hd2_1", "Boot Camp", "Complete training.", true, 96, false, 30),
+        ach("hd2_2", "Liberty!", "Liberate your first planet.", true, 71, false, 20),
+        ach("hd2_3", "Democracy Officer", "Reach level 20.", true, 44, false, 6),
+        ach("hd2_4", "Bug Hunter", "Kill 1000 Terminids.", false, 33, false),
+        ach("hd2_5", "For Super Earth", "Complete a Helldive difficulty mission.", false, 14, false),
+      ],
+    },
+  },
+  {
+    id: "eldenring",
+    title: "Elden Ring",
+    steamAppId: 1245620,
+    launcher: "steam",
+    installed: false,
+    installSizeBytes: null,
+    playtimeMinutes: 87 * 60 + 30,
+    lastPlayed: now - 21 * day,
+    coverColor: "#c9a227",
+    heroColor: "#2b230a",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["Souls-like", "RPG", "Open World"],
+    developer: "FromSoftware",
+    publisher: "Bandai Namco",
+    summary:
+      "A vast fantasy action-RPG adventure set in the Lands Between. Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring.",
+    achievements: {
+      gameId: "eldenring",
+      unlocked: 28,
+      total: 42,
+      achievements: [
+        ach("er_1", "Shardbearer Godrick", "Defeat Godrick the Grafted.", true, 61, false, 40),
+        ach("er_2", "Elden Lord", "Achieve the 'Elden Lord' ending.", false, 24, true),
+        ach("er_3", "Legendary Armaments", "Acquire all legendary armaments.", false, 9, false),
+      ],
+    },
+  },
+  {
+    id: "portal2",
+    title: "Portal 2",
+    steamAppId: 620,
+    launcher: "steam",
+    installed: false,
+    installSizeBytes: null,
+    playtimeMinutes: 22 * 60,
+    lastPlayed: now - 60 * day,
+    coverColor: "#2f6ea8",
+    heroColor: "#0f2438",
+    coverUrl: null,
+    heroUrl: null,
+    genres: ["Puzzle", "Co-op", "First-Person"],
+    developer: "Valve",
+    publisher: "Valve",
+    summary:
+      "The highly anticipated sequel to the award-winning Portal, featuring a full co-operative campaign and a wealth of single-player puzzles.",
+    achievements: {
+      gameId: "portal2",
+      unlocked: 51,
+      total: 51,
+      achievements: [
+        ach("p2_1", "Wake Up Call", "Survive the manual override.", true, 89, false, 70),
+        ach("p2_2", "Professor Portal", "Complete co-op course 6.", true, 42, false, 65),
+      ],
+    },
+  },
+];
