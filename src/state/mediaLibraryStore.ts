@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isObj, isStr, safeStorage, vArr } from "./persistence";
 import type { AuthorizedRoot, MediaScanProgress, Playability } from "@/core/types";
 
 /**
@@ -96,9 +97,21 @@ export const useMediaLibraryStore = create<MediaLibraryState>()(
     }),
     {
       name: "nexus-media-library",
+      storage: safeStorage(),
       version: 1,
       partialize: (s) => ({ roots: s.roots, files: s.files, favorites: s.favorites, collections: s.collections }),
-      merge: (persisted, current) => ({ ...current, ...((persisted ?? {}) as Partial<MediaLibraryState>), scan: null, unavailable: [] }),
+      merge: (persisted, current) => {
+        const p = isObj(persisted) ? persisted : {};
+        return {
+          ...current,
+          roots: vArr(p.roots, (x): x is AuthorizedRoot => isObj(x) && typeof x.id === "string" && typeof x.path === "string", [], 50),
+          files: vArr(p.files, (x): x is IndexedFile => isObj(x) && typeof x.id === "string" && typeof x.path === "string" && typeof x.rootId === "string", [], 50_000),
+          favorites: vArr(p.favorites, isStr, [], 5000),
+          collections: vArr(p.collections, (x): x is LocalCollection => isObj(x) && typeof x.id === "string" && typeof x.name === "string" && Array.isArray(x.itemIds), [], 200),
+          scan: null,
+          unavailable: [],
+        };
+      },
     },
   ),
 );

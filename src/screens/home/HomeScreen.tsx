@@ -31,10 +31,13 @@ const TONE_TEXT = {
 export function HomeScreen() {
   const now = useClock();
   const name = useSettingsStore((s) => s.profile.name) || "Joseph";
+  const subtitle = useSettingsStore((s) => s.profile.subtitle);
+  const clockFormat = useSettingsStore((s) => s.profile.clockFormat);
   const health = useTelemetryStore((s) => s.snapshot?.health);
   const meta = health ? HEALTH_META[health] : null;
 
-  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: clockFormat === "12h" }).replace(/s?[AP]M$/i, "");
+  const meridiem = clockFormat === "12h" ? (now.getHours() >= 12 ? "PM" : "AM") : null;
   const date = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }).toUpperCase().replace(",", " ·");
 
   return (
@@ -47,6 +50,7 @@ export function HomeScreen() {
             <h1 className="mt-4 font-display text-display-xl font-semibold text-white text-glow">
               WELCOME, {name.toUpperCase()}
             </h1>
+            {subtitle && <p className="mt-4 max-w-xl text-[15px] text-white/45">{subtitle}</p>}
             <div className="mt-8 flex items-baseline gap-4">
               <span className="font-display text-[13px] font-semibold tracking-[0.34em] text-white/50">NEXUS</span>
               <span className="h-3 w-px bg-white/15" />
@@ -56,7 +60,7 @@ export function HomeScreen() {
             </div>
           </div>
           <div className="flex flex-col items-start gap-4 lg:items-end">
-            <p className="font-mono text-display-xl font-light leading-none tabular tracking-tight text-white">{time}</p>
+            <p className="font-mono text-display-xl font-light leading-none tabular tracking-tight text-white">{time}{meridiem && <span className="ml-3 text-base text-white/35">{meridiem}</span>}</p>
             <p className="text-micro tracking-wide3 text-white/40">{date}</p>
             <div className="mt-2"><ModeSwitcher /></div>
           </div>

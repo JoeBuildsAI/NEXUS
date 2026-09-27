@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { safeStorage } from "./persistence";
 
 /**
  * User-defined handling for a USER application process.
@@ -44,6 +45,7 @@ export const useProcessPrefsStore = create<ProcessPrefsState>()(
     }),
     {
       name: "nexus-process-prefs",
+      storage: safeStorage(),
       version: 2,
       migrate: (persisted) => {
         const p = persisted as { prefs?: Record<string, string> };

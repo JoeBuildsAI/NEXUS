@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isObj, safeStorage, vArr } from "./persistence";
 
 export interface TrackedAchievement {
   gameId: string;
@@ -27,6 +28,13 @@ export const useGamePrefsStore = create<GamePrefsState>()(
       isTracked: (achievementId) => get().tracked.some((x) => x.achievementId === achievementId),
       trackedFor: (gameId) => get().tracked.find((x) => x.gameId === gameId),
     }),
-    { name: "nexus-game-prefs" },
+    {
+      name: "nexus-game-prefs",
+      storage: safeStorage(),
+      merge: (persisted, current) => ({
+        ...current,
+        tracked: vArr((persisted as { tracked?: unknown } | undefined)?.tracked, (x): x is TrackedAchievement => isObj(x) && typeof x.gameId === "string" && typeof x.achievementId === "string" && typeof x.name === "string" && typeof x.gameTitle === "string", [], 50),
+      }),
+    },
   ),
 );

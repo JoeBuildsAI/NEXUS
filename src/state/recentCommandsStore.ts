@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isObj, safeStorage, vArr } from "./persistence";
 import type { AssistantMatch } from "@/providers/assistant/AssistantProvider";
 
 export type RecentCommand = Omit<AssistantMatch, "confidence"> & { usedAt: number };
@@ -25,6 +26,13 @@ export const useRecentCommandsStore = create<RecentCommandsState>()(
         }),
       clear: () => set({ recents: [] }),
     }),
-    { name: "nexus-recent-commands" },
+    {
+      name: "nexus-recent-commands",
+      storage: safeStorage(),
+      merge: (persisted, current) => ({
+        ...current,
+        recents: vArr((persisted as { recents?: unknown } | undefined)?.recents, (x): x is RecentCommand => isObj(x) && typeof x.actionId === "string" && typeof x.label === "string", [], 20),
+      }),
+    },
   ),
 );

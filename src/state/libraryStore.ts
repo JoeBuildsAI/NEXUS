@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isObj, safeStorage } from "./persistence";
 import type { Game, GameDetails } from "@/core/types";
 import { getProviders } from "@/providers";
 import { isOffline } from "@/core/errors";
@@ -145,9 +146,21 @@ export const useLibraryStore = create<LibraryState>()(
     }),
     {
       name: "nexus-library-cache",
+      storage: safeStorage(),
       version: 1,
       partialize: (s) => ({ games: s.games, details: s.details, mode: s.mode }),
-      merge: (persisted, current) => ({ ...current, ...((persisted ?? {}) as Partial<LibraryState>), loading: false, inflight: [], loadedAt: null }),
+      merge: (persisted, current) => {
+        const p = isObj(persisted) ? persisted : {};
+        return {
+          ...current,
+          games: Array.isArray(p.games) ? (p.games as Game[]).filter((g) => isObj(g) && typeof g.id === "string" && typeof g.title === "string") : [],
+          details: isObj(p.details) ? (p.details as Record<string, CachedDetails>) : {},
+          mode: p.mode === "real" ? "real" : "demo",
+          loading: false,
+          inflight: [],
+          loadedAt: null,
+        };
+      },
     },
   ),
 );

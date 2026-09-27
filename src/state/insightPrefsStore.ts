@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isStr, safeStorage, vArr, vBool } from "./persistence";
 
 interface InsightPrefsState {
   /** Insight ids the user dismissed. Cleared when the underlying state changes materially (see reset). */
@@ -20,6 +21,13 @@ export const useInsightPrefsStore = create<InsightPrefsState>()(
       reset: () => set({ dismissed: [] }),
       setEnabled: (enabled) => set({ enabled }),
     }),
-    { name: "nexus-insight-prefs" },
+    {
+      name: "nexus-insight-prefs",
+      storage: safeStorage(),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as { dismissed?: unknown; enabled?: unknown };
+        return { ...current, dismissed: vArr(p.dismissed, isStr, [], 50), enabled: vBool(p.enabled, true) };
+      },
+    },
   ),
 );

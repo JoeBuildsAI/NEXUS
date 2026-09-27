@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { safeStorage } from "./persistence";
+import { sanitizeSettings, SETTINGS_VERSION, type SettingsData } from "./settingsSchema";
 
 export type PrivacyAction = "home" | "minimize" | "tray";
 export type EnvironmentPreset = "nexus" | "void" | "aurora" | "neural" | "minimal";
@@ -8,6 +10,9 @@ export type BackgroundPerformance = "full" | "balanced" | "minimal";
 export interface ProfileSettings {
   name: string;
   onboardingComplete: boolean;
+  /** Optional one-line Home subtitle. Empty = none. */
+  subtitle: string;
+  clockFormat: "24h" | "12h";
 }
 
 export interface AppearanceSettings {
@@ -19,6 +24,8 @@ export interface AppearanceSettings {
   telemetryAnimation: boolean;
   reducedMotion: boolean;
   cursorLighting: boolean;
+  /** Explicitly selected local image shown behind the environment (asset URL), or null. */
+  backgroundImage: string | null;
 }
 
 export interface StartupSettings {
@@ -30,7 +37,7 @@ export interface StartupSettings {
 export interface GamingSettings {
   gamingModeEnabled: boolean;
   approvedBackgroundApps: string[];
-  defaultLauncher: string;
+  defaultLauncher: "steam" | "epic" | "gog" | "xbox";
 }
 
 export interface MediaSettings {
@@ -38,6 +45,10 @@ export interface MediaSettings {
   defaultColumns: number;
   defaultRows: number;
   pauseOnHide: boolean;
+  /** Generate local thumbnails (Windows Shell; cached locally only). */
+  thumbnails: boolean;
+  /** Restore the saved workspace structure on launch (never auto-plays). */
+  restoreWorkspace: boolean;
 }
 
 export interface PrivacySettings {
@@ -53,6 +64,8 @@ export interface SystemSettings {
   safety: "observe" | "enabled";
   allowStartupChanges: boolean;
   allowProcessManagement: boolean;
+  /** Keep a local, private activity history (game sessions, modes, cleanup). */
+  activityHistory: boolean;
 }
 
 export interface AISettings {
@@ -67,16 +80,12 @@ export interface ShortcutSettings {
   screenShortcutsEnabled: boolean;
 }
 
-interface SettingsState {
-  profile: ProfileSettings;
-  appearance: AppearanceSettings;
-  startup: StartupSettings;
-  gaming: GamingSettings;
-  media: MediaSettings;
-  privacy: PrivacySettings;
-  system: SystemSettings;
-  ai: AISettings;
-  shortcuts: ShortcutSettings;
+export interface WindowSettings {
+  /** What the titlebar close button does. */
+  closeBehavior: "tray" | "exit";
+}
+
+interface SettingsState extends SettingsData {
   /** Developer panel visibility (dev builds only). */
   devPanelOpen: boolean;
   setProfile: (patch: Partial<ProfileSettings>) => void;
@@ -88,6 +97,7 @@ interface SettingsState {
   setSystem: (patch: Partial<SystemSettings>) => void;
   setAI: (patch: Partial<AISettings>) => void;
   setShortcuts: (patch: Partial<ShortcutSettings>) => void;
+  setWindow: (patch: Partial<WindowSettings>) => void;
   setDevPanelOpen: (open: boolean) => void;
 }
 
@@ -100,54 +110,29 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   telemetryAnimation: true,
   reducedMotion: false,
   cursorLighting: true,
+  backgroundImage: null,
+};
+
+export const DEFAULT_SETTINGS: SettingsData = {
+  profile: { name: "Joseph", onboardingComplete: false, subtitle: "", clockFormat: "24h" },
+  appearance: DEFAULT_APPEARANCE,
+  startup: { launchOnLogin: false, startMinimized: false, startupAnimation: true },
+  gaming: { gamingModeEnabled: true, approvedBackgroundApps: ["Spotify.exe", "Discord.exe"], defaultLauncher: "steam" },
+  media: { authorizedFolders: [], defaultColumns: 3, defaultRows: 2, pauseOnHide: true, thumbnails: false, restoreWorkspace: true },
+  privacy: { hotkey: "CommandOrControl+Shift+`", action: "home", stopPlaybackOnTrigger: true, clearWorkspaceOnTrigger: false },
+  system: { safety: "observe", allowStartupChanges: false, allowProcessManagement: false, activityHistory: true },
+  ai: { provider: "local", localCommandMode: true },
+  shortcuts: { commandPalette: "Ctrl+Space", privacy: "Ctrl+Shift+`", screenPrefix: "ctrl", screenShortcutsEnabled: true },
+  window: { closeBehavior: "tray" },
 };
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      profile: { name: "Joseph", onboardingComplete: false },
-      appearance: DEFAULT_APPEARANCE,
-      startup: {
-        launchOnLogin: false,
-        startMinimized: false,
-        startupAnimation: true,
-      },
-      gaming: {
-        gamingModeEnabled: true,
-        approvedBackgroundApps: ["Spotify.exe", "Discord.exe"],
-        defaultLauncher: "steam",
-      },
-      media: {
-        authorizedFolders: [],
-        defaultColumns: 3,
-        defaultRows: 2,
-        pauseOnHide: true,
-      },
-      privacy: {
-        hotkey: "CommandOrControl+Shift+`",
-        action: "home",
-        stopPlaybackOnTrigger: true,
-        clearWorkspaceOnTrigger: false,
-      },
-      system: {
-        safety: "observe",
-        allowStartupChanges: false,
-        allowProcessManagement: false,
-      },
-      ai: {
-        provider: "local",
-        localCommandMode: true,
-      },
-      shortcuts: {
-        commandPalette: "Ctrl+Space",
-        privacy: "Ctrl+Shift+`",
-        screenPrefix: "ctrl",
-        screenShortcutsEnabled: true,
-      },
+      ...DEFAULT_SETTINGS,
       devPanelOpen: false,
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
-      setAppearance: (patch) =>
-        set((s) => ({ appearance: { ...s.appearance, ...patch } })),
+      setAppearance: (patch) => set((s) => ({ appearance: { ...s.appearance, ...patch } })),
       setStartup: (patch) => set((s) => ({ startup: { ...s.startup, ...patch } })),
       setGaming: (patch) => set((s) => ({ gaming: { ...s.gaming, ...patch } })),
       setMedia: (patch) => set((s) => ({ media: { ...s.media, ...patch } })),
@@ -155,33 +140,20 @@ export const useSettingsStore = create<SettingsState>()(
       setSystem: (patch) => set((s) => ({ system: { ...s.system, ...patch } })),
       setAI: (patch) => set((s) => ({ ai: { ...s.ai, ...patch } })),
       setShortcuts: (patch) => set((s) => ({ shortcuts: { ...s.shortcuts, ...patch } })),
+      setWindow: (patch) => set((s) => ({ window: { ...s.window, ...patch } })),
       setDevPanelOpen: (devPanelOpen) => set({ devPanelOpen }),
     }),
     {
       name: "nexus-settings",
-      version: 2,
+      version: SETTINGS_VERSION,
+      storage: safeStorage(),
       partialize: (s) => {
-        // Never persist transient dev panel visibility.
         const { devPanelOpen: _d, ...rest } = s;
         return rest as SettingsState;
       },
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<SettingsState>;
-        return {
-          ...current,
-          ...p,
-          profile: { ...current.profile, ...p.profile },
-          appearance: { ...current.appearance, ...p.appearance },
-          startup: { ...current.startup, ...p.startup },
-          gaming: { ...current.gaming, ...p.gaming },
-          media: { ...current.media, ...p.media },
-          privacy: { ...current.privacy, ...p.privacy },
-          system: { ...current.system, ...p.system },
-          ai: { ...current.ai, ...p.ai },
-          shortcuts: { ...current.shortcuts, ...p.shortcuts },
-          devPanelOpen: false,
-        };
-      },
+      // Any persisted shape (older versions, partial, corrupted values) is coerced to valid settings.
+      migrate: (persisted) => sanitizeSettings(persisted, DEFAULT_SETTINGS) as unknown as SettingsState,
+      merge: (persisted, current) => ({ ...current, ...sanitizeSettings(persisted, DEFAULT_SETTINGS), devPanelOpen: false }),
     },
   ),
 );

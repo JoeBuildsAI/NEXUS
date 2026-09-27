@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isObj, safeStorage, vArr, vBool, vNum, vOneOf } from "./persistence";
 import type { PlayerSlot, WorkspaceLayout } from "@/core/types";
 
 export type LayoutId = "3x2" | "2x3" | "2x2-primary" | "focus";
@@ -105,6 +106,7 @@ export const useMediaStore = create<MediaState>()(
     {
       name: "nexus-media-workspace",
       version: 2,
+      storage: safeStorage(),
       // Do not persist playing state (privacy + avoids autoplay on restore).
       partialize: (s) => ({
         layout: s.layout,
@@ -116,9 +118,26 @@ export const useMediaStore = create<MediaState>()(
         slots: s.slots.map((sl) => ({ ...sl, playing: false })),
       }),
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<MediaState>;
-        const slots = Array.isArray(p.slots) && p.slots.length === SLOT_COUNT ? p.slots : current.slots;
-        return { ...current, ...p, slots, seekRequest: null };
+        const p = isObj(persisted) ? persisted : {};
+        const layout = vOneOf(p.layout, Object.keys(LAYOUTS) as LayoutId[], current.layout);
+        const rawSlots = Array.isArray(p.slots) && p.slots.length === SLOT_COUNT ? (p.slots as unknown[]) : [];
+        const slots = rawSlots.length
+          ? rawSlots.map((sl, i) => {
+              const o = isObj(sl) ? sl : {};
+              return { index: i, itemId: typeof o.itemId === "string" ? o.itemId : null, playing: false, muted: vBool(o.muted, true), volume: vNum(o.volume, 0.8, 0, 1) };
+            })
+          : current.slots;
+        return {
+          ...current,
+          layout,
+          columns: LAYOUTS[layout].columns,
+          rows: LAYOUTS[layout].rows,
+          focusIndex: vNum(p.focusIndex, 0, 0, SLOT_COUNT - 1),
+          syncPlayback: vBool(p.syncPlayback, false),
+          savedLayouts: vArr(p.savedLayouts, (x): x is WorkspaceLayout => isObj(x) && typeof x.id === "string" && typeof x.name === "string" && Array.isArray(x.slots), [], 30),
+          slots,
+          seekRequest: null,
+        };
       },
     },
   ),

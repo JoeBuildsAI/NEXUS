@@ -1,7 +1,7 @@
 import { APP_VERSION } from "@/core/version";
 import { useRef, useState } from "react";
 import { Download, RotateCcw, Upload } from "lucide-react";
-import { SettingsSection, SettingRow, TextInput } from "../SettingsControls";
+import { SettingsSection, SettingRow, TextInput, Select } from "../SettingsControls";
 import { Toggle, Button, Badge } from "@/components/ui";
 import { useSettingsStore, type AppearanceSettings, type PrivacySettings, type ShortcutSettings, type StartupSettings, type SystemSettings, type GamingSettings, type AISettings } from "@/state/settingsStore";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
@@ -81,6 +81,12 @@ export function GeneralSettings() {
     <SettingsSection title="General" description="Identity, core behavior, and configuration backup.">
       <SettingRow label="Your name" description="Used for the welcome greeting.">
         <TextInput value={profile.name} onChange={(e) => setProfile({ name: e.target.value })} className="w-44" aria-label="Your name" />
+      </SettingRow>
+      <SettingRow label="Home subtitle" description="One optional line under the greeting.">
+        <TextInput value={profile.subtitle} onChange={(e) => setProfile({ subtitle: e.target.value.slice(0, 80) })} className="w-64" placeholder="None" aria-label="Home subtitle" />
+      </SettingRow>
+      <SettingRow label="Clock" description="Time format on Home.">
+        <Select value={profile.clockFormat} onChange={(v) => setProfile({ clockFormat: v })} options={[{ value: "24h" as const, label: "24-hour" }, { value: "12h" as const, label: "12-hour" }]} />
       </SettingRow>
       <SettingRow label="Launch on login" description="Start NEXUS automatically after you sign in to Windows.">
         <Toggle checked={startup.launchOnLogin} onChange={(v) => setStartup({ launchOnLogin: v })} />
