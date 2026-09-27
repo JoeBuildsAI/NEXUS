@@ -24,7 +24,7 @@ export function MealsSection() {
   const [selectedMeal, setSelectedMeal] = useState<string | null>(null);
   const [editor, setEditor] = useState<Meal | "new" | null>(null);
   const [picker, setPicker] = useState<{ day: DayKey; slot: MealSlot; replaceEntry?: string } | null>(null);
-  useEffect(() => { if (focus?.section === "meals" && focus.id) { const e = life.mealPlan.find((x) => x.id === focus.id); if (e) setSelectedMeal(e.mealId); } }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (focus?.section === "meals" && focus.id) { const e = life.mealPlan.find((x) => x.id === focus.id); if (e) setSelectedMeal(e.mealId); else if (life.meals.some((x) => x.id === focus.id)) setSelectedMeal(focus.id); } }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const meal = life.meals.find((m) => m.id === selectedMeal) ?? null;
   const facts = useMemo(() => (meal ? mealFacts(meal, life.foods) : null), [meal, life.foods]);
 

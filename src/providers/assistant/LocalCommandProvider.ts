@@ -133,9 +133,20 @@ function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Searchable LIFE metadata (titles only — never notes, never email or media). */
+export interface LifeIndexEntry {
+  kind: "task" | "routine" | "exercise" | "workout" | "food" | "meal" | "event";
+  id: string;
+  title: string;
+  hint?: string;
+  /** Events: the day to open. */
+  day?: string;
+}
+
 export interface CommandContext {
   getApps: () => Promise<readonly AppEntry[]>;
   getGames: () => Promise<readonly Game[]>;
+  getLifeIndex?: () => readonly LifeIndexEntry[];
 }
 
 /**
@@ -188,6 +199,16 @@ export class LocalCommandProvider implements AssistantProvider {
         group: "app",
         hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : a.source === "app-paths" ? "Registered" : "Installed",
       });
+    }
+
+    // LIFE search: tasks, routines, exercises, workouts, foods, meals, events by title.
+    const SECTION: Record<LifeIndexEntry["kind"], string> = { task: "tasks", routine: "routines", exercise: "fitness", workout: "fitness", food: "nutrition", meal: "meals", event: "calendar" };
+    for (const e of this.ctx?.getLifeIndex?.() ?? []) {
+      const score = fuzzyScore(stripped, e.title);
+      if (score < 0.62) continue;
+      if (e.kind === "event") matches.push({ actionId: "open-calendar", args: { view: "day", day: e.day ?? "" }, confidence: score * 0.95, label: e.title, group: "life", hint: e.hint ?? "Event" });
+      else if (e.kind === "workout" && wantsLaunch) matches.push({ actionId: "start-workout", args: { name: e.title }, confidence: score * 0.98, label: `Start ${e.title}`, group: "life", hint: "Workout" });
+      else matches.push({ actionId: "open-life", args: { section: SECTION[e.kind], id: e.id }, confidence: score * 0.95, label: e.title, group: "life", hint: e.hint ?? e.kind.charAt(0).toUpperCase() + e.kind.slice(1) });
     }
 
     // "add task X" / "remind me to X" → create a task through the quick-add grammar.

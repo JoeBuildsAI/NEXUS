@@ -22,6 +22,23 @@ import { LocalCommandProvider } from "./assistant/LocalCommandProvider";
 import type { AppProvider } from "./apps/AppProvider";
 import { NoIntelligenceProvider, type InboxIntelligenceProvider } from "./intelligence/InboxIntelligenceProvider";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useLifeStore } from "@/state/lifeStore";
+import type { LifeIndexEntry } from "./assistant/LocalCommandProvider";
+
+/** Titles only; bounded so a 10k-task library never dominates the palette. */
+function lifeIndex(): LifeIndexEntry[] {
+  const s = useLifeStore.getState();
+  if (s.status !== "ready") return [];
+  const out: LifeIndexEntry[] = [];
+  for (const t of s.tasks) if (t.status === "open") out.push({ kind: "task", id: t.id, title: t.title, hint: t.dueDay ? `Task · ${t.dueDay}` : "Task" });
+  for (const r of s.routines) out.push({ kind: "routine", id: r.id, title: r.name, hint: "Routine" });
+  for (const e of s.exercises) out.push({ kind: "exercise", id: e.id, title: e.name, hint: "Exercise" });
+  for (const w of s.workoutTemplates) out.push({ kind: "workout", id: w.id, title: w.name, hint: "Workout" });
+  for (const f of s.foods) out.push({ kind: "food", id: f.id, title: f.name, hint: "Food" });
+  for (const m of s.meals) out.push({ kind: "meal", id: m.id, title: m.name, hint: "Meal" });
+  for (const e of s.events) if (!e.recurrence) out.push({ kind: "event", id: e.id, title: e.title, hint: `Event · ${e.day}`, day: e.day });
+  return out.slice(0, 5000);
+}
 import { MockAppProvider } from "./apps/MockAppProvider";
 import { TauriAppProvider } from "./apps/TauriAppProvider";
 
@@ -97,6 +114,7 @@ export function getProviders(): Providers {
     assistant: new LocalCommandProvider({
       getApps: () => apps.getApps(),
       getGames: () => steam.getGames(),
+      getLifeIndex: () => lifeIndex(),
     }),
   };
   return cached;

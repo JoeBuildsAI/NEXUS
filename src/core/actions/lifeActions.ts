@@ -36,8 +36,8 @@ export function lifeActions(): ActionDefinition[] {
       requiresConfirmation: false,
       keywords: ["calendar", "week", "month", "agenda"],
       handler: ({ args }) => {
-        const a = args as { view?: CalendarView; dayOffset?: string };
-        const day = a.dayOffset ? addDays(todayKey(), Number(a.dayOffset) || 0) : todayKey();
+        const a = args as { view?: CalendarView; dayOffset?: string; day?: string };
+        const day = a.day && /^d{4}-d{2}-d{2}$/.test(a.day) ? a.day : a.dayOffset ? addDays(todayKey(), Number(a.dayOffset) || 0) : todayKey();
         useNavigationStore.getState().openCalendar(a.view ?? "day", day);
         return { ok: true };
       },

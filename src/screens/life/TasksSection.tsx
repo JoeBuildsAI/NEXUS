@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Circle } from "lucide-react";
 import { useLifeStore } from "@/state/lifeStore";
 import { useSettingsStore } from "@/state/settingsStore";
+import { useNavigationStore } from "@/state/navigationStore";
 import type { Task } from "@/core/life/models";
 import { isOverdue, parseQuickAdd, tasksForView, type TaskView } from "@/core/life/tasks";
 import { addDays, formatMinute, parseTimeInput, relativeDayLabel, todayKey } from "@/core/life/time";
@@ -18,6 +19,8 @@ export function TasksSection() {
   const [view, setView] = useState<TaskView>("today");
   const [draft, setDraft] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const focus = useNavigationStore((s) => s.lifeFocus);
+  useEffect(() => { if (focus?.section === "tasks" && focus.id) { setSelected(focus.id); const t = life.tasks.find((x) => x.id === focus.id); if (t) setView(t.status === "done" ? "completed" : t.someday ? "someday" : t.dueDay && t.dueDay > today ? "upcoming" : t.dueDay || t.today ? "today" : "inbox"); } }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const tasks = useMemo(() => tasksForView(life.tasks, view, today), [life.tasks, view, today]);
   const counts = useMemo(() => Object.fromEntries(VIEWS.map((v) => [v.id, tasksForView(life.tasks, v.id, today).length])) as Record<TaskView, number>, [life.tasks, today]);
   const sel = life.tasks.find((t) => t.id === selected) ?? null;
