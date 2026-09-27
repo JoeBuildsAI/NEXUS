@@ -76,6 +76,7 @@ pub fn run() {
             system::exit_app,
             apps::discover_apps,
             apps::launch_app,
+            apps::app_icon,
             steam::steam_discover,
             steam::steam_local_artwork,
             steam::steam_launch,

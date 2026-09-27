@@ -136,13 +136,15 @@ export class LocalCommandProvider implements AssistantProvider {
     for (const a of apps) {
       const score = fuzzyScore(stripped, a.name);
       if (score < 0.6) continue;
+      // Discovery quality nudges ranking: a Start Menu app beats a system32 helper with the same name score.
+      const quality = a.rank != null ? 0.94 + (a.rank / 100) * 0.06 : 1;
       matches.push({
         actionId: "launch-app",
         args: { appId: a.id },
-        confidence: score * (wantsLaunch ? 1 : 0.9),
+        confidence: score * (wantsLaunch ? 1 : 0.9) * quality,
         label: `Launch ${a.name}`,
         group: "app",
-        hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : "Installed",
+        hint: a.source === "builtin" ? "Windows" : a.source === "mock" ? "Demo" : a.source === "app-paths" ? "Registered" : "Installed",
       });
     }
 

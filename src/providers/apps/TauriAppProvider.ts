@@ -4,11 +4,12 @@ import { createLogger } from "@/lib/logger";
 
 const log = createLogger("apps");
 
-/** Real Windows app discovery (Start Menu shortcuts + built-ins) via Rust. */
+/** Real Windows app discovery (resolved Start Menu shortcuts, App Paths, built-ins) via Rust. */
 export class TauriAppProvider implements AppProvider {
   readonly id = "tauri-apps";
   private cache: readonly AppEntry[] | null = null;
   private inflight: Promise<readonly AppEntry[]> | null = null;
+  private icons = new Map<string, Promise<string | null>>();
 
   private async invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
     const { invoke } = await import("@tauri-apps/api/core");
@@ -37,6 +38,24 @@ export class TauriAppProvider implements AppProvider {
         this.inflight = null;
       });
     return this.inflight;
+  }
+
+  iconFor(appId: string): Promise<string | null> {
+    let p = this.icons.get(appId);
+    if (!p) {
+      p = (async () => {
+        try {
+          const path = await this.invoke<string | null>("app_icon", { appId });
+          if (!path) return null;
+          const { convertFileSrc } = await import("@tauri-apps/api/core");
+          return convertFileSrc(path);
+        } catch {
+          return null;
+        }
+      })();
+      this.icons.set(appId, p);
+    }
+    return p;
   }
 
   async launch(appId: string) {

@@ -13,4 +13,6 @@ export interface AppProvider {
   getApps(): Promise<readonly AppEntry[]>;
   refresh(): Promise<readonly AppEntry[]>;
   launch(appId: string): Promise<{ ok: boolean; name?: string; message?: string }>;
+  /** Cached shell icon as an asset URL (desktop only); null when unavailable. */
+  iconFor?(appId: string): Promise<string | null>;
 }

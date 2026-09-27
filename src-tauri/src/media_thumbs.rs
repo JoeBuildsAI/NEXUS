@@ -58,7 +58,7 @@ pub fn media_thumbnail(app: tauri::AppHandle, state: tauri::State<crate::media::
     if out.is_file() {
         return Ok(ThumbnailResult { path: Some(out.to_string_lossy().to_string()), cached: true });
     }
-    match render_thumbnail(&p) {
+    match shell_image(&p, THUMB_W, ShellImageKind::Thumbnail) {
         Some(png) => {
             std::fs::write(&out, png).map_err(|e| e.to_string())?;
             Ok(ThumbnailResult { path: Some(out.to_string_lossy().to_string()), cached: false })
@@ -100,21 +100,33 @@ pub fn media_purge_thumbnails(app: tauri::AppHandle, root_id: Option<String>) ->
     Ok(removed)
 }
 
-/// Render a PNG thumbnail with IShellItemImageFactory. Runs on the calling
-/// (command) thread with its own COM apartment; returns None on any failure.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ShellImageKind {
+    /// Content thumbnail only (video frame, image) — never a generic file icon.
+    Thumbnail,
+    /// The file's icon (executables, shortcuts).
+    Icon,
+}
+
+/// Render a PNG with IShellItemImageFactory. Runs on the calling (command)
+/// thread with its own COM apartment; returns None on any failure.
 #[cfg(target_os = "windows")]
-fn render_thumbnail(path: &Path) -> Option<Vec<u8>> {
+pub fn shell_image(path: &Path, size: i32, kind: ShellImageKind) -> Option<Vec<u8>> {
     use windows::core::{HSTRING, PCWSTR};
     use windows::Win32::Foundation::SIZE;
     use windows::Win32::Graphics::Gdi::{DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS};
     use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
-    use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_THUMBNAILONLY};
+    use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY, SIIGBF_THUMBNAILONLY};
 
     let init = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) };
     let result = (|| {
         let wide = HSTRING::from(path.as_os_str());
         let factory: IShellItemImageFactory = unsafe { SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None) }.ok()?;
-        let hbmp = unsafe { factory.GetImage(SIZE { cx: THUMB_W, cy: THUMB_H }, SIIGBF_THUMBNAILONLY) }.ok()?;
+        let (cx, cy, flags) = match kind {
+            ShellImageKind::Thumbnail => (size, size * THUMB_H / THUMB_W, SIIGBF_THUMBNAILONLY),
+            ShellImageKind::Icon => (size, size, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK),
+        };
+        let hbmp = unsafe { factory.GetImage(SIZE { cx, cy }, flags) }.ok()?;
         let mut bmp = BITMAP::default();
         let got = unsafe { GetObjectW(hbmp.into(), std::mem::size_of::<BITMAP>() as i32, Some(&mut bmp as *mut BITMAP as *mut _)) };
         if got == 0 || bmp.bmWidth <= 0 || bmp.bmHeight <= 0 || bmp.bmWidth > 4096 || bmp.bmHeight > 4096 {
@@ -159,7 +171,7 @@ fn render_thumbnail(path: &Path) -> Option<Vec<u8>> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn render_thumbnail(_path: &Path) -> Option<Vec<u8>> {
+pub fn shell_image(_path: &Path, _size: i32, _kind: ShellImageKind) -> Option<Vec<u8>> {
     None
 }
 
@@ -209,7 +221,7 @@ mod probe {
     #[ignore]
     fn shell_thumbnail_roundtrip() {
         let p = std::path::Path::new(r"C:\Windows\Web\Wallpaper\Windows\img0.jpg");
-        let png = super::render_thumbnail(p).expect("shell produced a thumbnail");
+        let png = super::shell_image(p, super::THUMB_W, super::ShellImageKind::Thumbnail).expect("shell produced a thumbnail");
         assert_eq!(&png[..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
         println!("thumbnail bytes: {}", png.len());
         std::fs::write(std::env::temp_dir().join("nexus-thumb-probe.png"), &png).unwrap();

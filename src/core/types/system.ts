@@ -26,7 +26,11 @@ export interface AppEntry {
   readonly id: string;
   readonly name: string;
   readonly path: string;
-  readonly source: "start-menu" | "start-menu-user" | "builtin" | "mock" | "user";
+  readonly source: "start-menu" | "start-menu-user" | "app-paths" | "builtin" | "mock" | "user";
+  /** Resolved executable for shortcuts (desktop). */
+  readonly target?: string;
+  /** Discovery quality 0–100 (desktop). */
+  readonly rank?: number;
 }
 
 export interface CpuTelemetry {

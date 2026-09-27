@@ -152,7 +152,10 @@ export function CommandPalette() {
                       className="group relative flex w-full items-baseline gap-6 py-2.5 text-left"
                     >
                       <span className={cn("w-[72px] shrink-0 text-micro transition-colors", active ? "text-white/60" : "text-white/25")}>{GROUP_LABEL[m.group]}</span>
-                      <span className={cn("flex-1 truncate font-display text-[19px] tracking-wide transition-colors duration-150", active ? "text-white" : "text-white/55 group-hover:text-white/80")}>{m.label}</span>
+                      <span className={cn("flex min-w-0 flex-1 items-center gap-3 font-display text-[19px] tracking-wide transition-colors duration-150", active ? "text-white" : "text-white/55 group-hover:text-white/80")}>
+                        {m.group === "app" && typeof m.args.appId === "string" && <AppGlyph appId={m.args.appId} />}
+                        <span className="truncate">{m.label}</span>
+                      </span>
                       {m.hint && <span className={cn("shrink-0 text-xs transition-colors", active ? "text-white/45" : "text-white/20")}>{m.hint}</span>}
                     </button>
                   );
@@ -169,4 +172,16 @@ export function CommandPalette() {
       )}
     </AnimatePresence>
   );
+}
+
+/** Tiny shell icon for app results; renders nothing until the icon is cached (no layout shift). */
+function AppGlyph({ appId }: { appId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getProviders().apps.iconFor?.(appId).then((u) => !cancelled && setUrl(u));
+    return () => { cancelled = true; };
+  }, [appId]);
+  if (!url) return null;
+  return <img src={url} alt="" className="h-[18px] w-[18px] shrink-0 rounded-[3px] opacity-90" draggable={false} />;
 }
