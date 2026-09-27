@@ -20,6 +20,8 @@ export interface EmailProvider {
   getSubscriptions(): Promise<readonly Subscription[]>;
   unsubscribeSender(subscriptionId: string): Promise<void>;
   health?(): Promise<ProviderHealth>;
+  /** Whether messages come from real accounts, the demo inbox, or nothing. */
+  mode?(): Promise<"real" | "demo" | "none">;
   /** Incremental loading (older pages); returns the number of messages added. */
   loadOlder?(): Promise<number>;
   hasMore?(): boolean;

@@ -10,6 +10,7 @@ import { dayNutrition, targetProgress } from "@/core/life/nutrition";
 import { summarizeList } from "@/core/life/grocery";
 import { formatDayLong, formatMinute, minuteOfDay, startOfWeek, todayKey } from "@/core/life/time";
 import { getProviders } from "@/providers";
+import { config } from "@/core/config";
 import { useDevStore } from "@/state/devStore";
 import { summarize } from "@/core/email/classify";
 import { Button } from "@/components/ui";
@@ -34,7 +35,7 @@ export function TodayScreen() {
   const hour12 = useSettingsStore((s) => s.profile.clockFormat === "12h");
   const { openLife, openCalendar, openCommunications, navigate } = useNavigationStore();
   const emailConnected = useDevStore((s) => s.emailConnected);
-  const [mail, setMail] = useState<{ important: number; receipts: number; shipments: number; security: number } | null>(null);
+  const [mail, setMail] = useState<{ important: number; receipts: number; shipments: number; security: number; demo: boolean } | null>(null);
   const health = useTelemetryStore((s) => s.snapshot?.health);
   const healthMeta = health ? HEALTH_META[health] : null;
 
@@ -42,12 +43,17 @@ export function TodayScreen() {
   useEffect(() => {
     let cancelled = false;
     const start = new Date(); start.setHours(0, 0, 0, 0);
-    getProviders().email.getMessages().then((msgs) => {
+    const email = getProviders().email;
+    void (async () => {
+      const mode = email.mode ? await email.mode() : "demo";
+      // The desktop Today never shows demo-inbox counts as if they were the user's mail.
+      if (mode === "none" || (mode === "demo" && config.isTauri)) return setMail(null);
+      const msgs = await email.getMessages();
       if (cancelled) return;
       const s = summarize(msgs, start.getTime());
       const shipments = msgs.filter((m) => m.timestamp >= start.getTime() && m.category === "order").length;
-      setMail({ important: s.important, receipts: s.receipts, shipments, security: s.security });
-    }).catch(() => { if (!cancelled) setMail(null); });
+      setMail({ important: s.important, receipts: s.receipts, shipments, security: s.security, demo: mode === "demo" });
+    })().catch(() => { if (!cancelled) setMail(null); });
     return () => { cancelled = true; };
   }, [emailConnected]);
 
@@ -183,7 +189,7 @@ export function TodayScreen() {
               <li>
                 <button onClick={() => openCommunications({ surface: "summary" })} className="flex w-full items-baseline gap-3 text-left">
                   <span className="font-mono text-[13px] tabular text-white/85">{mail.important}</span>
-                  <span className="text-white/60">important email{mail.important === 1 ? "" : "s"}</span>
+                  <span className="text-white/60">important email{mail.important === 1 ? "" : "s"}{mail.demo && <span className="ml-2 text-[11px] uppercase tracking-wide2 text-white/30">demo</span>}</span>
                   <span className="ml-auto text-[12px] text-white/30">{[mail.shipments ? `${mail.shipments} shipment${mail.shipments === 1 ? "" : "s"}` : "", mail.receipts ? `${mail.receipts} receipt${mail.receipts === 1 ? "" : "s"}` : "", mail.security ? `${mail.security} security` : ""].filter(Boolean).join(" · ")}</span>
                 </button>
               </li>
