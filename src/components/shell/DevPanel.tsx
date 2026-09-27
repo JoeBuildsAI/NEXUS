@@ -11,6 +11,14 @@ import { DEMO_GAMES } from "@/core/demo/games";
  * Development-only simulation panel (Ctrl+Shift+D). Lets us exercise offline,
  * pressure, and live-event states on the dev laptop. Not rendered in production.
  */
+declare global {
+  interface Window {
+    /** Dev builds only: lets the screenshot/stress scripts drive simulations. */
+    __nexusDev?: typeof useDevStore;
+  }
+}
+if (isDevBuild && typeof window !== "undefined") window.__nexusDev = useDevStore;
+
 export function DevPanel() {
   const open = useSettingsStore((s) => s.devPanelOpen);
   const setOpen = useSettingsStore((s) => s.setDevPanelOpen);
@@ -63,6 +71,12 @@ export function DevPanel() {
               <Toggle label="High CPU" checked={dev.highCpu} onChange={(v) => dev.set({ highCpu: v })} />
               <Toggle label="High RAM" checked={dev.highRam} onChange={(v) => dev.set({ highRam: v })} />
               <div className="hairline-t my-1" />
+              <Cycle label="Steam library" value={dev.steamLibrarySize} options={[0, 500, 1000] as const} onChange={(v) => { dev.set({ steamLibrarySize: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => { useLibraryStore.getState().clearCache(); void useLibraryStore.getState().load({ force: true }); }); }} format={(v) => (v ? `+${v}` : "demo")} />
+              <Cycle label="Media index" value={dev.mediaLibrarySize} options={[0, 1000, 10000] as const} onChange={(v) => dev.set({ mediaLibrarySize: v })} format={(v) => (v ? `+${v}` : "demo")} />
+              <Toggle label="Steam profile private" checked={dev.steamPrivateProfile} onChange={(v) => { dev.set({ steamPrivateProfile: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => useLibraryStore.getState().clearCache()); }} />
+              <Toggle label="Extreme titles" checked={dev.extremeText} onChange={(v) => { dev.set({ extremeText: v }); void import("@/state/libraryStore").then(({ useLibraryStore }) => { useLibraryStore.getState().clearCache(); void useLibraryStore.getState().load({ force: true }); }); }} />
+              <Toggle label="Provider exceptions" checked={dev.providerExceptions} onChange={(v) => dev.set({ providerExceptions: v })} />
+              <div className="hairline-t my-1" />
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="flex-1" onClick={fireAchievement}><Zap size={12} /> Achievement</Button>
                 <Button size="sm" variant="outline" className="flex-1" onClick={fireEmail}>Email</Button>
@@ -73,5 +87,15 @@ export function DevPanel() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function Cycle<T extends number>({ label, value, options, onChange, format }: { label: string; value: T; options: readonly T[]; onChange: (v: T) => void; format: (v: T) => string }) {
+  const next = () => onChange(options[(options.indexOf(value) + 1) % options.length]!);
+  return (
+    <button onClick={next} className="flex w-full items-center justify-between text-left text-white/70 transition-colors hover:text-white">
+      <span>{label}</span>
+      <span className="font-mono text-[11px] text-white/45">{format(value)}</span>
+    </button>
   );
 }

@@ -12,7 +12,7 @@ import { actionRegistry } from "@/core/actions/registry";
 import { completionPercent, type AchievementSourceStatus, type GameDetails } from "@/core/types";
 import { closestAchievements, recentUnlocks } from "@/core/gaming/completion";
 import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, displayTitleClass } from "@/lib/utils";
 
 type Tab = "all" | "unlocked" | "locked";
 
@@ -105,7 +105,7 @@ export function GameDetail({ gameId }: { gameId: string }) {
               {[...new Set([game.developer, game.publisher].filter(Boolean))].join(" · ") || (game.genres.length ? game.genres.slice(0, 3).join(" · ") : "Steam")}
               {!game.installed && <span className="ml-3 text-status-attention/80">Not installed</span>}
             </p>
-            <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }} className="mt-4 font-display text-display-xl font-semibold uppercase tracking-wide text-white">
+            <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }} className={cn("mt-4 max-w-4xl break-words font-display font-semibold uppercase tracking-wide text-white", displayTitleClass(game.title))}>
               {game.title}
             </motion.h1>
             <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 font-mono text-[12.5px] tabular text-white/50">

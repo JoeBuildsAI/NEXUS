@@ -88,7 +88,7 @@ export function ContinuePlaying() {
 
         <div className="relative flex h-full min-h-[220px] flex-col justify-end p-7">
           <p className="text-micro text-white/40">{data.lastPlayed ? `Last played ${formatRelativeTime(data.lastPlayed)}` : "Installed"}</p>
-          <h3 className="mt-2 font-display text-display-md font-semibold tracking-wide text-white">{data.title}</h3>
+          <h3 className="mt-2 line-clamp-2 break-words font-display text-display-md font-semibold tracking-wide text-white">{data.title}</h3>
           <div className="mt-3 flex items-center gap-5 font-mono text-[12.5px] tabular text-white/55">
             {data.playtimeMinutes > 0 && <span>{formatPlaytime(data.playtimeMinutes)}</span>}
             {data.achievements.total > 0 && <span>{data.achievements.unlocked} / {data.achievements.total}</span>}

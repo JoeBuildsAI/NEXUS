@@ -75,3 +75,16 @@ export function formatDuration(seconds: number): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/**
+ * Editorial title sizing that survives hostile titles: long titles step down
+ * and are clamped to a fixed number of lines so heroes never overflow.
+ */
+export function displayTitleClass(title: string, opts: { max?: "xl" | "lg" } = {}): string {
+  const n = title.trim().length;
+  const max = opts.max ?? "xl";
+  if (n > 60) return "text-display-sm line-clamp-3";
+  if (n > 34) return "text-display-md line-clamp-3";
+  if (n > 14 || max === "lg") return "text-display-lg line-clamp-2";
+  return "text-display-xl line-clamp-2";
+}

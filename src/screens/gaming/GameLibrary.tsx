@@ -15,7 +15,7 @@ import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { Button, ContextMenu } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { gameContextItems } from "./gameContextItems";
-import { cn } from "@/lib/utils";
+import { cn, displayTitleClass } from "@/lib/utils";
 
 type SortKey = "recent" | "name" | "playtime" | "completion" | "size";
 type FilterKey = "all" | "installed" | "completed" | "near" | "in-progress" | "no-achievements";
@@ -139,7 +139,7 @@ export function GameLibrary() {
                     {mode === "demo" ? "Demo library · " : ""}
                     {session.phase === "active" && session.gameId === featured.id ? "Session active" : featured.lastPlayed ? `Continue · ${formatRelativeTime(featured.lastPlayed)}` : "Ready"}
                   </p>
-                  <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className={cn("mt-4 font-display font-semibold uppercase tracking-wide text-white", featured.title.length > 14 ? "text-display-lg" : "text-display-xl")}>
+                  <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className={cn("mt-4 break-words font-display font-semibold uppercase tracking-wide text-white", displayTitleClass(featured.title))}>
                     {featured.title}
                   </motion.h1>
                   <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 font-mono text-[12.5px] tabular text-white/55">

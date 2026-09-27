@@ -13,6 +13,16 @@ export interface DevSimulation {
   storagePressure: boolean;
   highCpu: boolean;
   highRam: boolean;
+  /** Stress: synthesize a large Steam library (0 = demo set only). */
+  steamLibrarySize: 0 | 500 | 1000;
+  /** Stress: synthesize a large media index (0 = demo set only). */
+  mediaLibrarySize: 0 | 1000 | 10000;
+  /** Steam profile private: achievements unavailable but library fine. */
+  steamPrivateProfile: boolean;
+  /** Providers throw non-offline exceptions (chaos test). */
+  providerExceptions: boolean;
+  /** Extreme text: very long / Unicode / emoji titles. */
+  extremeText: boolean;
 }
 
 interface DevState extends DevSimulation {
@@ -32,6 +42,11 @@ export const useDevStore = create<DevState>((set) => ({
   storagePressure: false,
   highCpu: false,
   highRam: false,
+  steamLibrarySize: 0,
+  mediaLibrarySize: 0,
+  steamPrivateProfile: false,
+  providerExceptions: false,
+  extremeText: false,
   achievementPulse: 0,
   emailPulse: 0,
   set: (patch) => set(patch),

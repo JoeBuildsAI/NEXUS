@@ -20,7 +20,7 @@ export function GeneratedCover({ game, large }: { game: Game; large?: boolean })
       <div className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 75% 0%, ${game.coverColor} 0%, transparent 62%)`, opacity: 0.6 }} />
       <div className="absolute inset-0 nx-noise opacity-[0.05]" />
       <div className={cn("absolute inset-x-0 top-0 overflow-hidden p-4", large && "p-8")}>
-        <span className={cn("block font-display font-semibold uppercase leading-[0.92] tracking-tight text-white/[0.08] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]", large ? "text-[88px]" : "text-[28px]")}>
+        <span className={cn("block font-display font-semibold uppercase leading-[0.92] tracking-tight text-white/[0.08] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] break-words", large ? "text-[88px]" : game.title.length > 40 ? "text-[20px]" : "text-[28px]")}>
           {game.title}
         </span>
       </div>
@@ -50,7 +50,7 @@ export function GameCard({ game, completion, onClick }: GameCardProps) {
       <motion.div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/0" variants={{ hover: { boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.18)" } }} transition={{ duration: 0.3 }} />
 
       <motion.div className="absolute inset-x-0 bottom-0 p-3.5" variants={{ hover: { y: 0, opacity: 1 } }} initial={{ y: showImg ? 6 : 0, opacity: showImg ? 0 : 1 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-        <h3 className={cn("text-[13.5px] font-medium leading-tight", game.installed ? "text-white" : "text-white/70")}>{game.title}</h3>
+        <h3 className={cn("line-clamp-2 break-words text-[13.5px] font-medium leading-tight", game.installed ? "text-white" : "text-white/70")} title={game.title}>{game.title}</h3>
         <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] tabular text-white/50">
           {!game.installed && <span className="text-white/40">not installed</span>}
           {game.playtimeMinutes > 0 && <span>{formatPlaytime(game.playtimeMinutes)}</span>}

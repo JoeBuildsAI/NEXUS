@@ -3,21 +3,38 @@ import { DEMO_COLLECTIONS, DEMO_MEDIA } from "@/core/demo/media";
 import type { MediaProvider } from "./MediaProvider";
 import { ProviderOfflineError } from "@/core/errors";
 import { useDevStore } from "@/state/devStore";
+import { syntheticMedia } from "@/core/demo/synthetic";
 
 export class MockMediaProvider implements MediaProvider {
   readonly id = "mock-media";
   private items: MediaItem[] = [...DEMO_MEDIA];
+  private syntheticKey = "";
   private roots: AuthorizedRoot[] = [];
   private collections: MediaCollection[] = [...DEMO_COLLECTIONS];
 
   private guard() {
-    if (!useDevStore.getState().mediaConnected) {
+    const dev = useDevStore.getState();
+    if (!dev.mediaConnected) {
       throw new ProviderOfflineError("Media", "Media drive disconnected (simulated)");
     }
+    if (dev.providerExceptions) {
+      throw new Error("Simulated provider exception: media");
+    }
+  }
+
+  /** Dev lab: extend the demo set with synthetic items when requested. */
+  private ensureSynthetic() {
+    const dev = useDevStore.getState();
+    const key = `${dev.mediaLibrarySize}:${dev.extremeText}`;
+    if (key === this.syntheticKey) return;
+    this.syntheticKey = key;
+    const keep = this.items.filter((i) => !i.id.startsWith("synm-"));
+    this.items = dev.mediaLibrarySize || dev.extremeText ? [...keep, ...syntheticMedia(dev.mediaLibrarySize || 9, dev.extremeText)] : keep;
   }
 
   async getItems(): Promise<readonly MediaItem[]> {
     this.guard();
+    this.ensureSynthetic();
     return this.items;
   }
 
