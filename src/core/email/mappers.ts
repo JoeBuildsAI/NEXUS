@@ -36,7 +36,16 @@ export interface GraphPage {
 }
 
 /** Map a Graph `/me/messages` (or mailFolders/inbox/messages) page. */
-export function mapGraphMessages(body: string, accountId: string, rules: readonly UserRule[]): GraphPage | null {
+export interface MapContext {
+  /** Account slot → message id prefix "outlook:2:"; slot 1 keeps the legacy "outlook:" prefix. */
+  slot?: number;
+  ownDomain?: string | null;
+}
+export function idPrefix(provider: "outlook" | "gmail", slot = 1): string {
+  return slot === 1 ? `${provider}:` : `${provider}:${slot}:`;
+}
+
+export function mapGraphMessages(body: string, accountId: string, rules: readonly UserRule[], ctx: MapContext = {}): GraphPage | null {
   const j = safeJson(body) as { value?: unknown[]; "@odata.nextLink"?: string } | null;
   if (!j || !Array.isArray(j.value)) return null;
   const messages: Message[] = [];
@@ -51,13 +60,25 @@ export function mapGraphMessages(body: string, accountId: string, rules: readonl
     const body = m.body as { contentType?: string; content?: string } | undefined;
     const text = body?.content ? (body.contentType?.toLowerCase() === "html" ? toPlainText(body.content) : body.content) : preview;
     const headers = Array.isArray(m.internetMessageHeaders) ? (m.internetMessageHeaders as { name?: string; value?: string }[]) : [];
-    const listUnsub = headers.find((h) => h.name?.toLowerCase() === "list-unsubscribe")?.value ?? null;
+    const hv = (n: string) => headers.find((h) => h.name?.toLowerCase() === n)?.value ?? null;
+    const listUnsub = hv("list-unsubscribe");
+    const listUnsubPost = /one-click/i.test(hv("list-unsubscribe-post") ?? "");
+    const listId = hv("list-id");
     const hints: string[] = [];
     if (m.importance === "high") hints.push("importance:high");
-    const c = classifyMessage({ sender, senderAddress, subject, preview, listUnsubscribe: listUnsub, hints }, rules);
+    const flag = (m.flag as { flagStatus?: string } | undefined)?.flagStatus;
+    if (flag === "flagged") hints.push("starred");
+    const c = classifyMessage({ sender, senderAddress, subject, preview, listUnsubscribe: listUnsub, listId, hints, ownDomain: ctx.ownDomain ?? null, hasAttachments: m.hasAttachments === true }, rules);
     const ts = Date.parse(String(m.receivedDateTime ?? ""));
     messages.push({
-      id: `outlook:${m.id}`,
+      id: `${idPrefix("outlook", ctx.slot)}${m.id}`,
+      rawId: m.id,
+      threadId: typeof m.conversationId === "string" ? m.conversationId : null,
+      hasAttachments: m.hasAttachments === true,
+      starred: flag === "flagged",
+      listUnsubscribePost: listUnsubPost,
+      listId,
+      sizeBytes: null,
       accountId,
       sender,
       senderAddress,
@@ -115,6 +136,7 @@ interface GmailPart {
   mimeType?: string;
   body?: { data?: string };
   parts?: GmailPart[];
+  filename?: string;
 }
 function firstText(part: GmailPart | undefined, prefer: string): string | null {
   if (!part) return null;
@@ -127,8 +149,8 @@ function firstText(part: GmailPart | undefined, prefer: string): string | null {
 }
 
 /** Gmail `users/me/messages/{id}?format=full` → Message. */
-export function mapGmailMessage(body: string, accountId: string, rules: readonly UserRule[]): Message | null {
-  const j = safeJson(body) as { id?: string; snippet?: string; internalDate?: string; labelIds?: string[]; payload?: GmailPart & { headers?: { name?: string; value?: string }[] } } | null;
+export function mapGmailMessage(body: string, accountId: string, rules: readonly UserRule[], ctx: MapContext = {}): Message | null {
+  const j = safeJson(body) as { id?: string; threadId?: string; sizeEstimate?: number; snippet?: string; internalDate?: string; labelIds?: string[]; payload?: GmailPart & { headers?: { name?: string; value?: string }[] } } | null;
   if (!j || typeof j.id !== "string") return null;
   const headers = j.payload?.headers ?? [];
   const h = (n: string) => headers.find((x) => x.name?.toLowerCase() === n.toLowerCase())?.value ?? null;
@@ -143,9 +165,20 @@ export function mapGmailMessage(body: string, accountId: string, rules: readonly
   const hints = labels.filter((l) => l.startsWith("CATEGORY_")).map((l) => l.toLowerCase());
   if (labels.includes("IMPORTANT")) hints.push("importance:high");
   const listUnsub = h("List-Unsubscribe");
-  const c = classifyMessage({ sender, senderAddress, subject, preview, listUnsubscribe: listUnsub, hints }, rules);
+  const listUnsubPost = /one-click/i.test(h("List-Unsubscribe-Post") ?? "");
+  const listId = h("List-Id");
+  if (labels.includes("STARRED")) hints.push("starred");
+  const hasAttachments = hasAttachmentParts(j.payload);
+  const c = classifyMessage({ sender, senderAddress, subject, preview, listUnsubscribe: listUnsub, listId, hints, ownDomain: ctx.ownDomain ?? null, hasAttachments }, rules);
   return {
-    id: `gmail:${j.id}`,
+    id: `${idPrefix("gmail", ctx.slot)}${j.id}`,
+    rawId: j.id,
+    threadId: typeof j.threadId === "string" ? j.threadId : null,
+    hasAttachments,
+    starred: labels.includes("STARRED"),
+    listUnsubscribePost: listUnsubPost,
+    listId,
+    sizeBytes: typeof j.sizeEstimate === "number" ? j.sizeEstimate : null,
     accountId,
     sender,
     senderAddress,
@@ -160,6 +193,24 @@ export function mapGmailMessage(body: string, accountId: string, rules: readonly
     signals: c.signals,
     listUnsubscribe: listUnsub,
   };
+}
+
+function hasAttachmentParts(part: GmailPart | undefined): boolean {
+  if (!part) return false;
+  if (part.filename && part.filename.length > 0) return true;
+  return (part.parts ?? []).some(hasAttachmentParts);
+}
+
+/** Gmail profile totals (KNOWN figures for Inbox Health). */
+export function mapGmailTotals(body: string): { messages: number | null; unread: number | null } {
+  const j = safeJson(body) as { messagesTotal?: number } | null;
+  return { messages: typeof j?.messagesTotal === "number" ? j.messagesTotal : null, unread: null };
+}
+
+/** Graph inbox folder → totals. */
+export function mapGraphFolderTotals(body: string): { messages: number | null; unread: number | null } {
+  const j = safeJson(body) as { totalItemCount?: number; unreadItemCount?: number } | null;
+  return { messages: typeof j?.totalItemCount === "number" ? j.totalItemCount : null, unread: typeof j?.unreadItemCount === "number" ? j.unreadItemCount : null };
 }
 
 /** Gmail `users/me/profile` → account. */

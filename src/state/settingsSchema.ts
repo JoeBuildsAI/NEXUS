@@ -77,6 +77,7 @@ export function sanitizeSettings(persisted: unknown, defaults: SettingsData): Se
     ai: {
       provider: vOneOf(ai.provider, ["local", "openai", "anthropic"], d.ai.provider),
       localCommandMode: vBool(ai.localCommandMode, d.ai.localCommandMode),
+      inboxMode: vOneOf(ai.inboxMode, ["off", "metadata", "selected", "full"], d.ai.inboxMode),
     },
     shortcuts: {
       commandPalette: vStr(sh.commandPalette, d.shortcuts.commandPalette, 40),

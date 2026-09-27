@@ -64,10 +64,23 @@ fn secret_key(p: Provider, what: &str) -> String {
     format!("email.{}.{}", p.key(), what)
 }
 
+/// Account slots let several accounts of one provider coexist (1–9). Slot 1
+/// also reads the pre-0.4 slot-less keys so existing connections survive.
+pub fn valid_slot(slot: u8) -> Result<u8, String> {
+    if (1..=9).contains(&slot) { Ok(slot) } else { Err("invalid account slot".into()) }
+}
+fn token_key(p: Provider, slot: u8, what: &str) -> String {
+    format!("email.{}.{}.{}", p.key(), slot, what)
+}
+fn read_token(p: Provider, slot: u8, what: &str) -> Option<String> {
+    crate::secrets::read_secret(&token_key(p, slot, what)).or_else(|| if slot == 1 { crate::secrets::read_secret(&secret_key(p, what)) } else { None })
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthStatus {
     pub provider: String,
+    pub slot: u8,
     /// Client id (and secret where required) present.
     pub client_configured: bool,
     /// A refresh token exists — the account is connected.
@@ -77,7 +90,7 @@ pub struct OAuthStatus {
 }
 
 pub struct OAuthState {
-    pending: std::sync::Mutex<Option<(Provider, Instant)>>,
+    pending: std::sync::Mutex<Option<(Provider, u8, Instant)>>,
 }
 impl OAuthState {
     pub fn new() -> Self {
@@ -188,34 +201,36 @@ fn url_decode(s: &str) -> String {
 }
 
 #[tauri::command]
-pub fn oauth_status(state: tauri::State<OAuthState>, provider: String) -> Result<OAuthStatus, String> {
+pub fn oauth_status(state: tauri::State<OAuthState>, provider: String, slot: Option<u8>) -> Result<OAuthStatus, String> {
     let p = Provider::parse(&provider).ok_or("unknown provider")?;
+    let slot = valid_slot(slot.unwrap_or(1))?;
     let client_id = crate::secrets::read_secret(&secret_key(p, "clientId")).is_some();
     let client_ok = match p {
         Provider::Outlook => client_id,
         Provider::Gmail => client_id && crate::secrets::read_secret(&secret_key(p, "clientSecret")).is_some(),
     };
-    let pending = state.pending.lock().map(|g| g.as_ref().map(|(pp, at)| *pp == p && at.elapsed() < Duration::from_secs(200)).unwrap_or(false)).unwrap_or(false);
-    Ok(OAuthStatus { provider, client_configured: client_ok, connected: crate::secrets::read_secret(&secret_key(p, "refreshToken")).is_some(), pending })
+    let pending = state.pending.lock().map(|g| g.as_ref().map(|(pp, ps, at)| *pp == p && *ps == slot && at.elapsed() < Duration::from_secs(200)).unwrap_or(false)).unwrap_or(false);
+    Ok(OAuthStatus { provider, slot, client_configured: client_ok, connected: read_token(p, slot, "refreshToken").is_some(), pending })
 }
 
 /// Start the browser authorization flow. Emits `oauth:complete` with
 /// `{ provider, ok, error }` when the loopback redirect arrives (or times out).
 #[tauri::command]
-pub fn oauth_begin(app: tauri::AppHandle, state: tauri::State<OAuthState>, provider: String) -> Result<(), String> {
+pub fn oauth_begin(app: tauri::AppHandle, state: tauri::State<OAuthState>, provider: String, slot: Option<u8>) -> Result<(), String> {
     let p = Provider::parse(&provider).ok_or("unknown provider")?;
+    let slot = valid_slot(slot.unwrap_or(1))?;
     let client_id = crate::secrets::read_secret(&secret_key(p, "clientId")).ok_or("Client id not configured")?;
     if p == Provider::Gmail && crate::secrets::read_secret(&secret_key(p, "clientSecret")).is_none() {
         return Err("Client secret not configured".into());
     }
     {
         let mut pending = state.pending.lock().map_err(|e| e.to_string())?;
-        if let Some((_, at)) = pending.as_ref() {
+        if let Some((_, _, at)) = pending.as_ref() {
             if at.elapsed() < Duration::from_secs(200) {
                 return Err("An authorization is already in progress.".into());
             }
         }
-        *pending = Some((p, Instant::now()));
+        *pending = Some((p, slot, Instant::now()));
     }
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
@@ -241,7 +256,7 @@ pub fn oauth_begin(app: tauri::AppHandle, state: tauri::State<OAuthState>, provi
 
     let app2 = app.clone();
     std::thread::spawn(move || {
-        let outcome = wait_for_code(&listener, &csrf, Duration::from_secs(180)).and_then(|code| exchange_code(p, &client_id, &code, &verifier, &redirect));
+        let outcome = wait_for_code(&listener, &csrf, Duration::from_secs(180)).and_then(|code| exchange_code(p, slot, &client_id, &code, &verifier, &redirect));
         let (ok, error) = match outcome {
             Ok(()) => (true, None),
             Err(e) => (false, Some(e)),
@@ -251,7 +266,7 @@ pub fn oauth_begin(app: tauri::AppHandle, state: tauri::State<OAuthState>, provi
                 *g = None;
             }
         }
-        let _ = app2.emit("oauth:complete", serde_json::json!({ "provider": p.key(), "ok": ok, "error": error }));
+        let _ = app2.emit("oauth:complete", serde_json::json!({ "provider": p.key(), "slot": slot, "ok": ok, "error": error }));
     });
     Ok(())
 }
@@ -287,7 +302,7 @@ fn wait_for_code(listener: &TcpListener, expected_state: &str, timeout: Duration
     }
 }
 
-fn exchange_code(p: Provider, client_id: &str, code: &str, verifier: &str, redirect: &str) -> Result<(), String> {
+fn exchange_code(p: Provider, slot: u8, client_id: &str, code: &str, verifier: &str, redirect: &str) -> Result<(), String> {
     let mut form: Vec<(&str, String)> = vec![
         ("client_id", client_id.to_string()),
         ("grant_type", "authorization_code".into()),
@@ -299,7 +314,7 @@ fn exchange_code(p: Provider, client_id: &str, code: &str, verifier: &str, redir
         form.push(("client_secret", crate::secrets::read_secret(&secret_key(p, "clientSecret")).ok_or("Client secret missing")?));
     }
     let resp = post_form(p.token_url(), &form)?;
-    store_tokens(p, &resp)
+    store_tokens(p, slot, &resp)
 }
 
 fn post_form(url: &str, form: &[(&str, String)]) -> Result<serde_json::Value, String> {
@@ -318,26 +333,26 @@ fn post_form(url: &str, form: &[(&str, String)]) -> Result<serde_json::Value, St
     }
 }
 
-fn store_tokens(p: Provider, v: &serde_json::Value) -> Result<(), String> {
+fn store_tokens(p: Provider, slot: u8, v: &serde_json::Value) -> Result<(), String> {
     let access = v.get("access_token").and_then(|a| a.as_str()).ok_or("No access token in response")?;
     let expires_in = v.get("expires_in").and_then(|e| e.as_u64()).unwrap_or(3600);
-    crate::secrets::write_secret(&secret_key(p, "accessToken"), &format!("{}|{}", access, now_secs() + expires_in.saturating_sub(60)))?;
+    crate::secrets::write_secret(&token_key(p, slot, "accessToken"), &format!("{}|{}", access, now_secs() + expires_in.saturating_sub(60)))?;
     if let Some(rt) = v.get("refresh_token").and_then(|a| a.as_str()) {
-        crate::secrets::write_secret(&secret_key(p, "refreshToken"), rt)?;
+        crate::secrets::write_secret(&token_key(p, slot, "refreshToken"), rt)?;
     }
     Ok(())
 }
 
 /// Valid access token, refreshing with the stored refresh token when expired.
-fn access_token(p: Provider) -> Result<String, String> {
-    if let Some(stored) = crate::secrets::read_secret(&secret_key(p, "accessToken")) {
+fn access_token(p: Provider, slot: u8) -> Result<String, String> {
+    if let Some(stored) = read_token(p, slot, "accessToken") {
         if let Some((tok, exp)) = stored.rsplit_once('|') {
             if exp.parse::<u64>().map(|e| e > now_secs()).unwrap_or(false) {
                 return Ok(tok.to_string());
             }
         }
     }
-    let refresh = crate::secrets::read_secret(&secret_key(p, "refreshToken")).ok_or("not-connected")?;
+    let refresh = read_token(p, slot, "refreshToken").ok_or("not-connected")?;
     let client_id = crate::secrets::read_secret(&secret_key(p, "clientId")).ok_or("not-configured")?;
     let mut form: Vec<(&str, String)> = vec![("client_id", client_id), ("grant_type", "refresh_token".into()), ("refresh_token", refresh)];
     if p == Provider::Gmail {
@@ -346,21 +361,25 @@ fn access_token(p: Provider) -> Result<String, String> {
         form.push(("scope", p.scopes().into()));
     }
     let resp = post_form(p.token_url(), &form)?;
-    store_tokens(p, &resp)?;
-    crate::secrets::read_secret(&secret_key(p, "accessToken")).and_then(|s| s.rsplit_once('|').map(|(t, _)| t.to_string())).ok_or_else(|| "refresh failed".into())
+    store_tokens(p, slot, &resp)?;
+    read_token(p, slot, "accessToken").and_then(|s| s.rsplit_once('|').map(|(t, _)| t.to_string())).ok_or_else(|| "refresh failed".into())
 }
 
 #[tauri::command]
-pub fn oauth_disconnect(provider: String) -> Result<(), String> {
+pub fn oauth_disconnect(provider: String, slot: Option<u8>) -> Result<(), String> {
     let p = Provider::parse(&provider).ok_or("unknown provider")?;
+    let slot = valid_slot(slot.unwrap_or(1))?;
     if p == Provider::Gmail {
-        if let Some(rt) = crate::secrets::read_secret(&secret_key(p, "refreshToken")) {
+        if let Some(rt) = read_token(p, slot, "refreshToken") {
             let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(10)).build();
             let _ = agent.post("https://oauth2.googleapis.com/revoke").send_form(&[("token", rt.as_str())]);
         }
     }
     for what in ["accessToken", "refreshToken"] {
-        crate::secrets::delete_secret(&secret_key(p, what))?;
+        crate::secrets::delete_secret(&token_key(p, slot, what))?;
+        if slot == 1 {
+            crate::secrets::delete_secret(&secret_key(p, what))?;
+        }
     }
     Ok(())
 }
@@ -386,14 +405,15 @@ pub fn validate_api_path(path: &str) -> Result<(), String> {
 /// Allowlisted mail API call with bearer injection. Bodies are JSON strings
 /// produced by the frontend mappers; responses are raw JSON for TS parsing.
 #[tauri::command]
-pub fn mail_api(provider: String, method: String, path: String, body: Option<String>) -> Result<MailApiResponse, String> {
+pub fn mail_api(provider: String, method: String, path: String, body: Option<String>, slot: Option<u8>) -> Result<MailApiResponse, String> {
     let p = Provider::parse(&provider).ok_or("unknown provider")?;
+    let slot = valid_slot(slot.unwrap_or(1))?;
     validate_api_path(&path)?;
     let m = method.to_uppercase();
     if !["GET", "POST", "PATCH", "DELETE"].contains(&m.as_str()) {
         return Err("method not allowed".into());
     }
-    let token = match access_token(p) {
+    let token = match access_token(p, slot) {
         Ok(t) => t,
         Err(e) if e == "not-connected" || e == "not-configured" => return Ok(MailApiResponse { status: e, http_status: 0, body: String::new(), retry_after_secs: None }),
         Err(e) if e == "Network unavailable" => return Ok(MailApiResponse { status: "network-error".into(), http_status: 0, body: String::new(), retry_after_secs: None }),
@@ -423,9 +443,71 @@ pub fn mail_api(provider: String, method: String, path: String, body: Option<Str
     })
 }
 
+/// Reject anything but https to a public host; no credentials, default port only.
+pub fn validate_unsubscribe_url(raw: &str) -> Result<String, String> {
+    if raw.len() > 2048 || !raw.starts_with("https://") {
+        return Err("only https unsubscribe targets are allowed".into());
+    }
+    let rest = &raw["https://".len()..];
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if authority.contains('@') {
+        return Err("credentials in URL are not allowed".into());
+    }
+    let host = authority.split(':').next().unwrap_or("").to_ascii_lowercase();
+    let port = authority.split(':').nth(1);
+    if port.is_some_and(|p| p != "443") {
+        return Err("non-standard port".into());
+    }
+    let private = host == "localhost" || host.ends_with(".local") || host.parse::<std::net::IpAddr>().is_ok() || !host.contains('.');
+    if private {
+        return Err("target host is not public".into());
+    }
+    Ok(raw.to_string())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsubscribeResult {
+    pub ok: bool,
+    pub http_status: u16,
+    pub detail: String,
+}
+
+/// RFC 8058 one-click unsubscribe: a single POST with the standard body to a
+/// validated https URL. No redirects are followed, no body is rendered, no
+/// cookies are sent. Nothing else is ever fetched from email content.
+#[tauri::command]
+pub fn unsubscribe_one_click(url: String) -> Result<UnsubscribeResult, String> {
+    let target = validate_unsubscribe_url(&url)?;
+    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(12)).redirects(0).build();
+    match agent.post(&target).set("Content-Type", "application/x-www-form-urlencoded").set("User-Agent", "NEXUS/0.4 (one-click unsubscribe)").send_string("List-Unsubscribe=One-Click") {
+        Ok(r) => Ok(UnsubscribeResult { ok: (200..400).contains(&r.status()), http_status: r.status(), detail: "accepted".into() }),
+        Err(ureq::Error::Status(code, _)) => Ok(UnsubscribeResult { ok: false, http_status: code, detail: format!("sender responded with HTTP {code}") }),
+        Err(ureq::Error::Transport(_)) => Ok(UnsubscribeResult { ok: false, http_status: 0, detail: "network error".into() }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unsubscribe_targets_are_https_public_hosts_only() {
+        assert!(validate_unsubscribe_url("https://lists.example.com/u?x=1").is_ok());
+        assert!(validate_unsubscribe_url("http://lists.example.com/u").is_err());
+        assert!(validate_unsubscribe_url("https://user:pw@lists.example.com/u").is_err());
+        assert!(validate_unsubscribe_url("https://127.0.0.1/u").is_err());
+        assert!(validate_unsubscribe_url("https://localhost/u").is_err());
+        assert!(validate_unsubscribe_url("https://lists.example.com:8443/u").is_err());
+        assert!(validate_unsubscribe_url("https://intranet/u").is_err());
+    }
+
+    #[test]
+    fn account_slots_are_bounded_and_keyed() {
+        assert!(valid_slot(0).is_err());
+        assert!(valid_slot(10).is_err());
+        assert_eq!(token_key(Provider::Gmail, 2, "refreshToken"), "email.gmail.2.refreshToken");
+    }
 
     #[test]
     fn pkce_challenge_is_sha256_of_verifier() {

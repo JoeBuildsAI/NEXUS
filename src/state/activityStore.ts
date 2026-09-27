@@ -15,7 +15,10 @@ export type ActivityKind =
   | "integration-disconnected"
   | "media-authorized"
   | "media-revoked"
-  | "session-recovered";
+  | "session-recovered"
+  | "email-rule-created"
+  | "email-cleanup-completed"
+  | "email-unsubscribed";
 
 export interface ActivityEntry {
   id: string;

@@ -88,6 +88,7 @@ pub fn run() {
             oauth::oauth_begin,
             oauth::oauth_disconnect,
             oauth::mail_api,
+            oauth::unsubscribe_one_click,
             media::media_register_root,
             media::media_revoke_root,
             media::media_root_status,

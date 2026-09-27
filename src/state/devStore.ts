@@ -25,6 +25,13 @@ export interface DevSimulation {
   extremeText: boolean;
   /** Demo media plays local synthetic fixture videos (dev only). */
   syntheticVideos: boolean;
+  /** Stress: synthetic mailbox size across two demo accounts (0 = demo set only). */
+  emailLibrarySize: 0 | 5000 | 100000;
+  hugeThread: boolean;
+  /** Chaos: provider failure mode surfaced by the demo inbox. */
+  emailFailure: "none" | "auth" | "rate-limit" | "server";
+  /** Chaos: bulk operations fail for the last few ids of every batch. */
+  emailPartialFailure: boolean;
 }
 
 interface DevState extends DevSimulation {
@@ -50,6 +57,10 @@ export const useDevStore = create<DevState>((set) => ({
   providerExceptions: false,
   extremeText: false,
   syntheticVideos: false,
+  emailLibrarySize: 0,
+  hugeThread: false,
+  emailFailure: "none",
+  emailPartialFailure: false,
   achievementPulse: 0,
   emailPulse: 0,
   set: (patch) => set(patch),

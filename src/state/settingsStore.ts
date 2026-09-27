@@ -73,6 +73,8 @@ export interface SystemSettings {
 export interface AISettings {
   provider: "local" | "openai" | "anthropic";
   localCommandMode: boolean;
+  /** Optional inbox intelligence: what may leave the machine. Default off. */
+  inboxMode: "off" | "metadata" | "selected" | "full";
 }
 
 export interface ShortcutSettings {
@@ -123,7 +125,7 @@ export const DEFAULT_SETTINGS: SettingsData = {
   media: { authorizedFolders: [], defaultColumns: 3, defaultRows: 2, pauseOnHide: true, thumbnails: false, restoreWorkspace: true },
   privacy: { hotkey: "CommandOrControl+Shift+`", action: "home", stopPlaybackOnTrigger: true, clearWorkspaceOnTrigger: false },
   system: { safety: "observe", allowStartupChanges: false, allowProcessManagement: false, activityHistory: true, preferredGpu: null },
-  ai: { provider: "local", localCommandMode: true },
+  ai: { provider: "local", localCommandMode: true, inboxMode: "off" },
   shortcuts: { commandPalette: "Ctrl+Space", privacy: "Ctrl+Shift+`", screenPrefix: "ctrl", screenShortcutsEnabled: true },
   window: { closeBehavior: "tray" },
 };

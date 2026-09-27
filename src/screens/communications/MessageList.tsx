@@ -1,40 +1,66 @@
-import type { Message } from "@/core/types";
+import { Paperclip, Star } from "lucide-react";
+import type { EmailAccount } from "@/core/types";
+import type { ThreadRow } from "@/hooks/useInbox";
+import { CATEGORY_LABEL } from "@/core/email/classify";
+import { VirtualList } from "@/components/ui/VirtualList";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  messages: readonly Message[];
+  rows: readonly ThreadRow[];
   selectedId: string | null;
-  onSelect: (m: Message) => void;
+  onSelect: (row: ThreadRow) => void;
+  accounts: readonly EmailAccount[];
+  showAccount: boolean;
+  onEndReached?: () => void;
+  footer?: React.ReactNode;
+  scrollToIndex?: number | null;
 }
 
-/** Sender · subject · preview · time. Unread is obvious but quiet. */
-export function MessageList({ messages, selectedId, onSelect }: Props) {
+export const ROW_HEIGHT = 64;
+
+/** Virtualized thread list: unread dot, sender, subject, category, account, time. No cards. */
+export function MessageList({ rows, selectedId, onSelect, accounts, showAccount, onEndReached, footer, scrollToIndex }: Props) {
+  const labelOf = (id: string) => { const a = accounts.find((x) => x.id === id); return a?.label ?? a?.displayName ?? ""; };
   return (
-    <div className="divide-y divide-white/[0.05]" role="list">
-      {messages.map((m) => {
-        const active = selectedId === m.id;
+    <VirtualList
+      items={rows}
+      rowHeight={ROW_HEIGHT}
+      keyOf={(r) => r.head.id}
+      className="h-full"
+      onEndReached={onEndReached}
+      scrollToIndex={scrollToIndex}
+      footer={footer}
+      render={(row) => {
+        const m = row.head;
+        const active = m.id === selectedId;
         return (
           <button
-            key={m.id}
-            role="listitem"
-            onClick={() => onSelect(m)}
-            className={cn("group relative grid w-full grid-cols-[10px_1fr_auto] items-baseline gap-4 py-3.5 pl-1 pr-3 text-left transition-colors", active ? "bg-white/[0.035]" : "hover:bg-white/[0.02]")}
+            onClick={() => onSelect(row)}
+            data-message-row
+            className={cn("group relative flex h-full w-full items-start gap-4 px-3 text-left transition-colors", active ? "bg-white/[0.045]" : "hover:bg-white/[0.02]")}
           >
-            <span className={cn("mt-1.5 h-1.5 w-1.5 rounded-full", m.read ? "bg-transparent" : m.category === "important" ? "bg-white" : "bg-white/40")} />
-            <span className="min-w-0">
+            <span className={cn("mt-[22px] h-1.5 w-1.5 shrink-0 rounded-full", row.unread ? "bg-white" : "bg-transparent")} />
+            <span className="flex min-w-0 flex-1 flex-col justify-center py-2.5">
               <span className="flex items-baseline gap-3">
-                <span className={cn("truncate text-[14px]", m.read ? "text-white/55" : "text-white/95")}>{m.sender}</span>
-                {m.category === "important" && !m.read && <span className="shrink-0 text-micro text-white/40">attention</span>}
+                <span className={cn("truncate text-[13.5px]", row.unread ? "font-medium text-white" : "text-white/70")}>{m.sender.trim() || m.senderAddress || "Unknown sender"}</span>
+                {row.count > 1 && <span className="shrink-0 font-mono text-[10.5px] tabular text-white/35">{row.count}</span>}
+                <span className="ml-auto shrink-0 font-mono text-[10.5px] tabular text-white/35">{formatRelativeTime(m.timestamp)}</span>
               </span>
-              <span className={cn("mt-0.5 block truncate text-[13.5px]", m.read ? "text-white/40" : "text-white/75")}>{m.subject}</span>
-              <span className="mt-0.5 block truncate text-[12px] text-white/28">{m.preview}</span>
+              <span className="mt-0.5 flex items-center gap-2">
+                <span className={cn("truncate text-[13px]", row.unread ? "text-white/85" : "text-white/50")}>{m.subject}</span>
+                {m.hasAttachments && <Paperclip size={10} className="shrink-0 text-white/30" />}
+                {m.starred && <Star size={10} className="shrink-0 fill-white/60 text-white/60" />}
+              </span>
+              <span className="mt-1 flex items-center gap-2 text-micro text-white/30">
+                <span>{CATEGORY_LABEL[m.category]}</span>
+                {showAccount && labelOf(m.accountId) && <><span className="text-white/15">·</span><span>{labelOf(m.accountId)}</span></>}
+              </span>
             </span>
-            <span className="font-mono text-[11px] tabular text-white/30">{formatRelativeTime(m.timestamp)}</span>
-            {active && <span className="absolute inset-y-3 left-[-12px] w-px bg-white" />}
+            <span className={cn("absolute inset-y-2 left-0 w-px", active ? "bg-white/70" : "bg-transparent")} />
           </button>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }

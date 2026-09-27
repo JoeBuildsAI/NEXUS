@@ -5,6 +5,10 @@ import { outlookAdapter, gmailAdapter } from "./adapters";
 import { EmailAutoProvider } from "./EmailAutoProvider";
 import { MockEmailProvider } from "./MockEmailProvider";
 import { useEmailRulesStore } from "@/state/emailRulesStore";
+import type { MailAccountSlot } from "@/state/emailAccountsStore";
+
+const ADAPTERS = { outlook: outlookAdapter, gmail: gmailAdapter };
+const slots = (...list: ["outlook" | "gmail", number][]): MailAccountSlot[] => list.map(([provider, slot]) => ({ id: `acct-${provider}-${slot}`, provider, slot, label: `${provider} ${slot}`, address: null, addedAt: 0 }));
 
 const graphInbox = ok({
   value: [
@@ -123,22 +127,108 @@ describe("Gmail adapter", () => {
   });
 });
 
-describe("EmailAutoProvider", () => {
+describe("EmailAutoProvider (multi-account)", () => {
   it("serves the demo inbox when nothing is connected and labels it", async () => {
-    const o = new RealMailProvider(new FixtureMailBridge({ provider: "outlook", clientConfigured: false, connected: false, pending: false }), outlookAdapter);
-    const auto = new EmailAutoProvider([o], new MockEmailProvider(), true);
+    const bridge = new FixtureMailBridge({ provider: "outlook", clientConfigured: false, connected: false, pending: false });
+    const auto = new EmailAutoProvider(bridge, ADAPTERS, new MockEmailProvider(), true, () => slots(["outlook", 1]));
     expect(await auto.mode()).toBe("demo");
     expect((await auto.getMessages()).length).toBeGreaterThan(0);
     expect((await auto.health()).state).toBe("not-configured");
   });
 
   it("unifies connected accounts and routes actions by id prefix", async () => {
-    const { provider, bridge } = outlook();
-    const auto = new EmailAutoProvider([provider], new MockEmailProvider(), true);
+    const { bridge } = outlook();
+    const auto = new EmailAutoProvider(bridge, ADAPTERS, new MockEmailProvider(), true, () => slots(["outlook", 1]));
     expect(await auto.mode()).toBe("real");
     const msgs = await auto.getMessages();
     expect(msgs.every((m) => m.id.startsWith("outlook:"))).toBe(true);
     await auto.markRead("outlook:m1", true);
     expect(bridge.calls.some((c) => c.method === "PATCH")).toBe(true);
+  });
+
+  it("keeps two Outlook accounts apart: distinct ids, actions hit the right slot, batch refuses foreign ids", async () => {
+    const { bridge } = outlook();
+    const auto = new EmailAutoProvider(bridge, ADAPTERS, new MockEmailProvider(), true, () => slots(["outlook", 1], ["outlook", 2]));
+    const msgs = await auto.getMessages();
+    expect(msgs.filter((m) => m.accountId === "acct-outlook-1")).toHaveLength(2);
+    expect(msgs.filter((m) => m.accountId === "acct-outlook-2")).toHaveLength(2);
+    expect(msgs.some((m) => m.id === "outlook:m1")).toBe(true);
+    expect(msgs.some((m) => m.id === "outlook:2:m1")).toBe(true);
+    bridge.calls.length = 0;
+    await auto.markRead("outlook:2:m1", true);
+    expect(bridge.calls.filter((c) => c.method === "PATCH").map((c) => c.slot)).toEqual([2]);
+    const r = await auto.batch("acct-outlook-1", ["outlook:2:m1"], "archive");
+    expect(r).toMatchObject({ succeeded: 0, failed: 1 });
+    const okBatch = await auto.batch("acct-outlook-2", ["outlook:2:m1", "outlook:2:m2"], "archive");
+    expect(okBatch).toEqual({ succeeded: 2, failed: 0 });
+    expect((await auto.getMessages()).filter((m) => m.accountId === "acct-outlook-2")).toHaveLength(0);
+  });
+
+  it("mixed Gmail + Outlook accounts merge newest-first and report both in health", async () => {
+    const bridge = new FixtureMailBridge({ provider: "outlook", clientConfigured: true, connected: true, pending: false }, {
+      "GET /me?": ok({ mail: "j@outlook.example", displayName: "J" }),
+      "GET /me/mailFolders/inbox/messages": graphInbox,
+      "GET /me/mailFolders/inbox?": ok({ totalItemCount: 120, unreadItemCount: 7 }),
+      "GET /users/me/profile": ok({ emailAddress: "j@gmail.example", messagesTotal: 18492 }),
+      "GET /users/me/labels/INBOX": ok({ messagesUnread: 3204 }),
+      "GET /users/me/messages?": ok({ messages: [{ id: "g1" }], nextPageToken: null }),
+      "GET /users/me/messages/g1": ok({ id: "g1", threadId: "t1", sizeEstimate: 5000, internalDate: String(Date.parse("2026-09-27T10:00:00Z")), labelIds: ["INBOX", "UNREAD"], snippet: "hi", payload: { headers: [{ name: "From", value: "Alex <alex.chen@gmail.example>" }, { name: "Subject", value: "Co-op tonight?" }] } }),
+    });
+    const auto = new EmailAutoProvider(bridge, ADAPTERS, new MockEmailProvider(), true, () => slots(["outlook", 1], ["gmail", 1]));
+    const msgs = await auto.getMessages();
+    expect(msgs[0]!.id).toBe("gmail:g1"); // newest
+    expect(new Set(msgs.map((m) => m.accountId))).toEqual(new Set(["acct-outlook-1", "acct-gmail-1"]));
+    const accounts = await auto.getAccounts();
+    expect(accounts.find((a) => a.provider === "gmail")?.totals).toEqual({ messages: 18492, unread: 3204 });
+    expect(accounts.find((a) => a.provider === "outlook")?.totals).toEqual({ messages: 120, unread: 7 });
+    expect((await auto.health()).summary).toMatch(/2 accounts connected/);
+  });
+});
+
+describe("RealMailProvider incremental loading and search", () => {
+  it("loads the first page, then older pages on demand, and stops when exhausted", async () => {
+    let page = 0;
+    const bridge = new FixtureMailBridge({ provider: "outlook", clientConfigured: true, connected: true, pending: false }, {
+      "GET /me?": ok({ mail: "j@outlook.example", displayName: "J" }),
+      "GET /me/mailFolders/inbox?": ok({ totalItemCount: 3, unreadItemCount: 0 }),
+      "GET /me/mailFolders/inbox/messages": (path) => {
+        page++;
+        const older = path.includes("skip=");
+        // First page: a full initial window (200) so the initial sync stops; second page: one older message.
+        const value = older
+          ? [{ id: "old1", subject: "x", from: { emailAddress: { address: "a@b.example" } }, receivedDateTime: "2026-01-01T00:00:00Z" }]
+          : Array.from({ length: 200 }, (_, i) => ({ id: `new${i}`, subject: "x", from: { emailAddress: { address: "a@b.example" } }, receivedDateTime: new Date(Date.parse("2026-09-01T00:00:00Z") - i * 60_000).toISOString() }));
+        return ok({ value, "@odata.nextLink": older ? undefined : "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$skip=200" });
+      },
+    });
+    const p = new RealMailProvider(bridge, outlookAdapter, 1);
+    expect((await p.getMessages())).toHaveLength(200);
+    expect(p.runtime().hasMore).toBe(true);
+    expect(await p.loadOlder()).toBe(1);
+    expect((await p.getMessages()).at(-1)!.id).toBe("outlook:old1");
+    expect(p.runtime().hasMore).toBe(false);
+    expect(await p.loadOlder()).toBe(0);
+    expect(page).toBe(2);
+  });
+
+  it("provider search is bounded and never merged into the cache", async () => {
+    const { provider, bridge } = outlook({}, { "GET /me/messages?$search": ok({ value: [{ id: "s1", subject: "found", from: { emailAddress: { address: "z@z.example" } }, receivedDateTime: "2026-09-20T00:00:00Z" }] }) });
+    await provider.getMessages();
+    const found = await provider.search("found");
+    expect(found.map((m) => m.id)).toEqual(["outlook:s1"]);
+    expect((await provider.getMessages()).some((m) => m.id === "outlook:s1")).toBe(false);
+    expect(bridge.calls.some((c) => c.path.includes("$search="))).toBe(true);
+  });
+
+  it("unsubscribe plan reflects headers; one-click goes through the native bridge", async () => {
+    const { provider, bridge } = outlook({}, {
+      "GET /me/mailFolders/inbox/messages": ok({ value: [{ id: "u1", subject: "News", from: { emailAddress: { address: "news@l.example" } }, receivedDateTime: "2026-09-20T00:00:00Z", internetMessageHeaders: [{ name: "List-Unsubscribe", value: "<https://l.example/u/1>" }, { name: "List-Unsubscribe-Post", value: "List-Unsubscribe=One-Click" }] }] }),
+    });
+    await provider.getMessages();
+    const plan = provider.unsubscribePlan("outlook:u1");
+    expect(plan.capability).toBe("SUPPORTED_HEADER");
+    const r = await provider.unsubscribeOneClick(plan.url!);
+    expect(r.ok).toBe(true);
+    expect(bridge.unsubscribed).toEqual(["https://l.example/u/1"]);
   });
 });

@@ -22,6 +22,9 @@ export type SettingsSection =
   | "integrations"
   | "ai";
 
+export type CommsSurface = "inbox" | "health" | "subscriptions" | "rules" | "summary";
+export type CommsRequest = { surface: CommsSurface; view?: string; sender?: string; query?: string; accountId?: string; seq: number };
+
 export const SCREEN_ORDER: readonly Screen[] = ["home", "gaming", "media", "system", "communications"];
 
 interface NavigationState {
@@ -32,11 +35,14 @@ interface NavigationState {
   /** Active tab within the System screen. */
   systemTab: SystemTab;
   settingsSection: SettingsSection;
+  /** Deep-link into Communications (command palette → view/sender/surface). */
+  commsRequest: CommsRequest | null;
   commandPaletteOpen: boolean;
   setBootPhase: (phase: BootPhase) => void;
   navigate: (screen: Screen) => void;
   setSystemTab: (tab: SystemTab) => void;
   setSettingsSection: (section: SettingsSection) => void;
+  openCommunications: (req: Omit<CommsRequest, "seq">) => void;
   selectGame: (gameId: string | null) => void;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
@@ -49,11 +55,13 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   selectedGameId: null,
   systemTab: "overview",
   settingsSection: "general",
+  commsRequest: null,
   commandPaletteOpen: false,
   setBootPhase: (bootPhase) => set({ bootPhase }),
   navigate: (screen) => set({ screen, selectedGameId: null }),
   setSystemTab: (systemTab) => set({ systemTab }),
   setSettingsSection: (settingsSection) => set({ settingsSection }),
+  openCommunications: (req) => set((st) => ({ screen: "communications", selectedGameId: null, commsRequest: { ...req, seq: (st.commsRequest?.seq ?? 0) + 1 } })),
   selectGame: (selectedGameId) => set({ selectedGameId }),
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),

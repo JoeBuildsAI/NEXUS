@@ -14,13 +14,14 @@ import { MediaAutoProvider } from "./media/MediaAutoProvider";
 import { TauriMediaBridge } from "./media/MediaBridge";
 import type { EmailProvider } from "./email/EmailProvider";
 import { MockEmailProvider } from "./email/MockEmailProvider";
-import { RealMailProvider } from "./email/RealMailProvider";
 import { EmailAutoProvider } from "./email/EmailAutoProvider";
 import { TauriMailBridge } from "./email/MailBridge";
 import { gmailAdapter, outlookAdapter } from "./email/adapters";
 import type { AssistantProvider } from "./assistant/AssistantProvider";
 import { LocalCommandProvider } from "./assistant/LocalCommandProvider";
 import type { AppProvider } from "./apps/AppProvider";
+import { NoIntelligenceProvider, type InboxIntelligenceProvider } from "./intelligence/InboxIntelligenceProvider";
+import { useSettingsStore } from "@/state/settingsStore";
 import { MockAppProvider } from "./apps/MockAppProvider";
 import { TauriAppProvider } from "./apps/TauriAppProvider";
 
@@ -44,6 +45,8 @@ export interface Providers {
   readonly email: EmailProvider;
   readonly apps: AppProvider;
   readonly assistant: AssistantProvider;
+  /** Optional inbox intelligence — "none" until a provider is configured (never faked). */
+  readonly intelligence: InboxIntelligenceProvider;
 }
 
 let cached: Providers | null = null;
@@ -80,7 +83,7 @@ export function getProviders(): Providers {
   if (emailMode === "mock" || !tauri) email = new MockEmailProvider();
   else {
     const bridge = new TauriMailBridge();
-    email = new EmailAutoProvider([new RealMailProvider(bridge, outlookAdapter), new RealMailProvider(bridge, gmailAdapter)], new MockEmailProvider(), demoFallback);
+    email = new EmailAutoProvider(bridge, { outlook: outlookAdapter, gmail: gmailAdapter }, new MockEmailProvider(), demoFallback);
   }
   const apps: AppProvider = tauri ? new TauriAppProvider() : new MockAppProvider();
 
@@ -90,6 +93,7 @@ export function getProviders(): Providers {
     media,
     email,
     apps,
+    intelligence: new NoIntelligenceProvider(() => useSettingsStore.getState().ai.inboxMode),
     assistant: new LocalCommandProvider({
       getApps: () => apps.getApps(),
       getGames: () => steam.getGames(),

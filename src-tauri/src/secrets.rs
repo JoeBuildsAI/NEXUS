@@ -32,8 +32,14 @@ fn entry(key: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, key).map_err(|e| e.to_string())
 }
 
+/// Slot-scoped token keys: email.<outlook|gmail>.<1-9>.<accessToken|refreshToken>.
+fn is_slot_token_key(key: &str) -> bool {
+    let parts: Vec<&str> = key.split('.').collect();
+    parts.len() == 4 && parts[0] == "email" && matches!(parts[1], "outlook" | "gmail") && parts[2].len() == 1 && parts[2].chars().all(|c| ('1'..='9').contains(&c)) && matches!(parts[3], "accessToken" | "refreshToken")
+}
+
 fn native_entry(key: &str) -> Result<Entry, String> {
-    if !ALLOWED_KEYS.contains(&key) && !NATIVE_KEYS.contains(&key) {
+    if !ALLOWED_KEYS.contains(&key) && !NATIVE_KEYS.contains(&key) && !is_slot_token_key(key) {
         return Err(format!("unknown secret key: {key}"));
     }
     Entry::new(SERVICE, key).map_err(|e| e.to_string())
@@ -81,6 +87,10 @@ mod tests {
         assert!(entry("email.password").is_err(), "only allowlisted keys may be stored");
         assert!(entry("email.outlook.refreshToken").is_err(), "tokens are never settable from the UI");
         assert!(native_entry("email.outlook.refreshToken").is_ok());
+        assert!(native_entry("email.gmail.3.refreshToken").is_ok());
+        assert!(entry("email.gmail.3.refreshToken").is_err(), "slot tokens are native-only");
+        assert!(native_entry("email.gmail.10.refreshToken").is_err());
+        assert!(native_entry("email.gmail.3.clientSecret").is_err());
     }
 }
 
@@ -120,7 +130,7 @@ pub fn secret_status(keys: Vec<String>) -> Result<Vec<SecretStatus>, String> {
     Ok(keys
         .into_iter()
         .map(|k| {
-            let known = ALLOWED_KEYS.contains(&k.as_str()) || NATIVE_KEYS.contains(&k.as_str());
+            let known = ALLOWED_KEYS.contains(&k.as_str()) || NATIVE_KEYS.contains(&k.as_str()) || is_slot_token_key(&k);
             let configured = known && read_secret(&k).is_some();
             SecretStatus { key: k, configured }
         })

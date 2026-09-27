@@ -2,9 +2,9 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { isObj, safeStorage, vArr } from "./persistence";
 import type { UserRule } from "@/core/email/classify";
-import type { MessageCategory } from "@/core/types";
+import { MESSAGE_CATEGORIES, type MessageCategory } from "@/core/types";
 
-const CATEGORIES: MessageCategory[] = ["important", "newsletter", "subscription", "receipt", "notification", "personal", "social", "other"];
+const CATEGORIES: readonly MessageCategory[] = MESSAGE_CATEGORIES;
 
 interface EmailRulesState {
   rules: UserRule[];
@@ -28,7 +28,7 @@ export const useEmailRulesStore = create<EmailRulesState>()(
       storage: safeStorage(),
       merge: (persisted, current) => ({
         ...current,
-        rules: vArr((persisted as { rules?: unknown } | undefined)?.rules, (x): x is UserRule => isObj(x) && (x.kind === "domain" || x.kind === "address") && typeof x.value === "string" && CATEGORIES.includes(x.category as MessageCategory), [], 500),
+        rules: vArr((persisted as { rules?: unknown } | undefined)?.rules, (x): x is UserRule => isObj(x) && (x.kind === "domain" || x.kind === "address" || x.kind === "list") && typeof x.value === "string" && CATEGORIES.includes(x.category as MessageCategory), [], 500),
       }),
     },
   ),

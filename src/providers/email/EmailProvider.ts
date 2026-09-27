@@ -1,4 +1,5 @@
 import type { EmailAccount, InboxSummary, Message, ProviderHealth, Subscription } from "@/core/types";
+import type { CleanupOp } from "@/core/email/cleanup";
 
 /**
  * Abstraction over communications sources: MockEmailProvider (demo),
@@ -19,4 +20,11 @@ export interface EmailProvider {
   getSubscriptions(): Promise<readonly Subscription[]>;
   unsubscribeSender(subscriptionId: string): Promise<void>;
   health?(): Promise<ProviderHealth>;
+  /** Incremental loading (older pages); returns the number of messages added. */
+  loadOlder?(): Promise<number>;
+  hasMore?(): boolean;
+  /** Provider-side (or local, for demo) search — bounded results. */
+  search?(query: string): Promise<readonly Message[]>;
+  /** Bulk cleanup op for one account. */
+  batch?(accountId: string, messageIds: string[], op: CleanupOp): Promise<{ succeeded: number; failed: number; error?: string }>;
 }
