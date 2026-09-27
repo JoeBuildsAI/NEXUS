@@ -166,6 +166,9 @@ export function MediaSettingsSection() {
       <SettingRow label="Restore last volume" description="Remember volume per video (local only).">
         <Toggle checked={defaults.restoreVolume} onChange={(v) => setDefaults({ restoreVolume: v })} />
       </SettingRow>
+      <SettingRow label="Focus pauses the others" description="Entering Focus pauses every other player; leaving Focus never restarts them on its own.">
+        <Toggle checked={defaults.focusPausesOthers} onChange={(v) => setDefaults({ focusPausesOthers: v })} />
+      </SettingRow>
       <SettingRow label="Restore last position" description="Resume where a video was left. Off by default — positions are private state.">
         <Toggle checked={defaults.restorePosition} onChange={(v) => setDefaults({ restorePosition: v })} />
       </SettingRow>

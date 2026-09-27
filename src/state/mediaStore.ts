@@ -31,8 +31,10 @@ export interface WorkspaceDefaults {
   mutedOnLoad: boolean;
   restoreVolume: boolean;
   restorePosition: boolean;
+  /** Focus mode pauses the players that leave the wall. */
+  focusPausesOthers: boolean;
 }
-export const DEFAULT_WORKSPACE_DEFAULTS: WorkspaceDefaults = { autoplay: false, loop: "full", fit: "smart", mutedOnLoad: true, restoreVolume: true, restorePosition: false };
+export const DEFAULT_WORKSPACE_DEFAULTS: WorkspaceDefaults = { autoplay: false, loop: "full", fit: "smart", mutedOnLoad: true, restoreVolume: true, restorePosition: false, focusPausesOthers: false };
 
 interface MediaState {
   /** Session-only: the restored workspace has been revealed by the user. */
@@ -128,7 +130,14 @@ export const useMediaStore = create<MediaState>()(
       lastVolume: {},
       lastPosition: {},
 
-      setMode: (mode) => set({ mode }),
+      setMode: (mode) =>
+        set((s) => {
+          if (mode === "focus" && s.defaults.focusPausesOthers) {
+            const keep = s.activeIndex ?? s.focusIndex;
+            return { mode, focusIndex: keep, slots: s.slots.map((sl) => (sl.index === keep ? sl : { ...sl, playing: false })) };
+          }
+          return { mode };
+        }),
       setPrimary: (primaryIndex) => set({ primaryIndex }),
       setFocusIndex: (focusIndex) => set({ focusIndex }),
       setActiveIndex: (activeIndex) => set({ activeIndex }),
@@ -283,6 +292,7 @@ export const useMediaStore = create<MediaState>()(
           mutedOnLoad: vBool(d.mutedOnLoad, DEFAULT_WORKSPACE_DEFAULTS.mutedOnLoad),
           restoreVolume: vBool(d.restoreVolume, DEFAULT_WORKSPACE_DEFAULTS.restoreVolume),
           restorePosition: vBool(d.restorePosition, DEFAULT_WORKSPACE_DEFAULTS.restorePosition),
+          focusPausesOthers: vBool(d.focusPausesOthers, DEFAULT_WORKSPACE_DEFAULTS.focusPausesOthers),
         };
         // v2 stored a fixed layout id; map to a wall mode.
         const legacy: Record<string, WallMode> = { "3x2": "grid", "2x3": "grid", "2x2-primary": "primary", focus: "focus" };
