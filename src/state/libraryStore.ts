@@ -73,10 +73,15 @@ export const useLibraryStore = create<LibraryState>()(
         const { steam, xbox } = getProviders();
         try {
           // Unified PLAY library: Steam + locally discovered Xbox PC titles. Provider gaps stay explicit.
-          const [steamGames, xboxGames] = await Promise.all([steam.getGames(), xbox.getGames().catch(() => [])]);
-          const games = [...steamGames, ...xboxGames];
+          const [steamResult, xboxGames] = await Promise.all([steam.getGames().then((g) => ({ ok: true as const, g }), (e: unknown) => ({ ok: false as const, e })), xbox.getGames().catch(() => [] as const)]);
+          // Steam missing must not hide real Xbox titles.
+          if (!steamResult.ok && !xboxGames.length) throw steamResult.e;
           const withMode = steam as { mode?: () => Promise<"real" | "demo"> };
-          const mode = typeof withMode.mode === "function" ? await withMode.mode() : "demo";
+          const steamMode = steamResult.ok ? (typeof withMode.mode === "function" ? await withMode.mode() : "demo") : "real";
+          // A real Xbox library is never padded with the demo Steam library.
+          const steamGames = !steamResult.ok || (steamMode === "demo" && xboxGames.length) ? [] : steamResult.g;
+          const games = [...steamGames, ...xboxGames];
+          const mode: "real" | "demo" = steamGames.length && steamMode === "demo" ? "demo" : "real";
           // Keep only cached details for games still present; reconcile core fields.
           const details: Record<string, CachedDetails> = {};
           for (const g of games) {

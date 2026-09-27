@@ -11,6 +11,7 @@ import { notify } from "@/state/toastStore";
 import { actionRegistry } from "@/core/actions/registry";
 import { completionPercent, type AchievementSourceStatus, type GameDetails } from "@/core/types";
 import { closestAchievements, recentUnlocks } from "@/core/gaming/completion";
+import { PROVIDER_LABEL, installLabel } from "@/core/gaming/labels";
 import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { cn, displayTitleClass } from "@/lib/utils";
 
@@ -103,22 +104,28 @@ export function GameDetail({ gameId }: { gameId: string }) {
           <Button variant="ghost" size="sm" className="-ml-3 w-fit text-white/50" onClick={() => selectGame(null)}><ArrowLeft size={14} /> Library</Button>
           <div className="max-w-4xl pb-6">
             <p className="text-micro tracking-cinematic text-white/40">
-              {[...new Set([game.developer, game.publisher].filter(Boolean))].join(" · ") || (game.genres.length ? game.genres.slice(0, 3).join(" · ") : "Steam")}
-              {!game.installed && <span className="ml-3 text-status-attention/80">Not installed</span>}
+              {[PROVIDER_LABEL[game.launcher], ...new Set([game.developer, game.publisher].filter(Boolean))].join(" · ")}
+              {!game.installed && <span className="ml-3 text-status-attention/80">{installLabel(game)}</span>}
             </p>
             <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }} className={cn("mt-4 max-w-4xl break-words font-display font-semibold uppercase tracking-wide text-white", displayTitleClass(game.title))}>
               {game.title}
             </motion.h1>
             <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 font-mono text-[12.5px] tabular text-white/50">
-              <span><span className="text-white/90">{game.playtimeMinutes > 0 ? formatPlaytime(game.playtimeMinutes) : "—"}</span> played</span>
-              <span><span className="text-white/90">{game.lastPlayed ? formatRelativeTime(game.lastPlayed) : "—"}</span> last played</span>
+              {game.launcher === "xbox" ? (
+                <span className="text-white/35">playtime unavailable</span>
+              ) : (
+                <>
+                  <span><span className="text-white/90">{game.playtimeMinutes > 0 ? formatPlaytime(game.playtimeMinutes) : "—"}</span> played</span>
+                  <span><span className="text-white/90">{game.lastPlayed ? formatRelativeTime(game.lastPlayed) : "never"}</span> last played</span>
+                </>
+              )}
               {game.installSizeBytes != null && <span><span className="text-white/90">{formatBytes(game.installSizeBytes, 1)}</span> on disk</span>}
               {hasData && <span><span className="text-white/90">{ach.unlocked} / {ach.total}</span> achievements</span>}
             </div>
             <div className="mt-8 flex items-center gap-3">
               {complete && <span className="mr-2 flex items-center gap-2 text-micro tracking-cinematic text-ember"><span className="h-1 w-1 rounded-full bg-ember" /> Complete</span>}
               <Button variant="primary" size="lg" disabled={!game.installed} onClick={() => void actionRegistry.execute("launch-game", { args: { gameId } })}>
-                <Play size={16} fill="currentColor" /> {game.installed ? "Play" : "Not installed"}
+                <Play size={16} fill="currentColor" /> {game.installed ? "Play" : installLabel(game)}
               </Button>
               {trackedFor && (
                 <span className="flex items-center gap-2 text-[13px] text-white/60"><Target size={13} className="text-white/40" /> Tracking <span className="text-white/90">{trackedFor.name}</span></span>

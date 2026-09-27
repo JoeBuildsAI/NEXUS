@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { GameDetails } from "@/core/types";
 import { completionPercent } from "@/core/types";
@@ -9,6 +9,8 @@ import { formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { Button, ContextMenu } from "@/components/ui";
 import { gameContextItems } from "./gameContextItems";
 import { cn } from "@/lib/utils";
+import { CoverImage } from "./CoverImage";
+import { PROVIDER_LABEL, installLabel } from "@/core/gaming/labels";
 
 /**
  * Console-style horizontal rail. Selection is a single index driven by mouse,
@@ -21,6 +23,7 @@ export function GameRail({ games, selectedId, onSelect, onOpen }: { games: reado
   const index = Math.max(0, games.findIndex((g) => g.id === selectedId));
   const selected = games[index] ?? null;
   const session = useGameSessionStore();
+  const [noArt, setNoArt] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -58,16 +61,18 @@ export function GameRail({ games, selectedId, onSelect, onOpen }: { games: reado
                 id={`rail-${g.id}`}
                 role="option"
                 aria-selected={on}
+                aria-label={g.title}
                 data-rail-index={i}
                 onClick={() => (on ? onOpen(g.id) : onSelect(g.id))}
                 onDoubleClick={() => void actionRegistry.execute("launch-game", { args: { gameId: g.id } })}
                 className={cn("group relative shrink-0 overflow-hidden rounded-sm transition-[transform,box-shadow] duration-300 ease-nexus focus-visible:outline-none", on ? "z-10 scale-[1.06] shadow-[0_0_0_1px_rgba(255,255,255,0.7),0_24px_60px_-20px_rgba(0,0,0,0.9)]" : "opacity-75 hover:opacity-100")}
                 style={{ width: 168, height: 252, background: `linear-gradient(160deg, ${g.coverColor}, #000 130%)` }}
               >
-                {g.coverUrl && <img src={g.coverUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
-                {!g.installed && <span className="absolute left-2 top-2 text-micro text-white/60">Not installed</span>}
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2.5 pt-8 text-left">
-                  <span className="block truncate text-[12.5px] text-white/90">{g.title}</span>
+                <CoverImage game={g} onFail={() => setNoArt((s) => new Set(s).add(g.id))} />
+                {!g.installed && <span className="absolute left-2 top-2 text-micro text-white/60">{installLabel(g)}</span>}
+                {/* Cover art already carries the title; the caption is for the focused tile, hover, or missing art. */}
+                <span className={cn("absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2.5 pt-8 text-left transition-opacity duration-200", on || !g.coverUrl || g.launcher === "xbox" || noArt.has(g.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100")}>
+                  <span className="line-clamp-2 block text-[12.5px] leading-snug text-white/90" title={g.title}>{g.title}</span>
                   {g.achievements.total > 0 && <span className="block font-mono text-[10.5px] tabular text-white/45">{completionPercent(g.achievements)}%</span>}
                 </span>
               </button>
@@ -79,11 +84,11 @@ export function GameRail({ games, selectedId, onSelect, onOpen }: { games: reado
       {selected && (
         <motion.div key={selected.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="mt-4 grid gap-x-14 gap-y-6 lg:grid-cols-[1fr_1fr_1fr]">
           <div>
-            <p className="text-micro text-white/35">{selected.launcher === "steam" ? "Steam" : selected.launcher}{selected.installed ? " · installed" : " · not installed"}{active ? " · running" : ""}</p>
+            <p className="text-micro text-white/35">{PROVIDER_LABEL[selected.launcher]} · {selected.installed ? "installed" : installLabel(selected).toLowerCase()}{active ? " · running" : ""}</p>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-7 gap-y-1 font-mono text-[12.5px] tabular text-white/55">
               {selected.playtimeMinutes > 0 ? <span><span className="text-white/90">{formatPlaytime(selected.playtimeMinutes)}</span> played</span> : <span className="text-white/35">no playtime data</span>}
               {selected.lastPlayed && <span>last {formatRelativeTime(selected.lastPlayed)}</span>}
-              {selected.achievements.total === 0 && <span className="text-white/35">{selected.achievements.status === "private-profile" ? "achievements private" : selected.achievements.status === "not-configured" ? "achievements need a Steam key" : "no achievements"}</span>}
+              {selected.achievements.total === 0 && <span className="text-white/35">{selected.achievements.status === "private-profile" ? "achievements private" : selected.achievements.status === "not-configured" ? "achievements need a Steam key" : selected.achievements.status === "unsupported" ? "achievements unavailable" : "no achievements"}</span>}
             </div>
             <div className="mt-4 flex items-center gap-3">
               {!selected.installed && <Button size="sm" variant="ghost" onClick={() => onOpen(selected.id)}>Details</Button>}

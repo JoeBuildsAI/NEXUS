@@ -50,6 +50,28 @@ describe("libraryStore", () => {
     expect(keys).toContain("g-404");
   });
 
+  const XBOX_GAME = { id: "xbox:Studio.Core", title: "Shooter", steamAppId: null, launcher: "xbox" as const, installed: true, installSizeBytes: null, playtimeMinutes: 0, lastPlayed: null, coverColor: "#111", heroColor: "#000", coverUrl: null, heroUrl: null, genres: [] };
+
+  it("real Xbox titles are not mixed with the demo Steam library", async () => {
+    const spy = vi.spyOn(getProviders().xbox, "getGames").mockResolvedValue([XBOX_GAME]);
+    await useLibraryStore.getState().load({ force: true });
+    const s = useLibraryStore.getState();
+    expect(s.games.map((g) => g.id)).toEqual(["xbox:Studio.Core"]);
+    expect(s.mode).toBe("real");
+    spy.mockRestore();
+  });
+
+  it("Steam unavailable still shows real Xbox titles instead of an offline screen", async () => {
+    const { useDevStore } = await import("./devStore");
+    useDevStore.getState().set({ steamConnected: false });
+    const spy = vi.spyOn(getProviders().xbox, "getGames").mockResolvedValue([XBOX_GAME]);
+    await useLibraryStore.getState().load({ force: true });
+    expect(useLibraryStore.getState().offline).toBe(false);
+    expect(useLibraryStore.getState().games).toHaveLength(1);
+    spy.mockRestore();
+    useDevStore.getState().set({ steamConnected: true });
+  });
+
   it("marks the library offline when the provider throws a typed offline error", async () => {
     const { useDevStore } = await import("./devStore");
     useDevStore.getState().set({ steamConnected: false });

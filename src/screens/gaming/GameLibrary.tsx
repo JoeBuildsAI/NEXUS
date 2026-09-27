@@ -16,6 +16,8 @@ import { formatBytes, formatPlaytime, formatRelativeTime } from "@/lib/utils";
 import { Button, ContextMenu } from "@/components/ui";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { gameContextItems } from "./gameContextItems";
+import { CoverImage } from "./CoverImage";
+import { PROVIDER_LABEL, installLabel } from "@/core/gaming/labels";
 import { cn, displayTitleClass } from "@/lib/utils";
 
 type SortKey = "recent" | "name" | "playtime" | "completion" | "size";
@@ -142,7 +144,7 @@ export function GameLibrary() {
                 <div className="max-w-3xl">
                   <p className="text-micro tracking-cinematic text-white/40">
                     {mode === "demo" ? "Demo library · " : ""}
-                    {session.phase === "active" && session.gameId === featured.id ? "Session active" : featured.lastPlayed ? `Continue · ${formatRelativeTime(featured.lastPlayed)}` : "Ready"}
+                    {PROVIDER_LABEL[featured.launcher]} · {session.phase === "active" && session.gameId === featured.id ? "Session active" : featured.lastPlayed ? `Last played ${formatRelativeTime(featured.lastPlayed)}` : featured.installed ? "Ready" : installLabel(featured)}
                   </p>
                   <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }} className={cn("mt-4 break-words font-display font-semibold uppercase tracking-wide text-white", displayTitleClass(featured.title))}>
                     {featured.title}
@@ -154,9 +156,13 @@ export function GameLibrary() {
                     {featured.installSizeBytes != null && <span><span className="text-white/90">{formatBytes(featured.installSizeBytes, 0)}</span> on disk</span>}
                   </div>
                   <div className="mt-8 flex items-center gap-3">
-                    <Button variant="primary" size="lg" onClick={() => void actionRegistry.execute("launch-game", { args: { gameId: featured.id } })}>
-                      <Play size={16} fill="currentColor" /> {session.phase === "active" && session.gameId === featured.id ? "Running" : "Continue"}
-                    </Button>
+                    {featured.installed ? (
+                      <Button variant="primary" size="lg" onClick={() => void actionRegistry.execute("launch-game", { args: { gameId: featured.id } })}>
+                        <Play size={16} fill="currentColor" /> {session.phase === "active" && session.gameId === featured.id ? "Running" : featured.lastPlayed ? "Continue" : "Play"}
+                      </Button>
+                    ) : (
+                      <span className="font-mono text-[12.5px] uppercase tracking-wide2 text-white/45">{installLabel(featured)}</span>
+                    )}
                     <Button variant="ghost" size="lg" onClick={() => selectGame(featured.id)}>Details</Button>
                   </div>
                 </div>
@@ -257,8 +263,8 @@ function CompletionColumn({ title, games, onSelect }: { title: string; games: Ga
             return (
               <li key={g.id}>
                 <button onClick={() => onSelect(g)} className="group flex w-full items-center gap-4 py-3 text-left">
-                  <span className="h-10 w-7 shrink-0 overflow-hidden rounded-sm bg-[#0b0b0c]" style={{ background: g.coverUrl ? undefined : `linear-gradient(160deg, ${g.coverColor}, #000)` }}>
-                    {g.coverUrl && <img src={g.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                  <span className="relative h-10 w-7 shrink-0 overflow-hidden rounded-sm" style={{ background: `linear-gradient(160deg, ${g.coverColor}, #000)` }}>
+                    <CoverImage game={g} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] text-white/80 transition-colors group-hover:text-white">{g.title}</span>
