@@ -38,9 +38,9 @@ export function TelemetryWave({ height = 120 }: { height?: number }) {
 
       const hist = histRef.current;
       const series = [
-        { data: hist.map((x) => x.cpu.usagePercent), alpha: 0.85, width: 1.25 },
-        { data: hist.map((x) => x.memory.usagePercent), alpha: 0.35, width: 1 },
-        { data: hist.map((x) => x.gpu?.usagePercent ?? 0), alpha: 0.2, width: 1 },
+        { data: hist.map((x) => x.cpu), alpha: 0.85, width: 1.25 },
+        { data: hist.map((x) => x.memory), alpha: 0.35, width: 1 },
+        { data: hist.map((x) => x.gpu ?? 0), alpha: 0.2, width: 1 },
       ];
 
       ctx.strokeStyle = "rgba(255,255,255,0.05)";
@@ -57,7 +57,7 @@ export function TelemetryWave({ height = 120 }: { height?: number }) {
       ctx.lineTo(w, h - 0.5);
       ctx.stroke();
 
-      const N = 60;
+      const N = 120;
       for (const s of series) {
         if (s.data.length < 2) continue;
         const pts = s.data.slice(-N);

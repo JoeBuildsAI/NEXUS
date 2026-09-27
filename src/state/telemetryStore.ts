@@ -2,10 +2,20 @@ import { create } from "zustand";
 import type { TelemetrySnapshot } from "@/core/types";
 import { getProviders } from "@/providers";
 
+/** Compact history point — a few numbers, never the whole snapshot. */
+export interface TelemetryPoint {
+  readonly t: number;
+  readonly cpu: number;
+  readonly memory: number;
+  readonly gpu: number | null;
+  readonly down: number;
+  readonly up: number;
+}
+
 interface TelemetryState {
   snapshot: TelemetrySnapshot | null;
-  /** Short rolling history for charts (memory only, never persisted). */
-  history: TelemetrySnapshot[];
+  /** Rolling history for charts (memory only, never persisted). ~10 min at 1.5 s. */
+  history: TelemetryPoint[];
   polling: boolean;
   error: string | null;
   consecutiveFailures: number;
@@ -14,7 +24,9 @@ interface TelemetryState {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
-const HISTORY_LIMIT = 60;
+const HISTORY_LIMIT = 400;
+/** A gap this long (sleep, lock) resets the series instead of drawing a false flat line. */
+const GAP_RESET_MS = 60_000;
 
 export const useTelemetryStore = create<TelemetryState>((set, get) => ({
   snapshot: null,
@@ -29,12 +41,12 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
       if (document.hidden) return; // don't burn cycles when not visible
       try {
         const snapshot = await provider.getTelemetry();
-        set((s) => ({
-          snapshot,
-          error: null,
-          consecutiveFailures: 0,
-          history: [...s.history, snapshot].slice(-HISTORY_LIMIT),
-        }));
+        const point: TelemetryPoint = { t: snapshot.timestamp || Date.now(), cpu: snapshot.cpu.usagePercent, memory: snapshot.memory.usagePercent, gpu: snapshot.gpu?.usagePercent ?? null, down: snapshot.network.downBytesPerSec, up: snapshot.network.upBytesPerSec };
+        set((s) => {
+          const last = s.history[s.history.length - 1];
+          const base = last && point.t - last.t > GAP_RESET_MS ? [] : s.history;
+          return { snapshot, error: null, consecutiveFailures: 0, history: [...base, point].slice(-HISTORY_LIMIT) };
+        });
       } catch (err) {
         set((s) => {
           const failures = s.consecutiveFailures + 1;

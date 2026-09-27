@@ -27,7 +27,7 @@ export function SystemOverview() {
 
   const health = HEALTH_META[snapshot.health];
   const gpu = hw?.gpus.find((g) => g.name && !/intel|amd radeon\(tm\) graphics/i.test(g.name)) ?? hw?.gpus[0];
-  const netDown = history.map((h) => h.network.downBytesPerSec);
+  const netDown = history.map((h) => h.down);
   const netMax = Math.max(1_000_000, ...netDown) * 1.15;
 
   return (
@@ -45,9 +45,9 @@ export function SystemOverview() {
       </div>
 
       <div className="grid grid-cols-2 gap-x-12 gap-y-12 xl:grid-cols-4">
-        <LiveChart label="CPU" value={`${snapshot.cpu.usagePercent}%`} data={history.map((h) => h.cpu.usagePercent)} sublabel={`${snapshot.cpu.name} · ${snapshot.cpu.cores} threads`} />
-        <LiveChart label="Memory" value={`${snapshot.memory.usagePercent}%`} data={history.map((h) => h.memory.usagePercent)} sublabel={`${formatBytes(snapshot.memory.usedBytes, 1)} of ${formatBytes(snapshot.memory.totalBytes, 0)}`} />
-        <LiveChart label="GPU" value={snapshot.gpu ? `${snapshot.gpu.usagePercent}%` : undefined} unavailable={!snapshot.gpu} data={history.map((h) => h.gpu?.usagePercent ?? 0)} sublabel={gpu?.name ?? snapshot.gpu?.name ?? "No adapter reported"} />
+        <LiveChart label="CPU" value={`${snapshot.cpu.usagePercent}%`} data={history.map((h) => h.cpu)} sublabel={`${snapshot.cpu.name} · ${snapshot.cpu.cores} threads`} />
+        <LiveChart label="Memory" value={`${snapshot.memory.usagePercent}%`} data={history.map((h) => h.memory)} sublabel={`${formatBytes(snapshot.memory.usedBytes, 1)} of ${formatBytes(snapshot.memory.totalBytes, 0)}`} />
+        <LiveChart label="GPU" value={snapshot.gpu ? `${snapshot.gpu.usagePercent}%` : undefined} unavailable={!snapshot.gpu} data={history.map((h) => h.gpu ?? 0)} sublabel={gpu?.name ?? snapshot.gpu?.name ?? "No adapter reported"} />
         <LiveChart label="Network" value={formatBitrate(snapshot.network.downBytesPerSec)} data={netDown} max={netMax} sublabel={`↑ ${formatBitrate(snapshot.network.upBytesPerSec)} · ${snapshot.network.ssidOrInterface ?? "offline"}`} />
       </div>
 

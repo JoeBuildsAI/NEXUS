@@ -18,7 +18,7 @@ interface LiveChartProps {
 /** Thin-line instrument. White by default; pads from the right so data scrolls in. */
 export function LiveChart({
   data,
-  capacity = 60,
+  capacity = 240,
   max = 100,
   color = "rgba(255,255,255,0.85)",
   height = 64,
