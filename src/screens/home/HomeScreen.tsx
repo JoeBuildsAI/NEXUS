@@ -44,7 +44,7 @@ export function HomeScreen() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1560px] flex-col px-12 pb-16 pt-10 2xl:max-w-[1760px] 2xl:px-16 2xl:pt-14 min-[2400px]:max-w-[2200px] min-[2400px]:pt-24">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="mx-auto flex min-h-full max-w-[1560px] flex-col px-12 pb-16 pt-10 short:pt-6 2xl:max-w-[1760px] 2xl:px-16 2xl:pt-14 min-[2400px]:max-w-[2200px] min-[2400px]:pt-24">
         {/* Hero */}
         <motion.header variants={rise} className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1fr_auto]">
           <div>
@@ -70,13 +70,13 @@ export function HomeScreen() {
         </motion.header>
 
         {/* Instrumentation */}
-        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-10 lg:grid-cols-[minmax(420px,38%)_1fr]">
+        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-10 short:mt-10 lg:grid-cols-[minmax(420px,38%)_1fr]">
           <InstrumentLedger />
           <div className="flex flex-col justify-end"><TelemetryWave height={150} /></div>
         </motion.section>
 
         {/* Context — asymmetric */}
-        <motion.section variants={rise} className="mt-20 grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[1.35fr_1fr]">
+        <motion.section variants={rise} className="mt-20 grid grid-cols-1 gap-x-16 gap-y-12 short:mt-12 lg:grid-cols-[1.35fr_1fr]">
           <ErrorBoundary inline label="Continue playing"><ContinuePlaying /></ErrorBoundary>
           <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-1">
             <ErrorBoundary inline label="Communications"><CommsSurface /></ErrorBoundary>
@@ -84,7 +84,7 @@ export function HomeScreen() {
           </div>
         </motion.section>
 
-        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[1.35fr_1fr]">
+        <motion.section variants={rise} className="mt-16 grid grid-cols-1 gap-x-16 gap-y-12 short:mt-10 lg:grid-cols-[1.35fr_1fr]">
           <ErrorBoundary inline label="Suggestions"><InsightsSurface /></ErrorBoundary>
           <ErrorBoundary inline label="Recent"><RecentActivity /></ErrorBoundary>
         </motion.section>

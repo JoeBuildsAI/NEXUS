@@ -86,8 +86,9 @@ export function VideoWorkspace({ items }: Props) {
       <LayoutGroup>
         <div className="min-h-0 flex-1">
           {layout === "3x2" || layout === "2x3" ? (
-            <div className="grid h-full content-start gap-2" style={{ gridTemplateColumns: `repeat(${spec.columns}, minmax(0, 1fr))` }}>
-              {visible.map((s) => renderSlot(s.index))}
+            // The wall fills the viewport like a professional multiview; videos letterbox inside cells.
+            <div className="grid h-full gap-2" style={{ gridTemplateColumns: `repeat(${spec.columns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${spec.rows}, minmax(0, 1fr))` }}>
+              {visible.map((s) => renderSlot(s.index, true, "min-h-0"))}
             </div>
           ) : layout === "2x2-primary" ? (
             <div className="grid h-full gap-2" style={{ gridTemplateColumns: "2fr 1fr", gridTemplateRows: "repeat(4, minmax(0, 1fr))" }}>

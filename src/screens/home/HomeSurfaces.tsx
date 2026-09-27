@@ -144,7 +144,11 @@ export function StorageSurface() {
     <div>
       <SectionLabel action="Analyze" onAction={go}>Storage</SectionLabel>
       <button onClick={go} className="block w-full text-left">
-        <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{candidates ? formatBytes(reviewable, 0) : "—"}<span className="ml-3 font-sans text-base font-normal text-white/40">{candidates ? "reviewable" : "discovering"}{!real && candidates ? " · demo" : ""}</span></p>
+        {candidates ? (
+          <p className="font-sans text-display-lg font-semibold tabular tracking-tight text-white">{formatBytes(reviewable, 0)}<span className="ml-3 font-sans text-base font-normal text-white/40">reviewable{!real ? " · demo" : ""}</span></p>
+        ) : (
+          <p className="flex h-[3.25rem] items-center text-[13px] text-white/35">Discovering reviewable space</p>
+        )}
         <div className="mt-4 space-y-2.5">
           {drives.slice(0, 3).map((d) => {
             const used = d.totalBytes - d.freeBytes;

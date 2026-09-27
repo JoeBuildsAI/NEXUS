@@ -3,6 +3,10 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      screens: {
+        // Short viewports (1080p at 125% scaling ≈ 864px tall): tighten vertical rhythm.
+        short: { raw: "(max-height: 900px)" },
+      },
       colors: {
         // NEXUS BLACK — the environment is black; hierarchy comes from luminance.
         void: {
