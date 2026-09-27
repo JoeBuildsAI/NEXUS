@@ -50,7 +50,7 @@ await page.getByRole("button", { name: "All mail", exact: true }).click();
 await page.getByRole("button", { name: "why?" }).first().click().catch(() => {}); await shot("why", 300);
 await page.getByRole("button", { name: /Create rule/ }).first().click().catch(() => {}); await shot("rule-composer", 600);
 // Surfaces
-await surf("Today"); await shot("today");
+await surf("Digest"); await shot("today");
 await surf("Health");
 const th = Date.now();
 await page.getByRole("button", { name: "Analyze" }).click(); await page.waitForTimeout(400);

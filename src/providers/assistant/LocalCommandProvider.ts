@@ -114,7 +114,7 @@ const RULES: Rule[] = [
   R("open-mail", "Inbox Health", ["inbox health", "email health", "mail health", "analyze inbox", "how much mail"], "mail", { surface: "health" }),
   R("open-mail", "Cleanup inbox", ["cleanup inbox", "clean inbox", "clean up email", "delete newsletters", "archive old mail", "bulk delete"], "mail", { surface: "inbox", view: "cleanup" }, "Review first"),
   R("open-mail", "Email rules", ["email rules", "mail rules", "routing rules", "filters", "gmail filters", "outlook rules"], "mail", { surface: "rules" }),
-  R("open-mail", "Today in mail", ["today's mail", "what mattered today", "daily summary", "mail summary"], "mail", { surface: "summary" }),
+  R("open-mail", "Mail digest", ["today's mail", "what mattered today", "daily summary", "mail summary", "mail digest", "digest"], "mail", { surface: "summary" }),
   R("refresh-mail", "Refresh Gmail", ["refresh gmail", "sync gmail", "check gmail"], "mail", { provider: "gmail" }),
   R("refresh-mail", "Refresh Outlook", ["refresh outlook", "sync outlook", "check outlook"], "mail", { provider: "outlook" }),
   R("refresh-mail", "Refresh mail", ["refresh mail", "sync mail", "check mail", "refresh email", "check email"], "mail"),

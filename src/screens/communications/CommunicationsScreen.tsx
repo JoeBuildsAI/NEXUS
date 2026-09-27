@@ -26,7 +26,7 @@ const VIEWS: { id: InboxView; label: string }[] = [
   { id: "travel", label: "Travel" }, { id: "financial", label: "Financial" }, { id: "subscriptions", label: "Subscriptions" }, { id: "newsletters", label: "Newsletters" },
   { id: "notifications", label: "Notifications" }, { id: "promotions", label: "Promotions" }, { id: "cleanup", label: "Cleanup" },
 ];
-const SURFACES: { id: CommsSurface; label: string }[] = [{ id: "inbox", label: "Inbox" }, { id: "summary", label: "Today" }, { id: "health", label: "Health" }, { id: "subscriptions", label: "Subscriptions" }, { id: "rules", label: "Rules" }];
+const SURFACES: { id: CommsSurface; label: string }[] = [{ id: "inbox", label: "Inbox" }, { id: "summary", label: "Digest" }, { id: "health", label: "Health" }, { id: "subscriptions", label: "Subscriptions" }, { id: "rules", label: "Rules" }];
 
 /**
  * Communications: unified multi-account inbox with views and filters, a

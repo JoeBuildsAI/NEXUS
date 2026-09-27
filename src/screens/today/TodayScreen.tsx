@@ -14,6 +14,8 @@ import { useDevStore } from "@/state/devStore";
 import { summarize } from "@/core/email/classify";
 import { Button } from "@/components/ui";
 import { SessionLine } from "@/screens/home/SessionLine";
+import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
+import { formatTime } from "@/hooks/useClock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -71,7 +73,11 @@ export function TodayScreen() {
           <p className="text-micro tracking-cinematic text-white/35">{formatDayLong(day)}</p>
           <h1 className="mt-3 font-display text-display-lg font-semibold uppercase tracking-wide text-white">{greeting(now.getHours(), name || null)}</h1>
         </div>
-        <SessionLine />
+        <div className="flex flex-col items-start gap-3 lg:items-end">
+          <p className="font-mono text-display-md font-light leading-none tabular tracking-tight text-white">{hour12 ? formatMinute(nowMinute, true) : formatTime(now)}</p>
+          <ModeSwitcher />
+          <SessionLine />
+        </div>
       </div>
 
       <div className="mt-8 grid min-h-0 flex-1 gap-14 lg:grid-cols-[1.35fr_minmax(300px,0.65fr)]">
