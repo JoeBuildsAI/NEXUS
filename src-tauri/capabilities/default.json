@@ -1,8 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core capabilities for the NEXUS main window.",
-  "windows": ["main"],
+  "description": "Core capabilities for the NEXUS main window. No shell or filesystem plugin access: launching, media and cleanup go through validated native commands.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
@@ -16,10 +18,7 @@
     "core:window:allow-start-dragging",
     "core:window:allow-close",
     "core:app:default",
-    "shell:allow-open",
     "dialog:allow-open",
-    "fs:allow-read-dir",
-    "fs:allow-read-file",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",

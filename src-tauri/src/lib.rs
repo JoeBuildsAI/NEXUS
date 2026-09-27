@@ -24,9 +24,7 @@ use tauri::{
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -141,9 +139,11 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(app, &[&open, &sep1, &gaming, &normal, &privacy, &sep2, &quit])?;
 
-    TrayIconBuilder::with_id("nexus-tray")
-        .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("NEXUS")
+    let mut tray = TrayIconBuilder::with_id("nexus-tray").tooltip("NEXUS");
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

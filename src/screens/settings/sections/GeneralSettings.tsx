@@ -3,7 +3,8 @@ import { useRef, useState } from "react";
 import { Download, RotateCcw, Upload } from "lucide-react";
 import { SettingsSection, SettingRow, TextInput, Select } from "../SettingsControls";
 import { Toggle, Button, Badge } from "@/components/ui";
-import { useSettingsStore, type AppearanceSettings, type PrivacySettings, type ShortcutSettings, type StartupSettings, type SystemSettings, type GamingSettings, type AISettings } from "@/state/settingsStore";
+import { useSettingsStore } from "@/state/settingsStore";
+import { sanitizeSettings } from "@/state/settingsSchema";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
 import { useGamePrefsStore } from "@/state/gamePrefsStore";
 import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
@@ -62,17 +63,20 @@ export function GeneralSettings() {
       onConfirm: () => {
         const b = v.backup;
         const s = useSettingsStore.getState();
-        if (b.settings.profile.name) s.setProfile({ name: b.settings.profile.name });
-        s.setAppearance(b.settings.appearance as Partial<AppearanceSettings>);
-        s.setStartup(b.settings.startup as Partial<StartupSettings>);
-        s.setGaming(b.settings.gaming as Partial<GamingSettings>);
-        s.setMedia(b.settings.media);
-        s.setPrivacy(b.settings.privacy as Partial<PrivacySettings>);
-        s.setSystem(b.settings.system as Partial<SystemSettings>);
-        s.setAI(b.settings.ai as Partial<AISettings>);
-        s.setShortcuts(b.settings.shortcuts as Partial<ShortcutSettings>);
-        useProcessPrefsStore.setState({ prefs: b.processPrefs });
-        useGamePrefsStore.setState({ tracked: b.trackedAchievements });
+        // Imported files are untrusted input: coerce through the same schema as hydration.
+        const current = { profile: s.profile, appearance: s.appearance, startup: s.startup, gaming: s.gaming, media: s.media, privacy: s.privacy, system: s.system, ai: s.ai, shortcuts: s.shortcuts, window: s.window };
+        const clean = sanitizeSettings({ ...current, ...b.settings, profile: { ...current.profile, name: b.settings.profile.name || current.profile.name }, window: current.window }, current);
+        s.setProfile({ name: clean.profile.name, subtitle: clean.profile.subtitle, clockFormat: clean.profile.clockFormat });
+        s.setAppearance(clean.appearance);
+        s.setStartup(clean.startup);
+        s.setGaming(clean.gaming);
+        s.setMedia({ ...clean.media, authorizedFolders: current.media.authorizedFolders });
+        s.setPrivacy(clean.privacy);
+        s.setSystem({ ...clean.system, preferredGpu: current.system.preferredGpu });
+        s.setAI(clean.ai);
+        s.setShortcuts(clean.shortcuts);
+        useProcessPrefsStore.setState({ prefs: Object.fromEntries(Object.entries(b.processPrefs).filter(([k, p]) => typeof k === "string" && k.length < 120 && ["normal", "never", "close", "suspend"].includes(String(p))).slice(0, 500)) });
+        useGamePrefsStore.setState({ tracked: b.trackedAchievements.filter((t) => t && typeof t.gameId === "string" && typeof t.achievementId === "string").slice(0, 50) });
         notify.success("Configuration imported", b.mediaRoots?.length ? "Re-authorize media folders in Settings → Media." : undefined);
         activity.record("config-imported", `Imported configuration (format v${b.version})`);
       },

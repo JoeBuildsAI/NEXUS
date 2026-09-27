@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/state/settingsStore";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
 import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
 import { renderDiagnostics } from "@/core/diagnostics/diagnostics";
+import { formatRecentLog } from "@/lib/logger";
 import { config } from "@/core/config";
 import type { ProviderHealth } from "@/core/types";
 import { notify } from "@/state/toastStore";
@@ -51,7 +52,7 @@ async function collect(): Promise<string> {
     systemSafety: settings.system.safety,
     processAllowlistCount: useProcessPrefsStore.getState().closeAllowlist().length,
     environment: settings.appearance.environment,
-  });
+  }) + ["", "", "Recent log (redacted: secrets, paths)", formatRecentLog(80) || "(empty)"].join("\n");
 }
 
 export function DiagnosticsPanel() {

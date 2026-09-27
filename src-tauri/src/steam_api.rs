@@ -91,11 +91,10 @@ pub fn steam_api_get(
         }
     }
 
-    if ep.needs_key {
-        query.push(("key".into(), key.unwrap()));
+    if let (true, Some(k)) = (ep.needs_key, key) {
+        query.push(("key".into(), k));
     }
-    if ep.needs_steamid {
-        let sid = steamid.unwrap();
+    if let (true, Some(sid)) = (ep.needs_steamid, steamid) {
         let sid = sanitize_param(&sid).ok_or("invalid SteamID")?;
         // GetPlayerSummaries uses `steamids` (plural).
         query.push((if endpoint_name == "playerSummary" { "steamids" } else { "steamid" }.into(), sid));
