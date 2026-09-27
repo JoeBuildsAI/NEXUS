@@ -24,7 +24,7 @@ Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchai
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer;
 `cargo test --lib` runs the Rust unit tests (steam/media/storage/system fixtures).
 
-Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.2.0_x64-setup.exe`
+Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.3.0_x64-setup.exe`
 (NSIS, per-user, unsigned; ~3 min release compile).
 
 Adding a Tauri feature to `Cargo.toml` (e.g. `protocol-asset`) must be paired
@@ -54,6 +54,14 @@ If port 1420 is stuck between runs, kill the listening PID:
   Space Grotesk; telemetry uses JetBrains Mono.
 - Visual audit: `node scripts/screenshots.mjs 1920x1080` (add `--quick` to skip
   mode/onboarding/empty-state flows); `node scripts/unused.mjs` lists dead modules.
+
+## Phase 5 additions (native)
+- `gpu.rs` — PDH GPU Engine/Adapter Memory counters + DXGI LUID mapping; `GpuState` in app state.
+- `media_thumbs.rs` — IShellItemImageFactory thumbnails/icons → PNG; hashed cache under app cache dir.
+- `oauth.rs` — PKCE + loopback OAuth, token storage (native-only keyring keys), allowlisted mail API proxy.
+- `apps.rs` — resolved .lnk targets (IShellLinkW), App Paths, ranking, shell icons.
+- Windows crate features live in `Cargo.toml` `[target.'cfg(windows)'.dependencies]`.
+- Stress/chaos visual audit: `node scripts/stress.mjs` (uses `window.__nexusDev` in dev builds).
 
 ## Native/provider boundaries
 - Steam: discovery reads only registry-located Steam paths + manifests; launch
