@@ -182,10 +182,10 @@ export function MediaLibrary({ view, items, onChanged }: { view: View; items: re
                   <div className="absolute inset-0 transition-transform duration-700 ease-nexus group-hover:scale-[1.03]" style={{ background: `radial-gradient(90% 90% at 30% 20%, ${item.thumbnailColor}, #000 90%)` }}>
                     {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
                   </div>
-                  <button onClick={() => sendToSlot(item)} className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100" aria-label={`Load ${item.title}`}>
+                  <button onClick={() => sendToSlot(item)} className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100" aria-label={`Load ${item.title}`}>
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-black"><Play size={14} className="ml-0.5" fill="currentColor" /></span>
                   </button>
-                  <button onClick={() => void toggleFav(item)} className={cn("absolute right-2 top-2 p-1 transition-opacity", item.favorite ? "opacity-100" : "opacity-0 group-hover:opacity-100")} aria-label={item.favorite ? "Unfavorite" : "Favorite"}>
+                  <button onClick={() => void toggleFav(item)} className={cn("absolute right-2 top-2 p-1 transition-opacity focus-visible:opacity-100", item.favorite ? "opacity-100" : "opacity-0 group-hover:opacity-100")} aria-label={item.favorite ? "Unfavorite" : "Favorite"}>
                     <Star size={13} className={item.favorite ? "fill-white text-white" : "text-white/70"} />
                   </button>
                   {item.playability === "potentially-unsupported" && <span className="absolute left-2 top-2 text-micro text-status-attention/80">{item.ext?.toUpperCase()}</span>}

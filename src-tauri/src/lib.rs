@@ -72,6 +72,7 @@ pub fn run() {
             system::power_set_active,
             system::set_close_behavior,
             system::exit_app,
+            system::launch_flags,
             apps::discover_apps,
             apps::launch_app,
             apps::app_icon,

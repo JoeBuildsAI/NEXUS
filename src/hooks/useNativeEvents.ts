@@ -46,6 +46,26 @@ export function useNativeEvents() {
     void import("@tauri-apps/api/core").then(({ invoke }) => invoke("gpu_set_preferred", { luid: preferredGpu }).catch(() => undefined));
   }, [preferredGpu]);
 
+  // Autostart always launches with --minimized (hidden by the native layer). If the
+  // user did NOT ask to start minimized, reveal the window once the shell is ready.
+  useEffect(() => {
+    if (!config.isTauri) return;
+    (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const flags = await invoke<{ minimized: boolean }>("launch_flags");
+        if (flags.minimized && !useSettingsStore.getState().startup.startMinimized) {
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          const w = getCurrentWindow();
+          await w.show();
+          await w.setFocus();
+        }
+      } catch {
+        /* window API unavailable */
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     // After the machine sleeps, timers fire in a burst on wake. Restart the
     // telemetry loop on visibility/focus so the interval is clean.

@@ -196,6 +196,18 @@ pub fn set_close_behavior(state: State<AppState>, behavior: String) -> Result<()
     Ok(())
 }
 
+/// Launch flags the frontend needs to honor user settings (e.g. "start minimized").
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchFlags {
+    pub minimized: bool,
+}
+
+#[tauri::command]
+pub fn launch_flags() -> LaunchFlags {
+    LaunchFlags { minimized: std::env::args().any(|a| a == "--minimized") }
+}
+
 /// Explicit exit (tray "Exit" and Settings). Never triggered by the close button in tray mode.
 #[tauri::command]
 pub fn exit_app(app: tauri::AppHandle) {

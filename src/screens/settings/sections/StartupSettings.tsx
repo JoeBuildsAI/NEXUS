@@ -50,7 +50,7 @@ export function StartupSettingsSection() {
           onChange={(v) => setStartup({ launchOnLogin: v })}
         />
       </SettingRow>
-      <SettingRow label="Start minimized" description="Launch into the tray without showing the window.">
+      <SettingRow label="Start minimized" description="When launched at login, stay in the tray instead of opening the window.">
         <Toggle checked={startup.startMinimized} onChange={(v) => setStartup({ startMinimized: v })} />
       </SettingRow>
       <SettingRow label="Boot animation" description="Play the NEXUS startup sequence on launch.">
