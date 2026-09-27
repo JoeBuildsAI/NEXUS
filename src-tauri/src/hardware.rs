@@ -39,66 +39,86 @@ pub struct HardwareInventory {
 
 pub struct HardwareCache(pub Mutex<Option<HardwareInventory>>);
 
+/// GPU inventory. DXGI is authoritative (fast, in-process, exact dedicated
+/// memory); WMI is consulted only for driver versions, best-effort with a
+/// timeout so a slow PowerShell never blocks first-run discovery.
 #[cfg(target_os = "windows")]
 fn query_gpus() -> Vec<GpuCapability> {
-    use std::os::windows::process::CommandExt;
-    // Read-only WMI query. AdapterRAM is a 32-bit field in WMI and unreliable
-    // above 4 GB, so we prefer the registry-backed qwMemorySize when present.
-    let script = r#"
-$gpus = Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion, PNPDeviceID
-$out = @()
-foreach ($g in $gpus) {
-  $vram = $null
-  try {
-    $key = Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}' -ErrorAction SilentlyContinue |
-      Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).MatchingDeviceId -and $g.PNPDeviceID -like ("*" + (Get-ItemProperty $_.PSPath).MatchingDeviceId + "*") } | Select-Object -First 1
-    if ($key) { $q = (Get-ItemProperty $key.PSPath -ErrorAction SilentlyContinue).'HardwareInformation.qwMemorySize'; if ($q) { $vram = [int64]$q } }
-  } catch {}
-  if (-not $vram -and $g.AdapterRAM) { $vram = [int64]$g.AdapterRAM }
-  $out += [pscustomobject]@{ name = $g.Name; vram = $vram; driver = $g.DriverVersion }
+    let report = crate::gpu::GpuState::new().report();
+    let drivers = query_driver_versions();
+    let mut out: Vec<GpuCapability> = report
+        .adapters
+        .iter()
+        .filter(|a| !a.software)
+        .map(|a| GpuCapability {
+            name: Some(a.name.clone()),
+            vram_total_mb: if a.dedicated_total_bytes > 0 { Some(a.dedicated_total_bytes / (1024 * 1024)) } else { None },
+            driver_version: drivers.iter().find(|(n, _)| n.eq_ignore_ascii_case(&a.name)).map(|(_, d)| d.clone()),
+            utilization_supported: report.supported,
+            temperature_supported: false,
+            memory_supported: report.supported,
+        })
+        .collect();
+    // Primary first so `gpus[0]` is the gaming GPU everywhere.
+    if let Some(p) = report.primary_luid.as_deref() {
+        if let Some(idx) = report.adapters.iter().filter(|a| !a.software).position(|a| a.luid == p) {
+            if idx < out.len() {
+                let primary = out.remove(idx);
+                out.insert(0, primary);
+            }
+        }
+    }
+    if out.is_empty() {
+        // DXGI unavailable (remote session, broken driver): fall back to WMI names.
+        out = drivers.into_iter().map(|(name, driver)| GpuCapability { name: Some(name), vram_total_mb: None, driver_version: Some(driver), utilization_supported: false, temperature_supported: false, memory_supported: false }).collect();
+    }
+    out
 }
-$out | ConvertTo-Json -Compress
-"#;
-    let out = std::process::Command::new("powershell")
+
+/// (adapter name, driver version) via WMI — best-effort, bounded to ~4 s.
+#[cfg(target_os = "windows")]
+fn query_driver_versions() -> Vec<(String, String)> {
+    use std::os::windows::process::CommandExt;
+    let script = "Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion | ConvertTo-Json -Compress";
+    let mut child = match std::process::Command::new(crate::system::powershell())
         .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script])
         .creation_flags(0x08000000)
-        .output();
-    let Ok(out) = out else { return vec![] };
-    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if text.is_empty() {
-        return vec![];
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if start.elapsed() > std::time::Duration::from_secs(4) => {
+                let _ = child.kill();
+                return vec![];
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Err(_) => return vec![],
+        }
     }
-    let parsed: serde_json::Value = match serde_json::from_str(&text) {
+    let mut text = String::new();
+    if let Some(mut so) = child.stdout.take() {
+        use std::io::Read;
+        let _ = so.read_to_string(&mut text);
+    }
+    let parsed: serde_json::Value = match serde_json::from_str(text.trim()) {
         Ok(v) => v,
         Err(_) => return vec![],
     };
-    let items: Vec<serde_json::Value> = match parsed {
+    let items = match parsed {
         serde_json::Value::Array(a) => a,
         v @ serde_json::Value::Object(_) => vec![v],
         _ => vec![],
     };
-    let pdh_available = crate::gpu::GpuState::new().report().supported;
     items
         .into_iter()
-        .filter_map(|v| {
-            let name = v.get("name")?.as_str()?.to_string();
-            // Skip virtual/remote display adapters.
-            if name.to_lowercase().contains("remote") || name.to_lowercase().contains("virtual") {
-                return None;
-            }
-            let vram = v.get("vram").and_then(|x| x.as_i64()).filter(|x| *x > 0).map(|x| (x as u64) / (1024 * 1024));
-            let driver = v.get("driver").and_then(|x| x.as_str()).map(|s| s.to_string());
-            Some(GpuCapability {
-                name: Some(name),
-                vram_total_mb: vram,
-                driver_version: driver,
-                // Live counters come from PDH GPU Engine / GPU Adapter Memory (see gpu.rs).
-                // Temperature has no vendor-neutral source and stays unsupported.
-                utilization_supported: pdh_available,
-                temperature_supported: false,
-                memory_supported: pdh_available,
-            })
-        })
+        .filter_map(|v| Some((v.get("Name")?.as_str()?.to_string(), v.get("DriverVersion")?.as_str()?.to_string())))
         .collect()
 }
 
@@ -117,7 +137,12 @@ pub fn collect() -> HardwareInventory {
         physical_cores: sys.physical_core_count(),
         total_memory_bytes: sys.total_memory(),
         os_name: System::name().unwrap_or_else(|| "Windows".into()),
-        os_version: System::long_os_version().or_else(System::os_version).unwrap_or_default(),
+        // long_os_version already includes the product name ("Windows 11 Home"); avoid "Windows Windows 11 Home".
+        os_version: {
+            let name = System::name().unwrap_or_else(|| "Windows".into());
+            let long = System::long_os_version().or_else(System::os_version).unwrap_or_default();
+            long.strip_prefix(&name).map(|r| r.trim().to_string()).unwrap_or(long)
+        },
         kernel_version: System::kernel_version().unwrap_or_default(),
         arch: std::env::consts::ARCH.to_string(),
         hostname: System::host_name().unwrap_or_default(),
@@ -143,6 +168,19 @@ mod tests {
             assert_eq!(g.utilization_supported, g.memory_supported, "both come from the same PDH source");
             assert!(g.name.as_deref().map(|n| !n.is_empty()).unwrap_or(false));
         }
+        assert!(!inv.os_version.starts_with(&inv.os_name), "OS product name must not be duplicated");
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn dxgi_inventory_lists_the_discrete_gpu_first_when_present() {
+        let inv = collect();
+        // Any machine with a display adapter must report at least one non-software GPU via DXGI.
+        assert!(!inv.gpus.is_empty(), "DXGI reported no adapters");
+        if inv.gpus.len() > 1 {
+            let first = inv.gpus[0].vram_total_mb.unwrap_or(0);
+            assert!(inv.gpus.iter().all(|g| g.vram_total_mb.unwrap_or(0) <= first), "primary (most dedicated memory) must be first");
+        }
     }
 }
 
@@ -157,4 +195,17 @@ pub fn get_hardware(cache: tauri::State<HardwareCache>, refresh: Option<bool>) -
     let inv = collect();
     *guard = Some(inv.clone());
     Ok(inv)
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod probe {
+    #[test]
+    #[ignore]
+    fn print_inventory() {
+        let inv = super::collect();
+        println!("{} | {}", inv.os_name, inv.os_version);
+        for g in &inv.gpus {
+            println!("{:?} vram={:?} driver={:?} util={}", g.name, g.vram_total_mb, g.driver_version, g.utilization_supported);
+        }
+    }
 }

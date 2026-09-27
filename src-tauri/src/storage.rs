@@ -364,7 +364,7 @@ fn rule_filter(id: &str) -> Box<dyn Fn(&Path, &std::fs::Metadata) -> bool> {
 fn recycle_bin_size() -> Option<(u64, usize)> {
     use std::os::windows::process::CommandExt;
     let script = "$i=(New-Object -ComObject Shell.Application).NameSpace(0xA).Items(); $s=0; $n=0; foreach($x in $i){ $s+=$x.Size; $n++ }; \"$s $n\"";
-    let out = std::process::Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script]).creation_flags(0x08000000).output().ok()?;
+    let out = std::process::Command::new(crate::system::powershell()).args(["-NoProfile", "-NonInteractive", "-Command", script]).creation_flags(0x08000000).output().ok()?;
     let t = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let mut it = t.split_whitespace();
     Some((it.next()?.parse().ok()?, it.next()?.parse().ok()?))
@@ -416,7 +416,7 @@ pub fn cleanup_execute(rule_ids: Vec<String>, dry_run: bool) -> Result<Vec<Clean
                 #[cfg(target_os = "windows")]
                 {
                     use std::os::windows::process::CommandExt;
-                    let r = std::process::Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"]).creation_flags(0x08000000).output();
+                    let r = std::process::Command::new(crate::system::powershell()).args(["-NoProfile", "-NonInteractive", "-Command", "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"]).creation_flags(0x08000000).output();
                     if r.is_err() {
                         err = Some("Clear-RecycleBin failed".into());
                     }

@@ -184,6 +184,19 @@ fn estimate_impact(command: &str) -> String {
     }
 }
 
+/// Absolute path to a System32 tool so behavior never depends on PATH
+/// (the app may be launched from environments with a stripped PATH).
+pub fn sys32(tool: &str) -> std::path::PathBuf {
+    let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:Windows".into());
+    std::path::PathBuf::from(root).join("System32").join(tool)
+}
+
+/// Windows PowerShell 5.1 host, by absolute path.
+pub fn powershell() -> std::path::PathBuf {
+    let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:Windows".into());
+    std::path::PathBuf::from(root).join("System32").join("WindowsPowerShell").join("v1.0").join("powershell.exe")
+}
+
 /// Mirror the user's close-button preference into native state.
 #[tauri::command]
 pub fn set_close_behavior(state: State<AppState>, behavior: String) -> Result<(), String> {
@@ -307,7 +320,7 @@ pub fn process_close_graceful(state: State<AppState>, name: String) -> Result<u3
     if running == 0 {
         return Ok(0);
     }
-    let out = std::process::Command::new("taskkill")
+    let out = std::process::Command::new(sys32("taskkill.exe"))
         .args(["/IM", &n])
         .creation_flags(0x08000000)
         .output()
@@ -345,7 +358,7 @@ fn run_powercfg(args: &[&str]) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        let out = std::process::Command::new("powercfg")
+        let out = std::process::Command::new(sys32("powercfg.exe"))
             .args(args)
             .creation_flags(0x08000000)
             .output()

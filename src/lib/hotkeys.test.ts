@@ -29,3 +29,14 @@ describe("accelerators", () => {
     for (const c of PRIVACY_HOTKEY_CHOICES) expect(parseAccelerator(c.value)).not.toBeNull();
   });
 });
+
+describe("formatVram", () => {
+  it("rounds to the marketed size", async () => {
+    const { formatVram } = await import("./utils");
+    expect(formatVram(32187)).toBe("32 GB");
+    expect(formatVram(16218)).toBe("16 GB");
+    expect(formatVram(11264)).toBe("11 GB");
+    expect(formatVram(485)).toBe("485 MB");
+    expect(formatVram(6144)).toBe("6 GB");
+  });
+});

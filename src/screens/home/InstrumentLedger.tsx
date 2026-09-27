@@ -1,6 +1,6 @@
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useHardware } from "@/hooks/useHardware";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, formatVram } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 function pad2(n: number) {
@@ -47,7 +47,7 @@ export function InstrumentLedger() {
   const gpuVramUsed = s.gpu?.memoryUsedMb ?? null;
   const gpuShort = gpuName?.replace(/^NVIDIA\s+GeForce\s+/i, "").replace(/^AMD\s+/i, "").replace(/\(TM\)|\(R\)/gi, "").trim() ?? null;
   const gpuMeta = gpuShort
-    ? `${gpuShort}${gpuVramTotal ? ` · ${gpuVramUsed != null && gpuVramUsed > 0 ? `${(gpuVramUsed / 1024).toFixed(1)} / ` : ""}${Math.round(gpuVramTotal / 1024)} GB` : ""}`
+    ? `${gpuShort}${gpuVramTotal ? ` · ${gpuVramUsed != null && gpuVramUsed > 0 ? `${(gpuVramUsed / 1024).toFixed(1)} / ` : ""}${formatVram(gpuVramTotal)}` : ""}`
     : "unavailable";
 
   return (

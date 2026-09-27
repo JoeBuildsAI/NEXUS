@@ -88,3 +88,11 @@ export function displayTitleClass(title: string, opts: { max?: "xl" | "lg" } = {
   if (n > 14 || max === "lg") return "text-display-lg line-clamp-2";
   return "text-display-xl line-clamp-2";
 }
+
+/** Marketed VRAM label: DXGI reports slightly under the nominal size (32187 MB → "32 GB"). */
+export function formatVram(mb: number): string {
+  if (mb < 1024) return `${mb} MB`;
+  const gb = mb / 1024;
+  const nominal = [1, 2, 3, 4, 6, 8, 10, 11, 12, 16, 20, 24, 32, 48, 64, 80, 96].find((n) => Math.abs(gb - n) / n < 0.06);
+  return `${nominal ?? Math.round(gb)} GB`;
+}

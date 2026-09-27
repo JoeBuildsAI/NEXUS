@@ -3,7 +3,7 @@ import { useTelemetryStore } from "@/state/telemetryStore";
 import { useHardware } from "@/hooks/useHardware";
 import { HEALTH_META } from "@/core/safety/health";
 import { config } from "@/core/config";
-import { formatBitrate, formatBytes, formatUptime } from "@/lib/utils";
+import { formatBitrate, formatBytes, formatUptime, formatVram } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const TONE_TEXT = { nominal: "text-white", attention: "text-status-attention", warning: "text-status-warning", critical: "text-status-critical" } as const;
@@ -61,7 +61,7 @@ export function SystemOverview() {
               snapshot.gpu
                 ? `${formatBytes(snapshot.gpu.memoryUsedMb * 1024 ** 2, 1)} of ${formatBytes(snapshot.gpu.memoryTotalMb * 1024 ** 2, 0)} dedicated · temperature unsupported${(snapshot.gpuAdapters?.length ?? 0) > 1 ? ` · ${snapshot.gpuAdapters!.length - 1} other adapter${snapshot.gpuAdapters!.length - 1 === 1 ? "" : "s"}` : ""}`
                 : gpu?.vramTotalMb
-                  ? `${Math.round(gpu.vramTotalMb / 1024)} GB · live counters unavailable on this build`
+                  ? `${formatVram(gpu.vramTotalMb)} · live counters unavailable on this build`
                   : "GPU counters need a vendor source; shown as unavailable rather than estimated."
             }
           />

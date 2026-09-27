@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatVram } from "@/lib/utils";
 import { getProviders } from "@/providers";
 import { native } from "@/providers/system/nativeBridge";
 import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
@@ -47,7 +48,7 @@ export function useEnvironmentScan(active: boolean): { lines: ScanLine[]; done: 
 
       await delay(300);
       const gpu = hw?.gpus[0];
-      set("gpu", gpu?.name ? { state: "ok", detail: `${gpu.name}${gpu.vramTotalMb ? ` · ${Math.round(gpu.vramTotalMb / 1024)} GB` : ""}` } : { state: "none", detail: config.isTauri ? "No adapter reported" : "Unavailable in preview" });
+      set("gpu", gpu?.name ? { state: "ok", detail: `${gpu.name}${gpu.vramTotalMb ? ` · ${formatVram(gpu.vramTotalMb)}` : ""}` } : { state: "none", detail: config.isTauri ? "No adapter reported" : "Unavailable in preview" });
 
       await delay(300);
       const roots = useMediaLibraryStore.getState().roots;

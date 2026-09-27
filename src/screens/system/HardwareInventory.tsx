@@ -1,7 +1,7 @@
 import { useHardware } from "@/hooks/useHardware";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { config } from "@/core/config";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, formatVram } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 /** Split "NVIDIA GeForce RTX 5090" → ["NVIDIA", "GEFORCE RTX 5090"]. */
@@ -42,7 +42,7 @@ export function HardwareInventory() {
                 <p className="mt-1 font-display text-display-md font-semibold tracking-wide text-white">{model}</p>
               </>
             ); })()}
-            <p className="mt-3 font-mono text-[13px] tabular text-white/50">{primaryGpu.vramTotalMb ? `${Math.round(primaryGpu.vramTotalMb / 1024)} GB` : "VRAM unknown"}{primaryGpu.driverVersion ? ` · driver ${primaryGpu.driverVersion}` : ""}</p>
+            <p className="mt-3 font-mono text-[13px] tabular text-white/50">{primaryGpu.vramTotalMb ? formatVram(primaryGpu.vramTotalMb) : "VRAM unknown"}{primaryGpu.driverVersion ? ` · driver ${primaryGpu.driverVersion}` : ""}</p>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-micro">
               <Cap label="Utilization" ok={primaryGpu.utilizationSupported} /><Cap label="Temperature" ok={primaryGpu.temperatureSupported} /><Cap label="VRAM usage" ok={primaryGpu.memorySupported} />
             </div>
@@ -50,7 +50,7 @@ export function HardwareInventory() {
             {gpus.length > 1 && (
               <div className="mt-5">
                 <p className="label mb-2">Other graphics</p>
-                {gpus.filter((g) => g !== primaryGpu).map((g) => <p key={g.name} className="text-[13px] text-white/55">{g.name}{g.vramTotalMb ? <span className="text-white/30"> · {g.vramTotalMb >= 1024 ? `${Math.round(g.vramTotalMb / 1024)} GB` : `${g.vramTotalMb} MB`}</span> : null}</p>)}
+                {gpus.filter((g) => g !== primaryGpu).map((g) => <p key={g.name} className="text-[13px] text-white/55">{g.name}{g.vramTotalMb ? <span className="text-white/30"> · {formatVram(g.vramTotalMb)}</span> : null}</p>)}
                 <p className="mt-2 text-[12px] text-white/30">Change the primary adapter in Settings → System if auto-detection is wrong.</p>
               </div>
             )}
