@@ -3,6 +3,7 @@ import { InstrumentLedger } from "./InstrumentLedger";
 import { TelemetryWave } from "./TelemetryWave";
 import { CommsSurface, ContinuePlaying, InsightsSurface, StorageSurface } from "./HomeSurfaces";
 import { RecentActivity } from "./RecentActivity";
+import { SessionLine } from "./SessionLine";
 import { ModeSwitcher } from "@/components/shell/ModeSwitcher";
 import { ErrorBoundary } from "@/components/ui";
 import { useClock, greeting } from "@/hooks/useClock";
@@ -59,6 +60,7 @@ export function HomeScreen() {
                 {meta ? `SYSTEM ${meta.label.toUpperCase()}` : "CALIBRATING"}
               </span>
             </div>
+            <SessionLine />
           </div>
           <div className="flex flex-col items-start gap-4 lg:items-end">
             <p className="font-mono text-display-xl font-light leading-none tabular tracking-tight text-white">{time}{meridiem && <span className="ml-3 text-base text-white/35">{meridiem}</span>}</p>
