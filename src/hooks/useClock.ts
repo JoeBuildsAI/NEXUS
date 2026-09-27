@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
-/** Ticking clock hook, updates every second. */
-export function useClock(): Date {
+/** Ticking clock hook; default every second, or a custom interval for calmer surfaces. */
+export function useClock(intervalMs = 1000): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), intervalMs);
     return () => clearInterval(id);
-  }, []);
+  }, [intervalMs]);
   return now;
 }
 

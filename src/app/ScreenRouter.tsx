@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { useNavigationStore } from "@/state/navigationStore";
 import { ErrorBoundary } from "@/components/ui";
-import { HomeScreen } from "@/screens/home/HomeScreen";
+import { TodayScreen } from "@/screens/today/TodayScreen";
+import { CalendarScreen } from "@/screens/calendar/CalendarScreen";
+import { LifeScreen } from "@/screens/life/LifeScreen";
 import { GamingScreen } from "@/screens/gaming/GamingScreen";
 import { MediaScreen } from "@/screens/media/MediaScreen";
 import { SystemScreen } from "@/screens/system/SystemScreen";
@@ -9,8 +11,10 @@ import { CommunicationsScreen } from "@/screens/communications/CommunicationsScr
 import { SettingsScreen } from "@/screens/settings/SettingsScreen";
 
 const SCREENS = {
-  home: { C: HomeScreen, label: "Home" },
-  gaming: { C: GamingScreen, label: "Gaming" },
+  home: { C: TodayScreen, label: "Today" },
+  calendar: { C: CalendarScreen, label: "Calendar" },
+  life: { C: LifeScreen, label: "Life" },
+  gaming: { C: GamingScreen, label: "Play" },
   media: { C: MediaScreen, label: "Media" },
   system: { C: SystemScreen, label: "System" },
   communications: { C: CommunicationsScreen, label: "Communications" },

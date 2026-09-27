@@ -1,4 +1,4 @@
-import { Gamepad2, House, Mail, MonitorCog, Play, Search, Settings, type LucideIcon } from "lucide-react";
+import { CalendarDays, Gamepad2, House, Mail, MonitorCog, Play, Search, Settings, Sparkles, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigationStore, type Screen } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
@@ -13,11 +13,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { screen: "home", label: "Home", icon: House, key: "1" },
-  { screen: "gaming", label: "Gaming", icon: Gamepad2, key: "2" },
-  { screen: "media", label: "Media", icon: Play, key: "3" },
-  { screen: "system", label: "System", icon: MonitorCog, key: "4" },
-  { screen: "communications", label: "Communications", icon: Mail, key: "5" },
+  { screen: "home", label: "Today", icon: House, key: "1" },
+  { screen: "calendar", label: "Calendar", icon: CalendarDays, key: "2" },
+  { screen: "life", label: "Life", icon: Sparkles, key: "3" },
+  { screen: "gaming", label: "Play", icon: Gamepad2, key: "4" },
+  { screen: "media", label: "Media", icon: Play, key: "5" },
+  { screen: "communications", label: "Communications", icon: Mail, key: "6" },
+  { screen: "system", label: "System", icon: MonitorCog, key: "7" },
 ];
 
 /**
@@ -59,7 +61,7 @@ export function NavRail() {
         title={`System ${HEALTH_META[health].label}`}
       />
 
-      <NavButton item={{ screen: "settings", label: "Settings", icon: Settings, key: "6" }} active={screen === "settings"} onClick={() => navigate("settings")} />
+      <NavButton item={{ screen: "settings", label: "Settings", icon: Settings, key: "8" }} active={screen === "settings"} onClick={() => navigate("settings")} />
     </nav>
   );
 }

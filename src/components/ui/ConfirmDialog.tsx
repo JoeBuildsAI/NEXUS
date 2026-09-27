@@ -26,6 +26,7 @@ export function ConfirmDialog() {
             <p className="mt-3 text-sm leading-relaxed text-white/55">{request.message}</p>
             <div className="mt-8 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => resolve(false)}>{request.cancelLabel ?? "Cancel"}</Button>
+              {request.secondaryLabel && <Button variant="outline" onClick={() => resolve("secondary")}>{request.secondaryLabel}</Button>}
               <Button variant={request.danger ? "danger" : "primary"} onClick={() => resolve(true)} autoFocus>{request.confirmLabel ?? "Confirm"}</Button>
             </div>
           </motion.div>

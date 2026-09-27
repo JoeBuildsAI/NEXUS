@@ -7,12 +7,15 @@ export interface ConfirmRequest {
   cancelLabel?: string;
   danger?: boolean;
   onConfirm: () => void;
+  /** Optional third choice (e.g. "Whole series"). */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }
 
 interface ConfirmState {
   request: ConfirmRequest | null;
   confirm: (req: ConfirmRequest) => void;
-  resolve: (confirmed: boolean) => void;
+  resolve: (confirmed: boolean | "secondary") => void;
 }
 
 /** Global confirmation gate used for destructive/impactful actions. */
@@ -21,7 +24,8 @@ export const useConfirmStore = create<ConfirmState>((set, get) => ({
   confirm: (request) => set({ request }),
   resolve: (confirmed) => {
     const req = get().request;
-    if (confirmed && req) req.onConfirm();
+    if (confirmed === "secondary" && req?.onSecondary) req.onSecondary();
+    else if (confirmed === true && req) req.onConfirm();
     set({ request: null });
   },
 }));
