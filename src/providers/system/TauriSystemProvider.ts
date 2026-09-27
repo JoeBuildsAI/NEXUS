@@ -51,7 +51,7 @@ export class TauriSystemProvider implements SystemProvider {
       >("get_processes");
       return raw.map((p) => ({
         ...p,
-        classification: classifyProcess(p.name, p.publisher),
+        classification: classifyProcess(p.name, p.publisher, p.path),
         managed: p.managed ?? false,
       }));
     } catch (err) {

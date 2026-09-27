@@ -43,3 +43,25 @@ describe("classifyProcess", () => {
     expect(isManageable("optional")).toBe(true);
   });
 });
+
+describe("path-aware classification", () => {
+  const S = String.fromCharCode(92);
+  const w = (...parts: string[]) => parts.join(S);
+  it("treats executables inside the Windows directory as protected Windows components", () => {
+    expect(classifyProcess("SearchHost.exe", null, w("C:", "Windows", "SystemApps", "Microsoft.Windows.Search_cw5n1h2txyewy", "SearchHost.exe"))).not.toBe("user-application");
+    expect(classifyProcess("wermgr.exe", null, w("C:", "Windows", "System32", "wermgr.exe"))).toBe("system-critical");
+  });
+  it("recognizes installed applications by location, even with an unknown publisher", () => {
+    expect(classifyProcess("Devin.exe", null, w("C:", "Users", "j", "AppData", "Local", "Programs", "Devin", "Devin.exe"))).toBe("user-application");
+    expect(classifyProcess("EpicGamesLauncher.exe", null, w("C:", "Program Files (x86)", "Epic Games", "Launcher", "Portal", "Binaries", "Win64", "EpicGamesLauncher.exe"))).toBe("user-application");
+    expect(classifyProcess("msedgewebview2.exe", null, w("C:", "Program Files (x86)", "Microsoft", "EdgeWebView", "Application", "140.0", "msedgewebview2.exe"))).toBe("user-application");
+  });
+  it("keeps security and driver vendors protected regardless of location", () => {
+    expect(classifyProcess("mbam.exe", null, w("C:", "Program Files", "Malwarebytes", "Anti-Malware", "mbam.exe"))).toBe("security");
+    expect(classifyProcess("NVDisplay.Container.exe", null, w("C:", "Program Files", "NVIDIA Corporation", "Display.NvContainer", "NVDisplay.Container.exe"))).toBe("driver");
+  });
+  it("still returns unknown without a usable path or publisher", () => {
+    expect(classifyProcess("mystery.exe", null, null)).toBe("unknown");
+    expect(classifyProcess("mystery.exe", null, w("D:", "tools", "mystery.exe"))).toBe("unknown");
+  });
+});

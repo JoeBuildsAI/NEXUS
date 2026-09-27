@@ -58,9 +58,30 @@ const KNOWN_USER_APPS = new Set([
 
 const OPTIONAL_HINTS = ["tray", "helper", "updater", "assistant", "companion"];
 
+// Path hints use forward slashes; paths are normalized before matching.
+const SECURITY_PATH_HINTS = ["/windows defender/", "/malwarebytes/", "/bitdefender/", "/kaspersky", "/eset/", "/norton", "/avast", "/avg/", "/crowdstrike/", "/sentinelone/"];
+const DRIVER_PATH_HINTS = ["/nvidia corporation/", "/amd/", "/realtek/", "/intel/", "/drivers/"];
+const USER_APP_PATH_HINTS = ["/program files/", "/program files (x86)/", "/appdata/local/programs/", "/appdata/roaming/", "/windowsapps/", "/scoop/", "/chocolatey/"];
+
+/** Where the executable lives, when the native layer could read it. */
+function classifyByPath(path: string | null | undefined): ProcessClass | null {
+  if (!path) return null;
+  const p = path.trim().toLowerCase().split("\\").join("/");
+  if (!p.includes("/")) return null;
+  if (SECURITY_PATH_HINTS.some((h) => p.includes(h))) return "security";
+  if (DRIVER_PATH_HINTS.some((h) => p.includes(h))) return "driver";
+  // Anything shipped inside the Windows directory is part of Windows: protected.
+  if (p.includes("/windows/") && !p.includes("/windows/systemapps/")) return "system-critical";
+  // Installed applications: Program Files, per-user program folders, store packages, per-user vendor folders.
+  if (USER_APP_PATH_HINTS.some((h) => p.includes(h))) return "user-application";
+  if (/\/appdata\/local\/[^/]+\/[^/]+\.exe$/.test(p)) return "user-application";
+  return null;
+}
+
 export function classifyProcess(
   name: string,
   publisher: string | null,
+  path?: string | null,
 ): ProcessClass {
   const n = name.trim().toLowerCase();
   const pub = (publisher ?? "").trim().toLowerCase();
@@ -71,6 +92,9 @@ export function classifyProcess(
   if (DRIVER_HINTS.some((h) => n.includes(h) || pub.includes(h))) return "driver";
   if (HARDWARE_PUBLISHERS.some((h) => pub.includes(h))) return "hardware";
   if (KNOWN_USER_APPS.has(n)) return "user-application";
+  // Name hints are weak; the executable's location is decisive when available.
+  const byPath = classifyByPath(path);
+  if (byPath) return byPath;
   // Optional bloatware hints only apply when a publisher is known. A
   // publisher-less "helper"/"updater" binary is more suspicious and must stay
   // UNKNOWN (protected) rather than becoming manageable.
