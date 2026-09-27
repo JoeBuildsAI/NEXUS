@@ -40,8 +40,17 @@ export class RealSteamProvider implements SteamProvider {
   constructor(private bridge: SteamBridge) {}
 
   // ---------- discovery ----------
+  private inflight: Promise<SteamDiscovery> | null = null;
+
+  /** Concurrent callers (library, status, palette) share one native scan. */
   async discover(force = false): Promise<SteamDiscovery> {
     if (!force && this.discovery && Date.now() - this.discovery.at < DISCOVERY_TTL) return this.discovery.value;
+    if (this.inflight) return this.inflight;
+    this.inflight = this.scan().finally(() => { this.inflight = null; });
+    return this.inflight;
+  }
+
+  private async scan(): Promise<SteamDiscovery> {
     try {
       const raw = await this.bridge.discover();
       const value = buildDiscovery(raw);
@@ -93,9 +102,11 @@ export class RealSteamProvider implements SteamProvider {
       steamAppId: g.appId,
       launcher: "steam",
       installed: g.fullyInstalled,
+      installState: g.installState,
       installSizeBytes: g.sizeOnDisk,
       playtimeMinutes: o?.playtimeMinutes ?? 0,
-      lastPlayed: o?.lastPlayed ?? g.lastUpdated,
+      // Never substitute LastUpdated: an auto-update is not a play session.
+      lastPlayed: o?.lastPlayed ?? g.lastPlayed,
       coverColor: palette.cover,
       heroColor: palette.hero,
       coverUrl: art.cover,

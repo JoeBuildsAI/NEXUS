@@ -21,6 +21,8 @@ export interface Game {
   readonly steamAppId: number | null;
   readonly launcher: Launcher;
   readonly installed: boolean;
+  /** Finer install state when the provider knows it (Steam manifests do). */
+  readonly installState?: "installed" | "updating" | "downloading" | "uninstalling" | "not-installed";
   readonly installSizeBytes: number | null;
   /** Total playtime in minutes. */
   readonly playtimeMinutes: number;

@@ -17,11 +17,39 @@ export interface SteamRaw {
   artworkCacheDir: string | null;
 }
 
-/** Steam's StateFlags bitmask (appmanifest). 4 = FullyInstalled. */
-export const STATE_FULLY_INSTALLED = 4;
+/**
+ * Steam's StateFlags bitmask (appmanifest, `EAppState`). 4 = FullyInstalled.
+ * 8 is UpdateQueued/Encrypted and 64 SharedOnly — neither means "not installed".
+ */
 export const STATE_UPDATE_REQUIRED = 2;
-export const STATE_UNINSTALLING = 8;
-export const STATE_UPDATE_RUNNING = 1024;
+export const STATE_FULLY_INSTALLED = 4;
+export const STATE_UPDATE_RUNNING = 256;
+export const STATE_UPDATE_STARTED = 1024;
+export const STATE_UNINSTALLING = 2048;
+
+/**
+ * Steam installs runtimes/redistributables as apps with manifests. They are not
+ * games and must never appear in PLAY (seen on a real library: 228980).
+ */
+const NON_GAME_APP_IDS = new Set([
+  228980, 1070560, 1391110, 1628350, 1826330, 1493710, 2180100, 2348590, 2805730, 3658110,
+  961940, 1054830, 1113280, 1245040, 1420170, 1580130, 1887720, 2230260,
+]);
+const NON_GAME_NAME = /^(Steamworks Common Redistributables|Steam Linux Runtime|Proton(\s|$)|Proton EasyAntiCheat Runtime|Proton BattlEye Runtime)/i;
+
+export function isNonGameApp(appId: number, name: string): boolean {
+  return NON_GAME_APP_IDS.has(appId) || NON_GAME_NAME.test(name);
+}
+
+export type SteamInstallState = "installed" | "updating" | "downloading" | "uninstalling" | "not-installed";
+
+export function installStateFrom(flags: number, sizeOnDisk: number | null): SteamInstallState {
+  if (flags & STATE_UNINSTALLING) return "uninstalling";
+  const busy = (flags & (STATE_UPDATE_RUNNING | STATE_UPDATE_STARTED)) !== 0;
+  if (flags & STATE_FULLY_INSTALLED) return busy ? "updating" : "installed";
+  if (busy || (flags & STATE_UPDATE_REQUIRED)) return sizeOnDisk ? "updating" : "downloading";
+  return "not-installed";
+}
 
 export interface InstalledGame {
   appId: number;
@@ -34,7 +62,9 @@ export interface InstalledGame {
   lastUpdated: number | null;
   stateFlags: number;
   fullyInstalled: boolean;
-  /** Playtime/last-played are not in manifests; enriched later via Web API. */
+  installState: SteamInstallState;
+  /** `LastPlayed` from the manifest (ms), written by the local Steam client. Playtime still needs the Web API. */
+  lastPlayed: number | null;
 }
 
 export interface SteamLibraryInfo {
@@ -77,16 +107,20 @@ export function parseManifest(content: string, libraryPath: string): InstalledGa
   const stateFlags = Number(vdfString(app, "StateFlags") ?? "0") || 0;
   const size = Number(vdfString(app, "SizeOnDisk"));
   const updated = Number(vdfString(app, "LastUpdated"));
+  const played = Number(vdfString(app, "LastPlayed"));
+  const sizeOnDisk = Number.isFinite(size) && size > 0 ? size : null;
   return {
     appId,
     name,
     installDir,
     installPath: joinWin(libraryPath, "steamapps", "common", installDir),
     libraryPath,
-    sizeOnDisk: Number.isFinite(size) && size > 0 ? size : null,
+    sizeOnDisk,
     lastUpdated: Number.isFinite(updated) && updated > 0 ? updated * 1000 : null,
     stateFlags,
     fullyInstalled: (stateFlags & STATE_FULLY_INSTALLED) !== 0 && (stateFlags & STATE_UNINSTALLING) === 0,
+    installState: installStateFrom(stateFlags, sizeOnDisk),
+    lastPlayed: Number.isFinite(played) && played > 0 ? played * 1000 : null,
   };
 }
 
@@ -126,6 +160,7 @@ export function buildDiscovery(raw: SteamRaw): SteamDiscovery {
         malformed.push(m.fileName);
         continue;
       }
+      if (isNonGameApp(g.appId, g.name)) continue;
       count++;
       const existing = games.get(g.appId);
       if (!existing || (!existing.fullyInstalled && g.fullyInstalled)) games.set(g.appId, g);

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RealSteamProvider } from "./RealSteamProvider";
 import { FixtureSteamBridge } from "./SteamBridge";
-import { MULTI_LIBRARY, ONE_LIBRARY, STEAM_MISSING, THIRTY_GAMES } from "@/core/steam/__fixtures__/steamFixtures";
+import { MULTI_LIBRARY, ONE_LIBRARY, STEAM_MISSING, THIRTY_GAMES, manifest } from "@/core/steam/__fixtures__/steamFixtures";
 import { isOffline } from "@/core/errors";
 import type { ApiResponse } from "@/core/steam/webApi";
 
@@ -54,6 +54,24 @@ describe("RealSteamProvider", () => {
     const portal = (await p.getGames()).find((g) => g.steamAppId === 620)!;
     expect(portal.playtimeMinutes).toBe(1320);
     expect(portal.lastPlayed).toBe(1700000000 * 1000);
+  });
+
+  it("without the Web API, last played comes from manifest LastPlayed — never LastUpdated", async () => {
+    const raw = { ...ONE_LIBRARY, libraries: [{ ...ONE_LIBRARY.libraries[0]!, manifests: [
+      { fileName: "appmanifest_620.acf", content: manifest(620, "Portal 2", "Portal 2", { updated: 1790000000, played: 0 }) },
+      { fileName: "appmanifest_864050.acf", content: manifest(864050, "We Were Here Too", "We Were Here Too", { updated: 1790000000, played: 1780000000 }) },
+    ] }] };
+    const games = await new RealSteamProvider(new FixtureSteamBridge(raw)).getGames();
+    expect(games.find((g) => g.steamAppId === 620)!.lastPlayed).toBeNull();
+    expect(games.find((g) => g.steamAppId === 864050)!.lastPlayed).toBe(1780000000 * 1000);
+  });
+
+  it("concurrent discovery calls share one native scan", async () => {
+    const bridge = new FixtureSteamBridge(ONE_LIBRARY);
+    const spy = vi.spyOn(bridge, "discover");
+    const p = new RealSteamProvider(bridge);
+    await Promise.all([p.getGames(), p.getStatus(), p.discover()]);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("only launches discovered games, by numeric app id", async () => {

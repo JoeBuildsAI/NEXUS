@@ -34,7 +34,7 @@ export const LEGACY_LIBRARYFOLDERS_VDF = `"LibraryFolders"
 }
 `;
 
-export function manifest(appId: number, name: string, installdir: string, opts: { state?: number; size?: number; updated?: number } = {}): string {
+export function manifest(appId: number, name: string, installdir: string, opts: { state?: number; size?: number; updated?: number; played?: number } = {}): string {
   return `"AppState"
 {
 	"appid"		"${appId}"
@@ -43,6 +43,7 @@ export function manifest(appId: number, name: string, installdir: string, opts: 
 	"StateFlags"		"${opts.state ?? 4}"
 	"installdir"		"${installdir}"
 	"LastUpdated"		"${opts.updated ?? 1700000000}"
+	"LastPlayed"		"${opts.played ?? 0}"
 	"SizeOnDisk"		"${opts.size ?? 3200000000}"
 	"buildid"		"123456"
 	"UserConfig"
@@ -101,7 +102,7 @@ export const MULTI_LIBRARY: SteamRaw = {
       manifests: [
         { fileName: "appmanifest_1091500.acf", content: manifest(1091500, "Cyberpunk 2077", "Cyberpunk 2077", { size: 120000000000 }) },
         { fileName: "appmanifest_1086940.acf", content: manifest(1086940, "Baldur's Gate 3", "Baldurs Gate 3", { size: 148000000000 }) },
-        { fileName: "appmanifest_553850.acf", content: manifest(553850, "HELLDIVERS™ 2", "Helldivers 2", { state: 4 | 8 }) }, // uninstalling
+        { fileName: "appmanifest_553850.acf", content: manifest(553850, "HELLDIVERS™ 2", "Helldivers 2", { state: 4 | 2048 }) }, // uninstalling
       ],
     },
     { path: "E:\\OldLibrary", exists: false, manifests: [] },

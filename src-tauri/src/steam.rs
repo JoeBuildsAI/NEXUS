@@ -148,24 +148,45 @@ pub fn steam_discover(app: tauri::AppHandle) -> Result<SteamRaw, String> {
     Ok(raw)
 }
 
+/// Artwork kinds and the file names Steam has used for them over time
+/// (`library_capsule.jpg` is the 2:3 cover in current clients).
+const ART_KINDS: &[(&str, &[&str])] = &[
+    ("cover", &["library_600x900.jpg", "library_capsule.jpg"]),
+    ("hero", &["library_hero.jpg"]),
+    ("header", &["library_header.jpg", "header.jpg"]),
+    ("logo", &["logo.png"]),
+];
+
+/// Resolve local artwork for an app id. Three layouts exist in the wild:
+///   librarycache/<appid>_<file>            (old clients)
+///   librarycache/<appid>/<file>            (2024 clients)
+///   librarycache/<appid>/<sha1>/<file>     (current clients, content-hashed)
+/// Only one level of subfolders under the app folder is inspected.
+pub fn local_artwork_in(cache: &Path, app_id: u32) -> Vec<(String, String)> {
+    let app_dir = cache.join(app_id.to_string());
+    let hashed: Vec<PathBuf> = std::fs::read_dir(&app_dir)
+        .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.is_dir()).take(64).collect())
+        .unwrap_or_default();
+    let mut out = Vec::new();
+    for (kind, files) in ART_KINDS {
+        let found = files.iter().find_map(|f| {
+            std::iter::once(cache.join(format!("{app_id}_{f}")))
+                .chain(std::iter::once(app_dir.join(f)))
+                .chain(hashed.iter().map(|d| d.join(f)))
+                .find(|p| p.is_file())
+        });
+        if let Some(p) = found {
+            out.push((kind.to_string(), p.to_string_lossy().to_string()));
+        }
+    }
+    out
+}
+
 /// Local artwork candidates for an app id from Steam's librarycache.
 #[tauri::command]
 pub fn steam_local_artwork(app_id: u32) -> Result<Vec<(String, String)>, String> {
     let Some(root) = locate_steam() else { return Ok(vec![]) };
-    let cache = root.join("appcache").join("librarycache");
-    let mut out = Vec::new();
-    for (kind, suffix) in [("cover", "library_600x900.jpg"), ("hero", "library_hero.jpg"), ("header", "header.jpg"), ("icon", "icon.jpg")] {
-        // Newer Steam clients nest per-app folders; older ones use flat files.
-        let flat = cache.join(format!("{app_id}_{suffix}"));
-        let nested = cache.join(app_id.to_string()).join(suffix);
-        for p in [flat, nested] {
-            if p.is_file() {
-                out.push((kind.to_string(), p.to_string_lossy().to_string()));
-                break;
-            }
-        }
-    }
-    Ok(out)
+    Ok(local_artwork_in(&root.join("appcache").join("librarycache"), app_id))
 }
 
 /// Launch via the Steam URL protocol. Only a numeric app id is accepted — the
@@ -213,6 +234,31 @@ mod tests {
         assert_eq!(lib.manifests.len(), 1);
         assert_eq!(lib.manifests[0].file_name, "appmanifest_620.acf");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolves_artwork_in_flat_nested_and_hashed_layouts() {
+        let cache = std::env::temp_dir().join(format!("nexus-steam-art-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&cache);
+        std::fs::create_dir_all(cache.join("400")).unwrap();
+        std::fs::write(cache.join("400").join("library_600x900.jpg"), b"x").unwrap();
+        std::fs::write(cache.join("620_library_hero.jpg"), b"x").unwrap();
+        let h1 = cache.join("1000001").join("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let h2 = cache.join("1000001").join("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        std::fs::create_dir_all(&h1).unwrap();
+        std::fs::create_dir_all(&h2).unwrap();
+        std::fs::write(h1.join("library_capsule.jpg"), b"x").unwrap();
+        std::fs::write(h2.join("library_hero.jpg"), b"x").unwrap();
+        std::fs::write(cache.join("1000001").join("cccccccc.jpg"), b"icon").unwrap();
+
+        let kinds = |id| local_artwork_in(&cache, id).into_iter().map(|(k, p)| (k, p.replace('\\', "/"))).collect::<Vec<_>>();
+        let hashed = kinds(1000001);
+        assert!(hashed.iter().any(|(k, p)| k == "cover" && p.ends_with("library_capsule.jpg")));
+        assert!(hashed.iter().any(|(k, p)| k == "hero" && p.ends_with("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/library_hero.jpg")));
+        assert!(kinds(400).iter().any(|(k, _)| k == "cover"));
+        assert!(kinds(620).iter().any(|(k, _)| k == "hero"));
+        assert!(kinds(1).is_empty());
+        let _ = std::fs::remove_dir_all(&cache);
     }
 
     #[test]
