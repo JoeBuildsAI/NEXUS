@@ -59,7 +59,7 @@ export function SystemOverview() {
             value={snapshot.gpu?.name ?? gpu?.name ?? "Unavailable"}
             sub={
               snapshot.gpu
-                ? `${formatBytes(snapshot.gpu.memoryUsedMb * 1024 ** 2, 1)} of ${formatBytes(snapshot.gpu.memoryTotalMb * 1024 ** 2, 0)} dedicated · temperature unsupported${(snapshot.gpuAdapters?.length ?? 0) > 1 ? ` · ${snapshot.gpuAdapters!.length - 1} other adapter${snapshot.gpuAdapters!.length - 1 === 1 ? "" : "s"}` : ""}`
+                ? `${formatBytes(snapshot.gpu.memoryUsedMb * 1024 ** 2, 1)} of ${formatVram(snapshot.gpu.memoryTotalMb)} dedicated · temperature unsupported${(snapshot.gpuAdapters?.length ?? 0) > 1 ? ` · ${snapshot.gpuAdapters!.length - 1} other adapter${snapshot.gpuAdapters!.length - 1 === 1 ? "" : "s"}` : ""}`
                 : gpu?.vramTotalMb
                   ? `${formatVram(gpu.vramTotalMb)} · live counters unavailable on this build`
                   : "GPU counters need a vendor source; shown as unavailable rather than estimated."
@@ -81,7 +81,7 @@ export function SystemOverview() {
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-white/30">Sampled every 1.5s · 60-sample buffer in memory only · slowed to 6s during a game session</p>
+          <p className="mt-4 text-[11px] text-white/30">Sampled every 1.5s · ~10 minutes kept in memory only · slowed to 6s during a game session</p>
         </div>
       </div>
     </div>
