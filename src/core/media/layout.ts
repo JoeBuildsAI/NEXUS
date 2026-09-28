@@ -50,8 +50,13 @@ export interface LayoutResult {
 }
 
 const DEFAULT_ASPECT = 16 / 9;
-/** Crop fraction SMART FILL tolerates before falling back to FIT. */
-export const SMART_FILL_MAX_CROP = 0.18;
+/**
+ * Crop fraction SMART FILL tolerates before falling back to FIT. A full tile is
+ * preferred over letterboxing when the crop is reasonable: 4:3 in a 16:9 tile
+ * (25%), 21:9 in 16:9 (24%) and 4:3 on a ~1.9:1 wall (30%) fill; portrait in
+ * landscape (68%) or square in 16:9 (44%) would lose too much and letterbox.
+ */
+export const SMART_FILL_MAX_CROP = 0.34;
 
 export function cropFraction(tileAspect: number, sourceAspect: number): number {
   if (!(tileAspect > 0) || !(sourceAspect > 0)) return 0;
@@ -197,7 +202,7 @@ function compositions(n: number, maxParts: number): number[][] {
   return out;
 }
 
-export function candidatesFor(n: number, mode: WallMode, hasPrimary: boolean, aspects: number[] = []): Candidate[] {
+export function candidatesFor(n: number, mode: WallMode, hasPrimary: boolean, aspects: number[] = [], wallAspect?: number): Candidate[] {
   if (n <= 0) return [];
   if (n === 1 || mode === "focus") return [{ id: "single", rects: [{ x: 0, y: 0, w: 1, h: 1 }] }];
   const out: Candidate[] = [];
@@ -222,6 +227,15 @@ export function candidatesFor(n: number, mode: WallMode, hasPrimary: boolean, as
       out.push(primaryLeft(n, frac, `pl:${frac}`));
       out.push(primaryTop(n, frac, `pt:${frac}`));
       if (n >= 4) out.push(primaryLeftGrid(n, frac, `plg:${frac}`));
+    }
+    // Primary sized to its own aspect (a portrait primary gets a portrait column).
+    if (wallAspect && aspects[0]) {
+      const fitFrac = Math.min(0.75, Math.max(0.28, aspects[0] / wallAspect));
+      if (fitFrac < 0.58) {
+        const f = Number(fitFrac.toFixed(3));
+        out.push(primaryLeft(n, f, `pla:${f}`));
+        if (n >= 3) out.push(primaryLeftGrid(n, f, `plga:${f}`));
+      }
     }
   }
   // Dedupe by geometry: e.g. rows:[1,1] and cols:[2] are the same stacked arrangement.
@@ -258,8 +272,10 @@ export function optimizeLayout(input: LayoutInput): LayoutResult {
 
   const lead = input.mode === "focus" ? (input.focusIndex ?? input.primaryIndex ?? players[0]!.index) : input.primaryIndex;
   const ordered = input.mode === "focus" ? orderPlayers(players, lead).slice(0, 1) : orderPlayers(players, lead);
-  const candidates = candidatesFor(ordered.length, input.mode, input.primaryIndex != null, ordered.map((p) => p.aspect ?? DEFAULT_ASPECT));
+  const candidates = candidatesFor(ordered.length, input.mode, input.primaryIndex != null, ordered.map((p) => p.aspect ?? DEFAULT_ASPECT), width / height);
   const viewportArea = width * height;
+  // A tile far below an equal share reads as an inexplicable sliver on a real wall.
+  const tinyArea = (input.primaryIndex != null ? 0.12 : 0.25) * (viewportArea / ordered.length);
 
   let best: LayoutResult | null = null;
   for (const cand of candidates) {
@@ -283,10 +299,13 @@ export function optimizeLayout(input: LayoutInput): LayoutResult {
       const tileArea = w * h;
       const covered = fit === "fill" || (fit === "smart" && crop <= SMART_FILL_MAX_CROP);
       // Covered tiles show the whole tile but lose `crop` of the source; letterboxed tiles show less area.
-      effective += covered ? tileArea * (1 - 0.6 * crop) : fitArea(w, h, aspect);
+      const shown = covered ? tileArea * (1 - 0.6 * crop) : fitArea(w, h, aspect);
+      effective += shown;
       if (w < minTile.width || h < minTile.height) penalty += 0.25;
+      if (ordered.length > 1 && tileArea < tinyArea) penalty += 0.2;
       if (tileAspect > 3.2 || tileAspect < 0.3) penalty += 0.08;
-      if (input.primaryIndex != null && p.index === input.primaryIndex) primaryArea = tileArea;
+      // Primary share counts displayed video, so a letterboxed portrait primary earns no bonus.
+      if (input.primaryIndex != null && p.index === input.primaryIndex) primaryArea = shown;
       smallest = Math.min(smallest, tileArea);
       largest = Math.max(largest, tileArea);
       return { index: p.index, x, y, width: w, height: h };
@@ -297,11 +316,14 @@ export function optimizeLayout(input: LayoutInput): LayoutResult {
     let score = coverage - penalty;
     if (input.primaryIndex != null && input.mode !== "focus") {
       const share = primaryArea / viewportArea;
-      // Reward a dominant primary (target ≥ 55% of the wall) without starving the rest.
-      score += 0.35 * Math.min(share, 0.6) - (share < 0.4 ? 0.15 : 0);
+      // Reward a dominant primary without starving the rest. The target is relative to
+      // what the source can show at full height (a portrait primary can never reach 55%).
+      const reachable = Math.min(1, (ordered[0]!.aspect ?? DEFAULT_ASPECT) / (width / height));
+      const target = Math.min(0.6, 0.9 * reachable);
+      score += 0.35 * Math.min(share, target) - (share < 0.66 * target ? 0.15 : 0);
     }
     // No explicit primary: asymmetric arrangements need a clear coverage win to be chosen.
-    if (input.primaryIndex == null && /^(pl|pt|plg):/.test(cand.id)) score -= 0.12;
+    if (input.primaryIndex == null && /^(pl|pt|plg|pla|plga):/.test(cand.id)) score -= 0.12;
     // Deterministic tie-break: side-by-side on landscape walls, stacked on portrait walls.
     if (cand.id.startsWith(width >= height ? "rows:" : "cols:")) score += 0.001;
     if (input.previousId && cand.id === input.previousId) score += 0.03;

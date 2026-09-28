@@ -113,6 +113,24 @@ describe("layout optimizer", () => {
 });
 
 describe("fit resolution", () => {
+  it("smart fill across real-world aspect ratios: fill when the crop is reasonable, never absurd", () => {
+    const tile169 = 16 / 9;
+    const cases: [string, number, number, "cover" | "contain"][] = [
+      ["16:9 in 16:9", tile169, 16 / 9, "cover"],
+      ["4:3 in 16:9", tile169, 4 / 3, "cover"],
+      ["21:9 ultrawide in 16:9", tile169, 21 / 9, "cover"],
+      ["4:3 on a 2134x1160 wall", 2134 / 1160, 4 / 3, "cover"],
+      ["16:9 in a 4:3 tile", 4 / 3, 16 / 9, "cover"],
+      ["square in a 4:3 tile", 4 / 3, 1, "cover"],
+      ["square in 16:9", tile169, 1, "contain"],
+      ["9:16 portrait in 16:9", tile169, 9 / 16, "contain"],
+      ["phone 9:19.5 in a portrait 9:16 tile", 9 / 16, 9 / 19.5, "cover"],
+      ["phone 9:19.5 in 16:9", tile169, 9 / 19.5, "contain"],
+      ["32:9 super-ultrawide in 16:9", tile169, 32 / 9, "contain"],
+    ];
+    for (const [name, tile, src, want] of cases) expect(resolveFit("smart", tile, src), name).toBe(want);
+  });
+
   it("smart fill covers when cropping is small and letterboxes when it is large", () => {
     expect(resolveFit("smart", 16 / 9, 16 / 9)).toBe("cover");
     expect(resolveFit("smart", 16 / 9, 4 / 3)).toBe(cropFraction(16 / 9, 4 / 3) <= SMART_FILL_MAX_CROP ? "cover" : "contain");
