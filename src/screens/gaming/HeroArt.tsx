@@ -22,7 +22,7 @@ export function HeroArt({ game, className, align = "right" }: { game: Game; clas
           <img src={game.heroUrl!} alt="" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-cover" />
         ) : game.launcher === "xbox" && game.coverUrl ? (
           // Xbox PC titles only ship a square logo: its own colours become the light, the mark sits quietly on the right.
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 overflow-hidden">
             <img src={game.coverUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-3xl saturate-150" draggable={false} />
             <img src={game.coverUrl} alt="" aria-hidden className="absolute right-[14%] top-1/2 w-[min(22%,220px)] -translate-y-1/2 object-contain opacity-90" draggable={false} />
           </div>

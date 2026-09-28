@@ -69,7 +69,7 @@ export function GameRail({ games, selectedId, onSelect, onOpen }: { games: reado
                 style={{ width: 168, height: 252, background: `linear-gradient(160deg, ${g.coverColor}, #000 130%)` }}
               >
                 <CoverImage game={g} onFail={() => setNoArt((s) => new Set(s).add(g.id))} />
-                {!g.installed && <span className="absolute left-2 top-2 text-micro text-white/60">{installLabel(g)}</span>}
+                {!g.installed && <span className="absolute left-2 top-2 rounded-[3px] bg-black/75 px-1.5 py-0.5 text-micro text-white/75">{installLabel(g)}</span>}
                 {/* Cover art already carries the title; the caption is for the focused tile, hover, or missing art. */}
                 <span className={cn("absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-3 pb-2.5 pt-8 text-left transition-opacity duration-200", on || !g.coverUrl || g.launcher === "xbox" || noArt.has(g.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100")}>
                   <span className="line-clamp-2 block text-[12.5px] leading-snug text-white/90" title={g.title}>{g.title}</span>
