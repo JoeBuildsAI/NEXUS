@@ -80,17 +80,23 @@ export function DataSettings() {
     if (!sqlite) return;
     requestConfirm({
       title: "Restore this backup?",
-      message: `${b.name}\n\nThe backup is integrity-checked first. Current personal data is replaced only if the check passes.`,
+      message: `${b.name}\n\nThe backup is integrity-checked first. Your current data is saved as a new backup before anything is replaced, so this can be undone.`,
       confirmLabel: "Restore",
       danger: true,
       onConfirm: async () => {
         setBusy("restore");
         try {
           await native.lifeValidateBackup(b.path);
+          // Safety snapshot of the current data (only when there is something to lose).
+          if (total > 0) await sqlite.backupTo(await native.lifeBackupTarget());
           const r = await sqlite.restoreFromFile(b.path);
           if (!r.ok) { notify.error("Restore refused", r.error ?? "Validation failed"); return; }
           await life.load({ force: true });
-          notify.success("Restored", `${r.rows?.toLocaleString() ?? ""} rows from ${b.name}`);
+          await refresh();
+          activity.record("life-backup", "Restored a backup (previous data kept as a backup)");
+          notify.success("Restored", `${r.rows?.toLocaleString() ?? ""} rows from ${b.name}. Previous data kept as a backup.`);
+        } catch (e) {
+          notify.error("Restore failed", String((e as Error)?.message ?? e).slice(0, 140));
         } finally { setBusy(null); }
       },
     });

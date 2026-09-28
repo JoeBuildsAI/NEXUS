@@ -96,8 +96,17 @@ pub fn life_paths(app: tauri::AppHandle) -> Result<LifePaths, String> {
 pub fn life_backup_target(app: tauri::AppHandle) -> Result<String, String> {
     let dir = config_dir(&app)?.join("backups");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let stamp = chrono_like_stamp();
-    Ok(dir.join(format!("life-{stamp}.db")).to_string_lossy().to_string())
+    Ok(unique_backup_path(&dir, &chrono_like_stamp()).to_string_lossy().to_string())
+}
+
+/// VACUUM INTO refuses an existing file; two snapshots in the same second
+/// (e.g. the safety snapshot right before a restore) get a numeric suffix.
+pub fn unique_backup_path(dir: &std::path::Path, stamp: &str) -> std::path::PathBuf {
+    let first = dir.join(format!("life-{stamp}.db"));
+    if !first.exists() {
+        return first;
+    }
+    (1..1000).map(|i| dir.join(format!("life-{stamp}-{i}.db"))).find(|p| !p.exists()).unwrap_or(first)
 }
 
 fn chrono_like_stamp() -> String {
@@ -196,17 +205,57 @@ pub fn life_quarantine(app: tauri::AppHandle) -> Result<String, String> {
         return Err("No database to quarantine.".into());
     }
     let target = dir.join(format!("life.corrupt-{}.db", chrono_like_stamp()));
-    std::fs::rename(&db, &target).map_err(|e| e.to_string())?;
-    for suffix in ["-wal", "-shm"] {
-        let side = dir.join(format!("{DB_NAME}{suffix}"));
-        let _ = std::fs::remove_file(side);
-    }
+    quarantine_files(&db, &target)?;
     Ok(target.to_string_lossy().to_string())
+}
+
+/// Move the database and its WAL/SHM side files together. The WAL may hold the
+/// newest committed transactions, so it is kept next to the quarantined file
+/// (SQLite recovers `<name>-wal` automatically if the set is opened again).
+pub fn quarantine_files(db: &Path, target: &Path) -> Result<(), String> {
+    std::fs::rename(db, target).map_err(|e| e.to_string())?;
+    for suffix in ["-wal", "-shm"] {
+        let side = PathBuf::from(format!("{}{suffix}", db.to_string_lossy()));
+        if side.exists() {
+            let _ = std::fs::rename(&side, format!("{}{suffix}", target.to_string_lossy()));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quarantine_keeps_wal_and_shm_with_the_database() {
+        let dir = std::env::temp_dir().join(format!("nexus-quar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("life.db");
+        for (p, b) in [(db.clone(), "db"), (dir.join("life.db-wal"), "wal"), (dir.join("life.db-shm"), "shm")] {
+            std::fs::write(p, b).unwrap();
+        }
+        let target = dir.join("life.corrupt-x.db");
+        quarantine_files(&db, &target).unwrap();
+        assert!(!db.exists());
+        assert_eq!(std::fs::read_to_string(dir.join("life.corrupt-x.db-wal")).unwrap(), "wal");
+        assert_eq!(std::fs::read_to_string(dir.join("life.corrupt-x.db-shm")).unwrap(), "shm");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn backup_paths_never_collide_within_a_second() {
+        let dir = std::env::temp_dir().join(format!("nexus-bk-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = unique_backup_path(&dir, "20260101-000000");
+        std::fs::write(&a, b"x").unwrap();
+        let b = unique_backup_path(&dir, "20260101-000000");
+        assert_ne!(a, b);
+        assert!(b.to_string_lossy().ends_with("life-20260101-000000-1.db"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn migrations_are_ordered_and_idempotent_sql() {
