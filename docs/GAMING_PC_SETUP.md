@@ -15,7 +15,7 @@ npm run tauri:build
 Artifact (NSIS, per-user install, no admin required):
 
 ```
-src-tauri\target\release\bundle\nsis\NEXUS_0.5.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\NEXUS_0.5.1_x64-setup.exe
 ```
 
 Run it. It installs to the current user's profile and creates a Start Menu
@@ -45,8 +45,11 @@ demo data only as a fallback (`VITE_DEMO_MODE=false` disables the fallback).
 ## 3. Steam
 
 If Steam is detected, the Gaming hub renders the **real installed library**
-immediately (names, install state, sizes, artwork from Steam's local cache with
-CDN fallback). **Play** launches via `steam://rungameid/<appid>` — only ids that
+immediately (names, install/download state, sizes, last played from the local
+client, artwork from Steam's local cache with CDN fallback). Redistributables
+and runtimes are not listed as games. Xbox PC titles appear next to Steam games
+(content/DLC packs are skipped); a real Xbox library is never padded with demo
+games. **Play** launches via `steam://rungameid/<appid>` — only ids that
 were discovered can be launched.
 
 Achievements and playtime need the Steam Web API:
@@ -84,8 +87,9 @@ MISSING / DRIVE DISCONNECTED — with Reload / Replace / Remove.
 the whole workspace; a landscape + a portrait pack side by side; six stay
 usable. Modes: Auto · Grid · Primary (one player weighted, double-click or P)
 · Focus (one player alone, Shift+F / Esc). Fit per player: **Smart fill**
-(default; fills the tile when it costs little cropping) · Fit · Fill — never
-distorted. Loop per player: **Off · Full · A–B**. Set **A** and **B** at the
+(default; fills the tile whenever the crop stays under about a third — 4:3,
+21:9 and 16:9-in-4:3 fill; portrait-in-landscape letterboxes) · Fit · Fill —
+never distorted. Loop per player: **Off · Full · A–B**. Set **A** and **B** at the
 playhead (buttons or I / O), the segment repeats precisely (frame-callback
 seeks, not "ended"); save it as a preset per file (Bookmark), load or delete
 later. Timeline: buffered, played, A–B range, hover time, drag seek. Master
@@ -165,17 +169,26 @@ Ctrl+Alt+P, Alt+Shift+P, F9, F10). The tray menu also has **Privacy**.
 
 Settings → System: set safety to **Enabled** and allow process management /
 startup changes as desired. Then System → Processes: mark user apps as
-**Close when Gaming Mode starts** or **Never touch**. Entering Gaming Mode shows
-exactly what will happen:
+**Close when Gaming Mode starts** or **Never touch**. Nothing is pre-approved.
+Entering Gaming Mode shows exactly what will happen:
 
-- graceful close of approved apps (`taskkill /IM`, never `/F`),
+- graceful close of approved apps (`taskkill /IM`, never `/F`); right before
+  closing, every running instance is re-checked by its install path and a
+  protected instance vetoes the close,
 - switch to the existing High/Ultimate performance power plan (previous plan
-  recorded; restored on exit — and on next start if NEXUS crashed),
-- reduced NEXUS footprint (ambient effects, telemetry polling) while a launched
-  game is detected running (read-only process probe; no injection).
+  recorded; restored on exit — and on next start if NEXUS crashed). If a
+  high-performance plan (including a vendor plan) is already active, it is left
+  unchanged and the preview says so,
+- reduced NEXUS footprint (ambient effects, telemetry polling, indexing,
+  thumbnails) while a game is running — launched from NEXUS or not (read-only
+  process probe of discovered install folders; no injection).
 
-Protected classes (Windows, drivers, security, hardware, unknown) can never be
-targeted.
+Protected classes (Windows, drivers, security, hardware/peripheral/audio/input
+software, game platforms and anti-cheat, the shared WebView2 runtime, unknown)
+can never be targeted.
+
+When NEXUS is not the foreground window it does essentially no work (ambient
+motion stops; telemetry drops to every 10 s).
 
 ## 7. Autostart, tray, window
 
@@ -189,8 +202,8 @@ longer on any monitor is re-centered.
 
 Utilization and dedicated VRAM come from Windows performance counters (the same
 source Task Manager uses), mapped to adapters by LUID. With an integrated GPU
-plus the RTX 5090, NEXUS picks the adapter with the most dedicated memory as
-primary; override in Settings → System → Primary GPU if needed. Temperature has
+plus a discrete card, NEXUS picks the adapter with the most dedicated memory as
+primary (software adapters are ignored); override in Settings → System → Primary GPU if needed. Temperature has
 no vendor-neutral source and is shown as unsupported rather than invented.
 
 ## 7c. Email (Outlook / Gmail)

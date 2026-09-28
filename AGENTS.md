@@ -10,7 +10,7 @@ npm run dev            # Vite dev server on http://localhost:1420 (frontend only
 npm run tauri:dev      # full native app (Rust + WebView2)
 npm run typecheck      # tsc --noEmit (strict)
 npm run lint           # eslint (.ts,.tsx)
-npm run test           # vitest run (41 tests)
+npm run test           # vitest run (~310 tests)
 npm run build          # tsc --noEmit && vite build
 npm run tauri:build    # NSIS installer (Windows)
 ```
@@ -24,7 +24,7 @@ Rust lives in `src-tauri/`. Cargo needs to be on PATH (`~/.cargo/bin`); toolchai
 is stable MSVC. `cargo build` inside `src-tauri` compiles the native layer;
 `cargo test --lib` runs the Rust unit tests (steam/media/storage/system fixtures).
 
-Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.5.0_x64-setup.exe`
+Installer: `npm run tauri:build` → `src-tauri/target/release/bundle/nsis/NEXUS_0.5.1_x64-setup.exe`
 (NSIS, per-user, unsigned; ~3 min release compile).
 
 Adding a Tauri feature to `Cargo.toml` (e.g. `protocol-asset`) must be paired
@@ -75,6 +75,27 @@ If port 1420 is stuck between runs, kill the listening PID:
 - Play: `src-tauri/src/xbox.rs` discovers GDK titles from `<drive>:\XboxGames\*\Content\MicrosoftGame.config`; `src/providers/xbox`; rail in `src/screens/gaming/GameRail.tsx`.
 - Media: BROWSER surfaces (`BrowserTile`, sandboxed iframe, https only) share the wall; CSP `frame-src https:`.
 - Audits: `node scripts/life-audit.mjs [WxH]`; scale/perf: `npx vitest run src/core/life/scale`.
+
+## 0.5.1 additions (real gaming-PC hardening)
+- Drive the REAL native app: start `tauri:dev` with
+  `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222 --remote-allow-origins=http://127.0.0.1"`
+  and connect `playwright-core` with `chromium.connectOverCDP("http://127.0.0.1:9222")`. Keep scratch
+  drivers outside the repo (gitignored paths are not writable by agent file tools). Playwright's CDP
+  session emulates focus — use raw CDP `Runtime.evaluate` when focus matters.
+- Relaunching the app (or a Rust edit under `tauri dev`) pops a maximized window in front of the
+  user; avoid while someone is using the PC.
+- Steam: `EAppState` flags (2048 = uninstalling), manifest `LastPlayed`, non-game apps filtered,
+  artwork in `librarycache/<appid>/<sha1>/library_capsule.jpg` (`steam::local_artwork_in`).
+- Xbox: DLC configs skipped; AUMID app id from `Content/appxmanifest.xml`.
+- CSP: `index.html` meta and `tauri.conf.json` must both allow `http://asset.localhost` (`src/app/csp.test.ts`).
+- Safety: process class `platform` (Steam/Xbox/anti-cheat) is protected; the allowlist ships empty;
+  `modeStore` re-classifies running instances by path before closing (veto).
+- Privacy hotkey is registered natively (`hotkey.rs`, event `nexus:privacy-hotkey`).
+- Performance: ambient motion runs on one frame-limited clock (`ambientMotion.ts`) and stops when the
+  window is not in front (`windowStore`, native focus events); telemetry cadence from `telemetryInterval`.
+- `useExternalGameWatch` + `processes_running_under` detect games started outside NEXUS.
+- Commits on a fresh machine without git identity: pass `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env vars
+  (never edit git config).
 
 ## Native/provider boundaries
 - Steam: discovery reads only registry-located Steam paths + manifests; launch
