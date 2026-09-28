@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { AmbientBackground } from "@/components/background/AmbientBackground";
 import { BootSequence } from "@/components/shell/BootSequence";
 import { TitleBar } from "@/components/shell/TitleBar";
@@ -34,7 +34,9 @@ export function App() {
   const bootPhase = useNavigationStore((s) => s.bootPhase);
   const setBootPhase = useNavigationStore((s) => s.setBootPhase);
   const startTelemetry = useTelemetryStore((s) => s.start);
-  const reducedMotion = useSettingsStore((s) => s.appearance.reducedMotion);
+  const reducedSetting = useSettingsStore((s) => s.appearance.reducedMotion);
+  const osReducedMotion = useWindowStore((s) => s.osReducedMotion);
+  const reducedMotion = reducedSetting || osReducedMotion;
   const glass = useSettingsStore((s) => s.appearance.glassIntensity);
   const onboardingComplete = useSettingsStore((s) => s.profile.onboardingComplete);
   const setDevPanelOpen = useSettingsStore((s) => s.setDevPanelOpen);
@@ -96,6 +98,7 @@ export function App() {
   }, [setDevPanelOpen]);
 
   return (
+    <MotionConfig reducedMotion={reducedMotion ? "always" : "user"}>
     <div
       className={cn("relative h-screen w-screen overflow-hidden", reducedMotion && "reduce-motion")}
       style={{ ["--glass-alpha" as string]: (glass / 100).toFixed(2) }}
@@ -125,5 +128,6 @@ export function App() {
       <PrivacyVeil />
       <DevPanel />
     </div>
+    </MotionConfig>
   );
 }

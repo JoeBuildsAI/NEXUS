@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useFieldLabel } from "./fieldLabel";
 
 interface ToggleProps {
   checked: boolean;
@@ -11,6 +12,7 @@ interface ToggleProps {
 
 /** Monochrome switch: white pill when on, smoke track when off. */
 export function Toggle({ checked, onChange, label, description, disabled, className }: ToggleProps) {
+  const rowLabel = useFieldLabel();
   return (
     <label className={cn("flex items-center justify-between gap-4", disabled && "opacity-40", className)}>
       {(label || description) && (
@@ -23,7 +25,7 @@ export function Toggle({ checked, onChange, label, description, disabled, classN
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={label}
+        aria-label={label ?? rowLabel ?? undefined}
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(

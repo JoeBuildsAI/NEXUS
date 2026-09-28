@@ -42,7 +42,8 @@ export function AmbientBackground() {
   const mood = screen === "media" ? MODE_MOOD.media : MODE_MOOD[mode];
   const blackout = screen === "media";
   const perf = appearance.backgroundPerformance;
-  const still = appearance.reducedMotion || !appearance.animationsEnabled;
+  const osReducedMotion = useWindowStore((s) => s.osReducedMotion);
+  const still = appearance.reducedMotion || osReducedMotion || !appearance.animationsEnabled;
 
   // Effective intensity: performance tier and in-game state reduce load.
   const perfScale = perf === "full" ? 1 : perf === "balanced" ? 0.65 : 0.25;

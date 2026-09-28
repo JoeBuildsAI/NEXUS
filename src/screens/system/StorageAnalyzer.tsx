@@ -35,12 +35,13 @@ const RISK: Record<CleanupRisk, { label: string; cls: string }> = {
 };
 
 type Candidate = CleanupCandidateView & { approved: boolean };
+const NO_DRIVES: typeof DEMO_DRIVES = [];
 
 export function StorageAnalyzer() {
   const liveDrives = useTelemetryStore((s) => s.snapshot?.storage);
   const gameRunning = useModeStore((s) => s.gameRunning);
   // Desktop never shows demo drives; the browser preview does (clearly illustrative).
-  const drives = liveDrives && liveDrives.length ? liveDrives : config.isTauri ? [] : DEMO_DRIVES;
+  const drives = liveDrives && liveDrives.length ? liveDrives : config.isTauri ? NO_DRIVES : DEMO_DRIVES;
   const eligible = useMemo(() => eligibleDrivesForScan(drives), [drives]);
   const excluded = drives.filter((d) => d.kind !== "fixed");
   const [selected, setSelected] = useState<string | null>(null);

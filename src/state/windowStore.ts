@@ -9,12 +9,17 @@ import { config } from "@/core/config";
 interface WindowState {
   focused: boolean;
   visible: boolean;
-  set: (patch: Partial<Pick<WindowState, "focused" | "visible">>) => void;
+  /** Windows "Animation effects" off (prefers-reduced-motion). */
+  osReducedMotion: boolean;
+  set: (patch: Partial<Pick<WindowState, "focused" | "visible" | "osReducedMotion">>) => void;
 }
+
+const reducedQuery = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 
 export const useWindowStore = create<WindowState>((set) => ({
   focused: typeof document === "undefined" ? true : document.hasFocus(),
   visible: typeof document === "undefined" ? true : !document.hidden,
+  osReducedMotion: reducedQuery?.matches ?? false,
   set: (patch) => set(patch),
 }));
 
@@ -37,6 +42,7 @@ export function wireWindowActivity(): void {
   document.addEventListener("visibilitychange", () => store.set({ visible: !document.hidden }));
   window.addEventListener("focus", () => store.set({ focused: true }));
   window.addEventListener("blur", () => store.set({ focused: false }));
+  reducedQuery?.addEventListener?.("change", (e) => store.set({ osReducedMotion: e.matches }));
   if (!config.isTauri) return;
   void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
     const w = getCurrentWindow();

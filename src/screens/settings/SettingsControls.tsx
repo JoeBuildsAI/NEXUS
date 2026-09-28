@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { FieldLabelContext, useFieldLabel } from "@/components/ui/fieldLabel";
 
 /** A settings section: large editorial title, generous rhythm, hairline rows. */
 export function SettingsSection({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -19,15 +20,16 @@ export function SettingRow({ label, description, children, className }: { label:
         <p className="text-[15px] text-white/85">{label}</p>
         {description && <p className="mt-1 text-[13px] leading-relaxed text-white/40">{description}</p>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="shrink-0"><FieldLabelContext.Provider value={label}>{children}</FieldLabelContext.Provider></div>
     </div>
   );
 }
 
 /** Text-only segmented control: no box, moving underline. */
 export function Select<T extends string>({ value, onChange, options, className }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; className?: string }) {
+  const rowLabel = useFieldLabel();
   return (
-    <div className={cn("flex items-center gap-5", className)} role="radiogroup">
+    <div className={cn("flex items-center gap-5", className)} role="radiogroup" aria-label={rowLabel ?? undefined}>
       {options.map((o) => {
         const active = o.value === value;
         return (
