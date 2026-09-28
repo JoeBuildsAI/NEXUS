@@ -97,7 +97,7 @@ export function ProcessViewer() {
         <div className="flex flex-wrap gap-x-8 gap-y-1 font-mono text-[12px] tabular text-white/40">
           <span><span className="text-white/85">{procs?.length ?? "—"}</span> processes</span>
           <span><span className="text-white/85">{counts["user-application"] ?? 0}</span> user apps</span>
-          <span><span className="text-white/85">{(counts["system-critical"] ?? 0) + (counts.driver ?? 0) + (counts.security ?? 0) + (counts.hardware ?? 0)}</span> protected</span>
+          <span><span className="text-white/85">{(counts["system-critical"] ?? 0) + (counts.driver ?? 0) + (counts.security ?? 0) + (counts.hardware ?? 0) + (counts.platform ?? 0)}</span> protected</span>
           <span><span className={counts.unknown ? "text-status-attention/80" : "text-white/85"}>{counts.unknown ?? 0}</span> unknown</span>
         </div>
         <p className={cn("text-micro", canAct ? "text-status-attention/80" : "text-white/30")}>{canAct ? "management enabled · marked user apps only" : "observe only · nothing is terminated"}</p>

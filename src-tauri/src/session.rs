@@ -31,6 +31,11 @@ fn file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("session.json"))
 }
 
+/// Parse a session record; tolerant of a UTF-8 BOM (editors / PowerShell add one).
+pub fn parse_record(text: &str) -> Option<SessionRecord> {
+    serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()
+}
+
 #[tauri::command]
 pub fn session_read(app: tauri::AppHandle) -> Result<Option<SessionRecord>, String> {
     let p = file(&app)?;
@@ -38,7 +43,15 @@ pub fn session_read(app: tauri::AppHandle) -> Result<Option<SessionRecord>, Stri
         return Ok(None);
     }
     let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
-    Ok(serde_json::from_str(&text).ok())
+    match parse_record(&text) {
+        Some(r) => Ok(Some(r)),
+        None => {
+            // Never leave an unreadable record in place forever: move it aside so
+            // the next session starts clean and the evidence is kept locally.
+            let _ = std::fs::rename(&p, p.with_file_name("session.invalid.json"));
+            Err("session record was unreadable and has been set aside".into())
+        }
+    }
 }
 
 #[tauri::command]
@@ -46,6 +59,19 @@ pub fn session_write(app: tauri::AppHandle, record: SessionRecord) -> Result<(),
     let p = file(&app)?;
     let text = serde_json::to_string_pretty(&record).map_err(|e| e.to_string())?;
     std::fs::write(&p, text).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_records_with_or_without_bom_and_rejects_garbage() {
+        let json = r#"{"mode":"gaming","startedAt":1,"previousPowerGuid":"381b4222-f694-41f0-9685-ff5bb260df2e","closedApps":[],"startupChanges":[]}"#;
+        assert_eq!(parse_record(json).unwrap().mode, "gaming");
+        assert!(parse_record(&format!("\u{feff}{json}")).unwrap().previous_power_guid.is_some());
+        assert!(parse_record("{not json").is_none());
+    }
 }
 
 #[tauri::command]

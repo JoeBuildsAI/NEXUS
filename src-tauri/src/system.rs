@@ -41,9 +41,10 @@ pub fn get_processes(state: State<AppState>) -> Result<Vec<ProcessRaw>, String> 
         })
         .collect();
 
-    // Return the most resource-relevant processes to keep the payload compact.
+    // Most resource-relevant first. A real gaming PC easily runs 300+ processes;
+    // a small cap hid lightweight tray apps — exactly the ones users mark for Gaming Mode.
     procs.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes));
-    procs.truncate(150);
+    procs.truncate(600);
     Ok(procs)
 }
 

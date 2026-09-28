@@ -5,6 +5,8 @@ import { Toggle, Button } from "@/components/ui";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useProcessPrefsStore } from "@/state/processPrefsStore";
 import { useModeStore } from "@/state/modeStore";
+import { classifyProcess, isManageable } from "@/core/safety/processClassifier";
+import { PROCESS_CLASS_META } from "@/core/safety/processMeta";
 
 /**
  * Gaming Mode config. The background-app allowlist is the set of processes the
@@ -21,11 +23,18 @@ export function GamingSettingsSection() {
   const allow = Object.entries(prefs).filter(([, p]) => p === "close").map(([n]) => n);
   const never = Object.entries(prefs).filter(([, p]) => p === "never").map(([n]) => n);
 
+  const [draftError, setDraftError] = useState<string | null>(null);
   const addApp = () => {
-    const name = draft.trim();
-    if (!name) return;
-    setPref(name.endsWith(".exe") ? name : `${name}.exe`, "close");
+    const raw = draft.trim();
+    if (!raw) return;
+    const name = raw.toLowerCase().endsWith(".exe") ? raw : `${raw}.exe`;
+    if (!/^[\w .()+-]{1,76}\.exe$/i.test(name)) return setDraftError("Enter a bare executable name, e.g. Spotify.exe.");
+    // Names alone can identify protected software; anything else is re-checked by path at run time.
+    const cls = classifyProcess(name, null, null);
+    if (cls !== "unknown" && !isManageable(cls)) return setDraftError(`${name} is ${PROCESS_CLASS_META[cls].label.toLowerCase()} software and is always protected.`);
+    setPref(name, "close");
     setDraft("");
+    setDraftError(null);
   };
 
   return (
@@ -50,6 +59,7 @@ export function GamingSettingsSection() {
           <TextInput value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addApp()} placeholder="ProcessName.exe" className="w-64 font-mono" />
           <Button size="sm" variant="ghost" onClick={addApp}>Add</Button>
         </div>
+        {draftError && <p role="alert" className="mt-2 text-[12.5px] text-status-attention/80">{draftError}</p>}
         {never.length > 0 && <p className="mt-4 text-[13px] text-white/40">Never touch: <span className="font-mono text-white/60">{never.join(", ")}</span></p>}
       </div>
 

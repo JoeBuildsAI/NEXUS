@@ -85,7 +85,10 @@ export function ModePreviewDialog() {
   const stepsFor = useModeStore((s) => s.stepsFor);
   const configs = useModeStore((s) => s.configs);
   const safety = useSettingsStore((s) => s.system.safety);
-  const steps = preview ? stepsFor(preview).filter((s) => s.kind !== "note" || s.id === "apps-none") : [];
+  // Re-render when the power probe resolves so the preview states the real plan.
+  useModeStore((s) => s.activePerformancePlan);
+  useModeStore((s) => s.powerSupported);
+  const steps = preview ? stepsFor(preview).filter((s) => s.kind !== "note" || s.id === "apps-none" || s.id === "power") : [];
 
   return (
     <AnimatePresence>

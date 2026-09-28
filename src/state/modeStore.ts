@@ -13,6 +13,7 @@ import { useSettingsStore } from "./settingsStore";
 import { useProcessPrefsStore } from "./processPrefsStore";
 import { notify } from "./toastStore";
 import { native } from "@/providers/system/nativeBridge";
+import { classifyProcess, isManageable } from "@/core/safety/processClassifier";
 import { createLogger } from "@/lib/logger";
 import { activity } from "./activityStore";
 
@@ -141,7 +142,12 @@ export const useModeStore = create<ModeState>((set, get) => ({
           }
         } else if (step.kind === "process-stop") {
           let any = false;
+          const running = await native.processList();
           for (const app of step.apps ?? []) {
+            // Execution-time veto: a typed or stale allowlist entry never closes a
+            // process whose running instance classifies as protected by its path.
+            const vetoed = running?.some((p) => p.name.toLowerCase() === app.toLowerCase() && !isManageable(classifyProcess(p.name, null, p.path)));
+            if (vetoed) { log.warn("Allowlisted app skipped: running instance is protected", { app }); continue; }
             const r = await native.closeGraceful(app);
             if (r.ok && r.count > 0) {
               closedApps.push(app);
@@ -202,20 +208,28 @@ export const useModeStore = create<ModeState>((set, get) => ({
   updateConfig: (mode, patch) => set((s) => ({ configs: { ...s.configs, [mode]: { ...s.configs[mode], ...patch } } })),
   setGameRunning: (gameRunning) => set({ gameRunning }),
 
-  recoverStaleSession: async () => {
-    const rec = await native.sessionRead();
-    if (!rec) return false;
-    let restored = false;
-    if (rec.previousPowerGuid) {
-      restored = await native.powerSetActive(rec.previousPowerGuid);
-    }
-    await native.sessionClear();
-    log.info("Recovered stale mode session", { mode: rec.mode, restoredPower: restored });
-    activity.record("session-recovered", restored ? "Restored the previous power plan after an interrupted session" : "Cleared an interrupted mode session");
-    notify.warn(
-      "Previous session recovered",
-      restored ? "NEXUS closed unexpectedly during Gaming Mode. The previous power plan has been restored." : "NEXUS closed unexpectedly during a mode. Session state was cleared.",
-    );
-    return true;
+  recoverStaleSession: () => {
+    // Concurrent boot paths (StrictMode, re-mounts) share one recovery.
+    recovery ??= recoverOnce().finally(() => { recovery = null; });
+    return recovery;
   },
 }));
+
+let recovery: Promise<boolean> | null = null;
+
+async function recoverOnce(): Promise<boolean> {
+  const rec = await native.sessionRead();
+  if (!rec) return false;
+  let restored = false;
+  if (rec.previousPowerGuid) {
+    restored = await native.powerSetActive(rec.previousPowerGuid);
+  }
+  await native.sessionClear();
+  log.info("Recovered stale mode session", { mode: rec.mode, restoredPower: restored });
+  activity.record("session-recovered", restored ? "Restored the previous power plan after an interrupted session" : "Cleared an interrupted mode session");
+  notify.warn(
+    "Previous session recovered",
+    restored ? "NEXUS closed unexpectedly during Gaming Mode. The previous power plan has been restored." : "NEXUS closed unexpectedly during a mode. Session state was cleared.",
+  );
+  return true;
+}

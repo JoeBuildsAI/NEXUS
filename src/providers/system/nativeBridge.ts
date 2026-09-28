@@ -100,6 +100,11 @@ export const native = {
   },
 
   // ---- processes ----
+  /** Running processes (name + executable path) for execution-time safety checks. */
+  async processList(): Promise<{ name: string; path: string | null }[] | null> {
+    if (!config.isTauri) return null;
+    return invoke<{ name: string; path: string | null }[]>("get_processes").catch(() => null);
+  },
   async closeGraceful(name: string): Promise<{ ok: boolean; count: number; error?: string }> {
     if (!config.isTauri) return { ok: true, count: 0 };
     try {

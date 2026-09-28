@@ -82,6 +82,18 @@ describe("Gaming Mode transaction semantics", () => {
     expect(n.active).toBe(VENDOR);
   });
 
+  it("SAFETY: an allowlisted name whose running instance is protected by path is never closed", async () => {
+    const n = fakeNative({ running: ["Spotify.exe", "ArmouryCrate.exe"] });
+    useProcessPrefsStore.setState({ prefs: { "spotify.exe": "close", "armourycrate.exe": "close" } });
+    vi.spyOn(native, "processList").mockResolvedValue([
+      { name: "Spotify.exe", path: "C:\\Users\\u\\AppData\\Roaming\\Spotify\\Spotify.exe" },
+      { name: "ArmouryCrate.exe", path: "C:\\Program Files\\WindowsApps\\B9ECED6F.ArmouryCrate_6.5.14.0_x64__qmba6cd70vzyy\\ArmouryCrate.exe" },
+    ]);
+    await useModeStore.getState().enterMode("gaming");
+    expect(n.closeCalls).toEqual(["spotify.exe"]);
+    expect(n.session?.closedApps).toEqual(["spotify.exe"]);
+  });
+
   it("a failed power switch is not recorded as a change, so exit never 'restores' it", async () => {
     const n = fakeNative({ setFails: true });
     await useModeStore.getState().enterMode("gaming");
@@ -107,6 +119,14 @@ describe("Gaming Mode transaction semantics", () => {
     expect(n.active).toBe(BALANCED);
     expect(n.session).toBeNull();
     expect(await useModeStore.getState().recoverStaleSession()).toBe(false); // idempotent
+  });
+
+  it("concurrent recovery calls restore once", async () => {
+    const n = fakeNative({ active: HIGH });
+    n.session = { mode: "gaming", startedAt: Date.now() - 60_000, previousPowerGuid: BALANCED, closedApps: [], startupChanges: [] };
+    const [a, b] = await Promise.all([useModeStore.getState().recoverStaleSession(), useModeStore.getState().recoverStaleSession()]);
+    expect([a, b]).toEqual([true, true]);
+    expect(n.setCalls).toEqual([BALANCED]);
   });
 
   it("unsupported power control is reported, never faked", async () => {
