@@ -151,7 +151,8 @@ pub fn get_telemetry(state: State<AppState>, gpu_state: State<crate::gpu::GpuSta
     let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
     sys.refresh_cpu_usage();
     sys.refresh_memory();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    // Only the count is needed here: refresh the process list without per-process CPU/memory/exe work.
+    sys.refresh_processes_specifics(sysinfo::ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new());
     let process_count = sys.processes().len();
 
     let cpu_usage = sys.global_cpu_usage().round() as u32;

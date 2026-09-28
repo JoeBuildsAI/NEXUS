@@ -160,19 +160,6 @@
     mix-blend-mode: overlay;
   }
 
-  @keyframes nx-drift-1 {
-    from { transform: translate3d(-6%, -4%, 0) scale(1); }
-    to { transform: translate3d(8%, 6%, 0) scale(1.12); }
-  }
-  @keyframes nx-drift-2 {
-    from { transform: translate3d(5%, 6%, 0) scale(1.08); }
-    to { transform: translate3d(-7%, -5%, 0) scale(0.96); }
-  }
-  @keyframes nx-drift-3 {
-    from { transform: translate3d(-4%, 7%, 0) scale(0.95); }
-    to { transform: translate3d(6%, -6%, 0) scale(1.1); }
-  }
-
   .text-glow {
     text-shadow: 0 0 40px rgba(255, 255, 255, 0.12);
   }

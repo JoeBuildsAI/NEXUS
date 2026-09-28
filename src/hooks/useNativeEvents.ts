@@ -117,9 +117,7 @@ export function useNativeEvents() {
     const check = () => {
       const now = Date.now();
       if (now - lastTick > 30_000) {
-        const t = useTelemetryStore.getState();
-        t.stop();
-        t.start(useModeStore.getState().gameRunning ? 6000 : 1500);
+        useTelemetryStore.getState().restart();
       }
       lastTick = now;
     };

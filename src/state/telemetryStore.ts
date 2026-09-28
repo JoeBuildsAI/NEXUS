@@ -21,9 +21,12 @@ interface TelemetryState {
   consecutiveFailures: number;
   start: (intervalMs?: number) => void;
   stop: () => void;
+  /** Restart with the current cadence (e.g. after sleep). */
+  restart: () => void;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+let currentInterval = 1500;
 const HISTORY_LIMIT = 400;
 /** A gap this long (sleep, lock) resets the series instead of drawing a false flat line. */
 const GAP_RESET_MS = 60_000;
@@ -36,6 +39,7 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
   consecutiveFailures: 0,
   start: (intervalMs = 1500) => {
     if (get().polling) return;
+    currentInterval = intervalMs;
     const provider = getProviders().system;
     const poll = async () => {
       if (document.hidden) return; // don't burn cycles when not visible
@@ -68,5 +72,9 @@ export const useTelemetryStore = create<TelemetryState>((set, get) => ({
     if (timer) clearInterval(timer);
     timer = null;
     set({ polling: false });
+  },
+  restart: () => {
+    get().stop();
+    get().start(currentInterval);
   },
 }));

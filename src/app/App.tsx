@@ -16,6 +16,7 @@ import { useNavigationStore } from "@/state/navigationStore";
 import { useTelemetryStore } from "@/state/telemetryStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { useModeStore } from "@/state/modeStore";
+import { isWindowActive, telemetryInterval, useWindowStore, wireWindowActivity } from "@/state/windowStore";
 import { useCleanupStore } from "@/state/cleanupStore";
 import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useNativeEvents } from "@/hooks/useNativeEvents";
@@ -45,13 +46,18 @@ export function App() {
   useEffect(() => { void useLifeStore.getState().load(); }, []);
 
   const gameRunning = useModeStore((s) => s.gameRunning);
+  const gamingMode = useModeStore((s) => s.current === "gaming");
+  const screen = useNavigationStore((s) => s.screen);
+  const active = useWindowStore(isWindowActive);
+  useEffect(() => wireWindowActivity(), []);
+  const interval = telemetryInterval({ active, gameRunning, gamingMode, screen });
 
   useEffect(() => {
-    // GAME SESSION ACTIVE → poll telemetry far less often.
+    // Fast only when live numbers are on screen; a game or a background window polls rarely.
     useTelemetryStore.getState().stop();
-    startTelemetry(gameRunning ? 6000 : 1500);
+    startTelemetry(interval);
     return () => useTelemetryStore.getState().stop();
-  }, [startTelemetry, gameRunning]);
+  }, [startTelemetry, interval]);
 
   useEffect(() => {
     const p = getProviders();

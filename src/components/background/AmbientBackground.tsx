@@ -5,6 +5,8 @@ import { useModeStore } from "@/state/modeStore";
 import { useNavigationStore } from "@/state/navigationStore";
 import { useLibraryStore } from "@/state/libraryStore";
 import { ENVIRONMENTS, MODE_MOOD } from "./environments";
+import { ambientFrameInterval, driftTransform, shouldRender, stepScale } from "./ambientMotion";
+import { isWindowActive, useWindowStore } from "@/state/windowStore";
 
 interface Particle {
   x: number;
@@ -47,7 +49,12 @@ export function AmbientBackground() {
   const gameScale = gameRunning ? 0.3 : 1;
   const intensity = (appearance.backgroundIntensity / 100) * perfScale * gameScale;
 
-  // Particles / links
+  const lightRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const active = useWindowStore(isWindowActive);
+  // Ambient motion stops entirely while a game runs, in Gaming Mode, or when NEXUS is not in front.
+  const frozen = still || gameRunning || mode === "gaming" || !active;
+
+  // Particles / links / light drift — one frame-limited, time-based clock.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -57,11 +64,15 @@ export function AmbientBackground() {
     let raf = 0;
     let width = 0;
     let height = 0;
+    let last = 0;
+    const t0 = performance.now();
+    const interval = ambientFrameInterval(perf);
     const count = Math.round(110 * spec.density * intensity);
     const linkMode = appearance.environment === "neural" && perf !== "minimal";
     const particles: Particle[] = [];
     const [pr, pg, pb] = spec.particleColor;
-    const speed = spec.speed * mood.energy * (still ? 0 : 1);
+    const speed = spec.speed * mood.energy * (frozen ? 0 : 1);
+    const lightPeriod = (i: number) => (38 + i * 9) / Math.max(0.2, mood.energy);
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, perf === "full" ? 2 : 1.25);
@@ -88,13 +99,14 @@ export function AmbientBackground() {
     resize();
     seed();
 
-    const draw = () => {
+    const draw = (dtMs = 0) => {
       ctx.clearRect(0, 0, width, height);
       const alphaScale = 0.3 + intensity * 0.7;
+      const k = speed * stepScale(dtMs);
       for (const p of particles) {
-        if (speed > 0) {
-          p.x += p.vx * speed;
-          p.y += p.vy * speed;
+        if (k > 0) {
+          p.x += p.vx * k;
+          p.y += p.vy * k;
           if (p.x < -10) p.x = width + 10;
           if (p.x > width + 10) p.x = -10;
           if (p.y < -10) p.y = height + 10;
@@ -126,27 +138,34 @@ export function AmbientBackground() {
           }
         }
       }
-      if (speed > 0) raf = requestAnimationFrame(draw);
+    };
+    const placeLights = (tSec: number) => {
+      lightRefs.current.forEach((el, i) => { if (el) el.style.transform = driftTransform(i, tSec, lightPeriod(i)); });
+    };
+    // rAF fires at the display rate (240 Hz on gaming monitors); render only every `interval`.
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (!shouldRender(now, last, interval)) return;
+      const dt = last ? now - last : 0;
+      last = now;
+      draw(dt);
+      placeLights((now - t0) / 1000);
     };
     draw();
+    placeLights(0);
+    if (speed > 0) raf = requestAnimationFrame(tick);
 
     const onResize = () => {
       resize();
       seed();
-      if (speed === 0) draw();
-    };
-    const onVis = () => {
-      if (document.hidden) cancelAnimationFrame(raf);
-      else if (speed > 0) raf = requestAnimationFrame(draw);
+      if (!raf) draw();
     };
     window.addEventListener("resize", onResize);
-    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
-      document.removeEventListener("visibilitychange", onVis);
     };
-  }, [spec, intensity, still, mood.energy, perf, appearance.environment]);
+  }, [spec, intensity, frozen, mood.energy, perf, appearance.environment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cursor-reactive light (direct DOM write; no React re-render per move).
   useEffect(() => {
@@ -179,7 +198,6 @@ export function AmbientBackground() {
   }, [appearance.cursorLighting, still, perf]);
 
   const lightOpacity = mood.brightness * (0.6 + intensity * 0.6);
-  const driftDur = (s: number) => `${(s / Math.max(0.2, mood.energy)).toFixed(0)}s`;
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={{ background: spec.base[2] }}>
@@ -203,6 +221,7 @@ export function AmbientBackground() {
       {spec.lights.map((c, i) => (
         <div
           key={`${appearance.environment}-${i}`}
+          ref={(el) => { lightRefs.current[i] = el; }}
           className="absolute rounded-full blur-[140px] transition-opacity duration-1000"
           style={{
             width: `${38 + i * 6}vw`,
@@ -211,8 +230,7 @@ export function AmbientBackground() {
             top: `${[28, 60, 78, 15][i % 4]}%`,
             background: c,
             opacity: lightOpacity,
-            animation: still ? "none" : `nx-drift-${(i % 3) + 1} ${driftDur(38 + i * 9)} ease-in-out infinite alternate`,
-            willChange: still ? "auto" : "transform",
+            willChange: frozen ? "auto" : "transform",
           }}
         />
       ))}
