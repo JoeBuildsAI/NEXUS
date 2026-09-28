@@ -31,7 +31,8 @@ export function HeroArt({ game, className, align = "right" }: { game: Game; clas
             <div className="absolute inset-0 nx-noise opacity-[0.05]" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
+        {/* Starts 2px outside the art so a fractional container edge never shows as a seam. */}
+        <div className="absolute inset-y-0 -left-0.5 right-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
       </div>
