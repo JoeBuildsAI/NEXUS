@@ -39,7 +39,8 @@ type Candidate = CleanupCandidateView & { approved: boolean };
 export function StorageAnalyzer() {
   const liveDrives = useTelemetryStore((s) => s.snapshot?.storage);
   const gameRunning = useModeStore((s) => s.gameRunning);
-  const drives = liveDrives && liveDrives.length ? liveDrives : DEMO_DRIVES;
+  // Desktop never shows demo drives; the browser preview does (clearly illustrative).
+  const drives = liveDrives && liveDrives.length ? liveDrives : config.isTauri ? [] : DEMO_DRIVES;
   const eligible = useMemo(() => eligibleDrivesForScan(drives), [drives]);
   const excluded = drives.filter((d) => d.kind !== "fixed");
   const [selected, setSelected] = useState<string | null>(null);
@@ -58,7 +59,12 @@ export function StorageAnalyzer() {
 
   useEffect(() => { void useCleanupStore.getState().discover(); }, []);
 
-  const analysis: StorageAnalysis | null = drive ? analyses[drive.mountPoint] ?? demoStorageAnalysis(drive.mountPoint, drive.totalBytes, drive.freeBytes) : null;
+  // Before Analyze the desktop shows only real used/free — never invented per-category sizes.
+  const analysis: StorageAnalysis | null = drive
+    ? analyses[drive.mountPoint] ?? (config.isTauri
+      ? { drive: drive.mountPoint, totalBytes: drive.totalBytes, usedBytes: drive.totalBytes - drive.freeBytes, freeBytes: drive.freeBytes, analyzedAt: 0, categories: [] }
+      : demoStorageAnalysis(drive.mountPoint, drive.totalBytes, drive.freeBytes))
+    : null;
   const isReal = drive ? !!analyses[drive.mountPoint] : false;
 
   const runAnalysis = async () => {
@@ -115,7 +121,7 @@ export function StorageAnalyzer() {
     });
   };
 
-  if (!drive || !analysis) return <p className="text-sm text-white/40">No eligible fixed drives detected.</p>;
+  if (!drive || !analysis) return <p className="text-sm text-white/40">{config.isTauri && !liveDrives ? "Reading drives…" : "No eligible fixed drives detected."}</p>;
   const cats = ORDER.map((k) => analysis.categories.find((c) => c.category === k)).filter((c): c is NonNullable<typeof c> => !!c);
 
   return (
@@ -172,7 +178,7 @@ export function StorageAnalyzer() {
             ))}
           </div>
           <p className="mt-5 max-w-lg text-[12px] leading-relaxed text-white/30">
-            {isReal ? "Bounded analysis of known locations — Windows, Program Files, Steam libraries, user folders, temp. Everything else is “other”. NEXUS never walks a whole drive." : "Illustrative until you run Analyze. Analysis inspects known locations on this fixed drive only; authorized media folders are never part of cleanup."}
+            {isReal ? "Bounded analysis of known locations — Windows, Program Files, Steam libraries, user folders, temp. Everything else is “other”. NEXUS never walks a whole drive." : config.isTauri ? "Run Analyze to see what is using space. It inspects known locations on this fixed drive only; authorized media folders are never part of cleanup." : "Illustrative until you run Analyze. Analysis inspects known locations on this fixed drive only; authorized media folders are never part of cleanup."}
           </p>
         </div>
 
