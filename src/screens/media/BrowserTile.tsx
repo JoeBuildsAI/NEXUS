@@ -93,7 +93,15 @@ export function BrowserTile({ slot, tile, isPrimary, isActive, onActivate }: { s
   );
 }
 
-/** https only; strips credentials; rejects anything that is not a web page. */
+function isLocalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h === "0.0.0.0" || h === "::1" || h === "::") return true;
+  if (/^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (!h.includes(".") && !h.includes(":")) return true; // single-label intranet names
+  return /^(fc|fd|fe80)/.test(h) && h.includes(":");
+}
+
+/** https only; strips credentials; rejects local/private hosts and anything that is not a web page. */
 export function normalizeUrl(input: string): string | null {
   let s = input.trim();
   if (!s) return null;
@@ -102,6 +110,9 @@ export function normalizeUrl(input: string): string | null {
     const u = new URL(s);
     if (u.protocol !== "https:" && u.protocol !== "http:") return null;
     if (u.username || u.password) return null;
+    // Never frame this machine or NEXUS's own origins (tauri.localhost, ipc.localhost,
+    // asset.localhost): a same-origin frame could reach privileged IPC.
+    if (isLocalHost(u.hostname)) return null;
     if (u.protocol === "http:") u.protocol = "https:";
     return u.toString();
   } catch {

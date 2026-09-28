@@ -11,4 +11,12 @@ describe("browser surface url policy", () => {
     expect(normalizeUrl("tauri://localhost")).toBeNull();
     expect(normalizeUrl("")).toBeNull();
   });
+
+  it("SECURITY: never frames NEXUS's own origins, loopback or private-network hosts", () => {
+    for (const u of ["http://tauri.localhost/", "https://ipc.localhost/plugin", "http://asset.localhost/C%3A%5C", "localhost:1420", "127.0.0.1", "https://[::1]/", "192.168.1.1", "10.0.0.5", "172.16.3.4", "169.254.1.1", "router", "https://[fe80::1]/"]) {
+      expect(normalizeUrl(u), u).toBeNull();
+    }
+    expect(normalizeUrl("172.32.0.1")).toBe("https://172.32.0.1/");
+    expect(normalizeUrl("www.youtube.com/watch?v=x")).toBe("https://www.youtube.com/watch?v=x");
+  });
 });
