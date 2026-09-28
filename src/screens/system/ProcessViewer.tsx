@@ -11,6 +11,7 @@ import { useProcessPrefsStore, type ProcessPreference } from "@/state/processPre
 import { useModeStore } from "@/state/modeStore";
 import { notify } from "@/state/toastStore";
 import type { ProcessClass, ProcessInfo } from "@/core/types";
+import { groupProcesses, type ProcessGroup } from "@/core/safety/processGroups";
 import { formatBytes } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -52,14 +53,14 @@ export function ProcessViewer() {
   }, [reload, gameRunning]);
 
   const rows = useMemo(() => {
-    let list = [...(procs ?? [])];
+    let list = groupProcesses(procs ?? []);
     if (filter === "managed") list = list.filter((p) => (prefs[p.name.toLowerCase()] ?? "normal") !== "normal");
     else if (filter !== "all") list = list.filter((p) => p.classification === filter);
     if (query) {
       const q = query.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q) || friendlyProcess(p.name).name.toLowerCase().includes(q) || (p.publisher ?? "").toLowerCase().includes(q));
     }
-    const cmp: Record<SortKey, (a: ProcessInfo, b: ProcessInfo) => number> = {
+    const cmp: Record<SortKey, (a: ProcessGroup, b: ProcessGroup) => number> = {
       cpu: (a, b) => a.cpuPercent - b.cpuPercent,
       mem: (a, b) => a.memoryBytes - b.memoryBytes,
       name: (a, b) => friendlyProcess(a.name).name.localeCompare(friendlyProcess(b.name).name),
@@ -145,6 +146,7 @@ export function ProcessViewer() {
                     <div className="flex min-w-0 items-center gap-3">
                       <span className={cn("h-1 w-1 shrink-0 rounded-full", pref === "close" ? "bg-white" : pref === "never" ? "bg-status-attention" : "bg-transparent")} />
                       <span className="truncate text-[13.5px] text-white/85">{friendly.name}</span>
+                      {p.count > 1 && <span className="shrink-0 font-mono text-[11px] tabular text-white/35">×{p.count}</span>}
                       {friendly.name.toLowerCase() !== p.name.toLowerCase().replace(/\.exe$/, "") && <span className="hidden truncate font-mono text-[11px] text-white/25 md:inline">{p.name}</span>}
                     </div>
                     <span className="text-right font-mono text-[12.5px] tabular text-white/70">{p.cpuPercent.toFixed(1)}</span>
@@ -157,7 +159,7 @@ export function ProcessViewer() {
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="grid grid-cols-1 gap-x-16 gap-y-6 px-2 pb-6 pt-2 md:grid-cols-[1fr_300px]">
                           <dl className="grid grid-cols-[110px_1fr] gap-y-2 text-[12.5px]">
-                            <dt className="text-white/30">Process</dt><dd className="font-mono text-white/70">{p.name} <span className="text-white/30">· PID {p.pid}</span></dd>
+                            <dt className="text-white/30">Process</dt><dd className="font-mono text-white/70">{p.name} <span className="text-white/30">· {p.count > 1 ? `${p.count} instances` : `PID ${p.pid}`}</span></dd>
                             <dt className="text-white/30">Publisher</dt><dd className="text-white/60">{p.publisher ?? "Not available"}</dd>
                             <dt className="text-white/30">Path</dt><dd className="truncate font-mono text-white/55" title={p.path ?? ""} data-selectable="true">{p.path ?? "Not available"}</dd>
                             <dt className="text-white/30">Description</dt><dd className="text-white/60">{friendly.description ?? "—"}</dd>

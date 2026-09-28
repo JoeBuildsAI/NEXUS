@@ -73,6 +73,7 @@ pub fn run() {
             system::open_external,
             system::process_close_graceful,
             system::process_running_under,
+            system::processes_running_under,
             system::power_get_state,
             system::power_set_active,
             system::set_close_behavior,

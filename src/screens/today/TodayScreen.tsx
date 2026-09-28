@@ -150,6 +150,7 @@ export function TodayScreen() {
                       <PhaseMark phase={phase} kind={it.kind} />
                       <span className={cn("truncate text-[15px]", phase === "completed" ? "text-white/60 line-through decoration-white/20" : "text-white/90")}>{it.title}</span>
                       <span className="shrink-0 text-[12px] text-white/35">{KIND_LABEL[it.kind]}{it.detail ? ` · ${it.detail}` : ""}</span>
+                      {it.kind === "task" && phase === "past" && !it.completed && <span className="shrink-0 text-[11px] uppercase tracking-wide2 text-status-attention/80">overdue</span>}
                     </button>
                     {it.kind === "routine" && st && !st.complete && !st.dismissed && (
                       <button onClick={() => void life.completeRoutine(it.refId, day)} className="shrink-0 text-[12px] text-white/40 hover:text-white">Complete all</button>

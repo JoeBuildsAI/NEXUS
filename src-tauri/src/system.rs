@@ -451,9 +451,58 @@ pub fn process_running_under(state: State<AppState>, install_dir: String) -> Res
     }))
 }
 
+/// Which of the given install folders currently host a running process (games
+/// started outside NEXUS — from Steam, the Xbox app or a desktop shortcut).
+/// One read-only process scan for all folders; no attach or window access.
+#[tauri::command]
+pub fn processes_running_under(state: State<AppState>, dirs: Vec<String>) -> Result<Vec<String>, String> {
+    let wanted: Vec<(String, String)> = dirs
+        .into_iter()
+        .take(300)
+        .filter_map(|d| {
+            let n = normalize_dir(&d);
+            (n.len() >= 4).then_some((d, n))
+        })
+        .collect();
+    if wanted.is_empty() {
+        return Ok(vec![]);
+    }
+    let mut sys = state.sys.lock().map_err(|e| e.to_string())?;
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet));
+    let exes: Vec<String> = sys.processes().values().filter_map(|p| p.exe().map(|e| e.to_string_lossy().to_lowercase())).collect();
+    Ok(matching_dirs(&wanted, &exes))
+}
+
+fn normalize_dir(d: &str) -> String {
+    let mut n = d.trim().to_lowercase().replace('/', "\\");
+    while n.ends_with('\\') {
+        n.pop();
+    }
+    n
+}
+
+/// Pure matcher: a folder matches when an executable lives inside it (boundary-aware).
+pub fn matching_dirs(wanted: &[(String, String)], exes: &[String]) -> Vec<String> {
+    wanted
+        .iter()
+        .filter(|(_, n)| exes.iter().any(|e| e.starts_with(n.as_str()) && e[n.len()..].starts_with('\\')))
+        .map(|(orig, _)| orig.clone())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn running_under_matches_folder_boundaries_only() {
+        let wanted = vec![
+            ("C:\\Steam\\steamapps\\common\\Game".to_string(), normalize_dir("C:\\Steam\\steamapps\\common\\Game\\")),
+            ("C:\\XboxGames\\Other".to_string(), normalize_dir("C:/XboxGames/Other")),
+        ];
+        let exes = vec!["c:\\steam\\steamapps\\common\\game\\bin\\game.exe".to_string(), "c:\\xboxgames\\other two\\x.exe".to_string()];
+        assert_eq!(matching_dirs(&wanted, &exes), vec!["C:\\Steam\\steamapps\\common\\Game".to_string()]);
+    }
 
     #[test]
     fn rejects_protected_and_malformed_names() {

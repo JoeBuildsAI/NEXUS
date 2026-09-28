@@ -22,6 +22,7 @@ import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 import { useNativeEvents } from "@/hooks/useNativeEvents";
 import { useReminders } from "@/hooks/useReminders";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
+import { useExternalGameWatch } from "@/hooks/useExternalGameWatch";
 import { useLifeStore } from "@/state/lifeStore";
 import { setupActions } from "@/core/actions/setup";
 import { getProviders } from "@/providers";
@@ -45,6 +46,7 @@ export function App() {
   useNativeEvents();
   useReminders();
   useAutoBackup();
+  useExternalGameWatch();
   useEffect(() => { void useLifeStore.getState().load(); }, []);
 
   const gameRunning = useModeStore((s) => s.gameRunning);
