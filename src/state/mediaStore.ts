@@ -58,6 +58,11 @@ interface MediaState {
   /** Last known volume per item (restoreVolume). Session + persisted, capped. */
   lastVolume: Record<string, number>;
   lastPosition: Record<string, number>;
+  /** Learned intrinsic aspect ratio per item, so the wall lays portrait/landscape
+   *  content correctly on first paint and across re-opens (no 16:9 flash). */
+  learnedAspects: Record<string, number>;
+  /** Session-only: edge-to-edge immersive wall (chrome hidden, controls auto-hide). */
+  immersive: boolean;
 
   setMode: (mode: WallMode) => void;
   setPrimary: (index: number | null) => void;
@@ -92,6 +97,10 @@ interface MediaState {
   setDefaults: (patch: Partial<WorkspaceDefaults>) => void;
   rememberVolume: (itemId: string, volume: number) => void;
   rememberPosition: (itemId: string, position: number) => void;
+  /** Record an item's intrinsic aspect ratio once the player has decoded metadata. */
+  learnAspect: (itemId: string, aspect: number) => void;
+  setImmersive: (immersive: boolean) => void;
+  toggleImmersive: () => void;
   saveWorkspace: (name: string, positions?: Record<number, number>) => void;
   renameLayout: (id: string, name: string) => void;
   restoreLayout: (id: string) => void;
@@ -134,6 +143,8 @@ export const useMediaStore = create<MediaState>()(
       defaults: DEFAULT_WORKSPACE_DEFAULTS,
       lastVolume: {},
       lastPosition: {},
+      learnedAspects: {},
+      immersive: false,
 
       setMode: (mode) =>
         set((s) => {
@@ -180,7 +191,7 @@ export const useMediaStore = create<MediaState>()(
           primaryIndex: s.primaryIndex === index ? null : s.primaryIndex,
           activeIndex: s.activeIndex === index ? null : s.activeIndex,
         })),
-      clearAll: () => set((s) => ({ slots: emptySlots(s.defaults.loop), primaryIndex: null, activeIndex: null, mode: s.mode === "focus" ? "auto" : s.mode })),
+      clearAll: () => set((s) => ({ slots: emptySlots(s.defaults.loop), primaryIndex: null, activeIndex: null, immersive: false, mode: s.mode === "focus" ? "auto" : s.mode })),
       swapSlots: (a, b) =>
         set((s) => {
           const slots = [...s.slots];
@@ -279,7 +290,17 @@ export const useMediaStore = create<MediaState>()(
         set({ mode, slots, primaryIndex: layout.primaryIndex ?? null, revealed: true });
       },
       deleteLayout: (id) => set((s) => ({ savedLayouts: s.savedLayouts.filter((l) => l.id !== id) })),
-      clearPrivateWorkspace: () => set((s) => ({ slots: emptySlots(s.defaults.loop), primaryIndex: null, activeIndex: null, lastVolume: {}, lastPosition: {}, mode: "auto", revealed: true })),
+      clearPrivateWorkspace: () => set((s) => ({ slots: emptySlots(s.defaults.loop), primaryIndex: null, activeIndex: null, lastVolume: {}, lastPosition: {}, learnedAspects: {}, immersive: false, mode: "auto", revealed: true })),
+      learnAspect: (itemId, aspect) =>
+        set((s) => {
+          if (!(aspect > 0) || !Number.isFinite(aspect) || s.learnedAspects[itemId] === aspect) return s;
+          const entries = Object.entries(s.learnedAspects);
+          // Cap the cache; drop the oldest entries when it grows large.
+          const trimmed = entries.length >= 500 ? Object.fromEntries(entries.slice(-400)) : s.learnedAspects;
+          return { learnedAspects: { ...trimmed, [itemId]: aspect } };
+        }),
+      setImmersive: (immersive) => set({ immersive }),
+      toggleImmersive: () => set((s) => ({ immersive: !s.immersive })),
     }),
     {
       name: "nexus-media-workspace",
@@ -295,6 +316,7 @@ export const useMediaStore = create<MediaState>()(
         defaults: s.defaults,
         lastVolume: s.lastVolume,
         lastPosition: s.lastPosition,
+        learnedAspects: s.learnedAspects,
         slots: s.slots.map((sl) => ({ ...sl, playing: false })),
       }),
       merge: (persisted, current) => {
@@ -315,6 +337,7 @@ export const useMediaStore = create<MediaState>()(
         const rawSlots = Array.isArray(p.slots) && p.slots.length === SLOT_COUNT ? (p.slots as unknown[]) : [];
         const slots = rawSlots.length ? rawSlots.map((sl, i) => validSlot(sl, i, defaults.loop)) : emptySlots(defaults.loop);
         const numMap = (v: unknown): Record<string, number> => (isObj(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => typeof k === "string" && typeof x === "number" && Number.isFinite(x)).slice(0, 500)) as Record<string, number> : {});
+        const aspectMap = (v: unknown): Record<string, number> => (isObj(v) ? Object.fromEntries(Object.entries(v).filter(([k, x]) => typeof k === "string" && typeof x === "number" && x > 0 && Number.isFinite(x)).slice(0, 500)) as Record<string, number> : {});
         return {
           ...current,
           mode,
@@ -325,6 +348,8 @@ export const useMediaStore = create<MediaState>()(
           defaults,
           lastVolume: numMap(p.lastVolume),
           lastPosition: numMap(p.lastPosition),
+          learnedAspects: aspectMap(p.learnedAspects),
+          immersive: false,
           slots,
           seekRequest: null,
           revealed: false,

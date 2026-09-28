@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderPlus, Keyboard, Library, Link2, Pause, Play, Plus, Save, ShieldOff, Trash2, Volume2, VolumeX, Zap, Globe } from "lucide-react";
+import { FolderPlus, Keyboard, Library, Link2, Maximize2, Minimize2, Pause, Play, Plus, Save, ShieldOff, Trash2, Volume2, VolumeX, Zap, Globe } from "lucide-react";
 import { PlayerTile } from "./PlayerTile";
 import { BrowserTile, normalizeUrl } from "./BrowserTile";
 import { MediaPicker } from "./MediaPicker";
@@ -7,6 +7,7 @@ import { SavedWorkspaces } from "./SavedWorkspaces";
 import { useMediaStore, WALL_MODES, SLOT_COUNT } from "@/state/mediaStore";
 import { useSettingsStore } from "@/state/settingsStore";
 import { usePrivacyStore } from "@/state/privacyStore";
+import { useAutoHideControls } from "@/hooks/useAutoHideControls";
 import { notify } from "@/state/toastStore";
 import { requestConfirm } from "@/state/confirmStore";
 import { optimizeLayout, type LayoutResult, type WallMode } from "@/core/media/layout";
@@ -28,7 +29,8 @@ interface Props {
  */
 export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props) {
   const store = useMediaStore();
-  const { slots, mode, primaryIndex, focusIndex, activeIndex, syncPlayback, defaults } = store;
+  const { slots, mode, primaryIndex, focusIndex, activeIndex, syncPlayback, defaults, immersive, learnedAspects } = store;
+  const controls = useAutoHideControls(immersive);
   const reducedMotion = useSettingsStore((s) => s.appearance.reducedMotion);
   const activatePrivacy = usePrivacyStore((s) => s.activate);
   const [pickerSlot, setPickerSlot] = useState<number | null>(null);
@@ -59,7 +61,14 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
   const register = useCallback((index: number, el: HTMLVideoElement | null) => {
     videoEls.current[index] = el;
     if (!el) return;
-    const update = () => { if (el.videoWidth && el.videoHeight) setAspects((a) => (a[index] === el.videoWidth / el.videoHeight ? a : { ...a, [index]: el.videoWidth / el.videoHeight })); };
+    const update = () => {
+      if (!el.videoWidth || !el.videoHeight) return;
+      const ratio = el.videoWidth / el.videoHeight;
+      setAspects((a) => (a[index] === ratio ? a : { ...a, [index]: ratio }));
+      // Remember it so portrait/landscape content lays out correctly on re-open (no 16:9 flash).
+      const itemId = useMediaStore.getState().slots[index]?.itemId;
+      if (itemId) useMediaStore.getState().learnAspect(itemId, ratio);
+    };
     el.addEventListener("loadedmetadata", update);
     update();
   }, []);
@@ -68,7 +77,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
     const result = optimizeLayout({
       width: size.width,
       height: size.height,
-      players: active.map((s) => ({ index: s.index, aspect: s.browser ? s.browser.aspect : aspects[s.index] ?? null })),
+      players: active.map((s) => ({ index: s.index, aspect: s.browser ? s.browser.aspect : aspects[s.index] ?? (s.itemId ? learnedAspects[s.itemId] ?? null : null) })),
       primaryIndex,
       focusIndex: mode === "focus" ? (active.some((s) => s.index === focusIndex) ? focusIndex : active[0]?.index ?? null) : null,
       mode,
@@ -78,7 +87,7 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
       fit: defaults.fit,
     });
     return result;
-  }, [size, active, aspects, primaryIndex, focusIndex, mode, defaults.fit]);
+  }, [size, active, aspects, learnedAspects, primaryIndex, focusIndex, mode, defaults.fit]);
   useEffect(() => { prevLayoutId.current = layout.id; }, [layout.id]);
 
   // Keyboard system for the active player (Media screen only; never while typing).
@@ -123,6 +132,26 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
+
+  // Immersive: pointer reveals the overlay; Esc reveals it, then exits. Capture
+  // phase so it owns Escape here without touching the privacy hotkey (global/native).
+  useEffect(() => {
+    if (!immersive) return;
+    const onMove = () => controls.reveal();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!controls.visible) controls.reveal();
+      else useMediaStore.getState().setImmersive(false);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [immersive, controls]);
 
   const onClear = () => {
     if (loaded === 0) return;
@@ -176,9 +205,17 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
   }
 
   return (
-    <div className="flex h-full flex-col gap-3">
-      {/* Master bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className={cn("relative flex h-full flex-col", immersive ? "gap-0" : "gap-3")}>
+      {/* Master bar — a fading translucent overlay in immersive mode, in-flow otherwise. */}
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3",
+          immersive && "absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/85 via-black/45 to-transparent px-4 py-3 transition-opacity duration-300",
+          immersive && !controls.visible && "pointer-events-none opacity-0",
+        )}
+        onMouseEnter={() => immersive && controls.hold(true)}
+        onMouseLeave={() => immersive && controls.hold(false)}
+      >
         <div className="flex items-center gap-1">
           <Ctl onClick={anyPlaying ? store.pauseAll : store.playAll} label={anyPlaying ? "Pause all" : "Play all"} primary>{anyPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}</Ctl>
           <Ctl onClick={() => store.muteAll(!anyMuted)} label={anyMuted ? "Unmute all" : "Mute all"}>{anyMuted ? <Volume2 size={14} /> : <VolumeX size={14} />}</Ctl>
@@ -200,13 +237,14 @@ export function VideoWall({ items, onOpenLibrary, onAuthorize, realMode }: Props
           {loaded < SLOT_COUNT && <Ctl onClick={addBrowserSurface} label="Add browser surface (isolated web page)"><Globe size={14} /></Ctl>}
           <Ctl onClick={() => setShowSaved(true)} label="Saved workspaces"><Save size={14} /></Ctl>
           <Ctl onClick={() => setShowKeys((v) => !v)} label="Keyboard shortcuts (?)" active={showKeys}><Keyboard size={14} /></Ctl>
+          <Ctl onClick={() => store.toggleImmersive()} label={immersive ? "Exit immersive (Esc)" : "Immersive — edge to edge"} active={immersive}>{immersive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</Ctl>
           <Ctl onClick={onClear} label="Clear wall"><Trash2 size={14} /></Ctl>
           <Ctl onClick={() => activatePrivacy("ui")} label="Privacy (Ctrl+Shift+`)"><ShieldOff size={14} /></Ctl>
         </div>
       </div>
 
       {/* The wall */}
-      <div ref={containerRef} data-wall className={cn("relative min-h-0 flex-1 overflow-hidden bg-black", dropHint && "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]")} onMouseDown={(e) => { if (e.target === e.currentTarget) store.setActiveIndex(null); }} onDragOver={onDragOver} onDragLeave={() => setDropHint(false)} onDrop={(e) => onDrop(e)}>
+      <div ref={containerRef} data-wall className={cn("relative min-h-0 flex-1 overflow-hidden bg-black", dropHint && "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]")} onMouseDown={(e) => { if (e.target === e.currentTarget) store.setActiveIndex(null); }} onMouseMove={immersive ? () => controls.reveal() : undefined} onDragOver={onDragOver} onDragLeave={() => setDropHint(false)} onDrop={(e) => onDrop(e)}>
         {size.width > 0 && layout.tiles.map((tile) => {
           const slot = slots[tile.index]!;
           if (slot.browser && !slot.itemId) return <BrowserTile key={slot.index} slot={slot} tile={tile} isPrimary={primaryIndex === slot.index} isActive={activeIndex === slot.index} onActivate={store.setActiveIndex} />;

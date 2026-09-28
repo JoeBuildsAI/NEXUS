@@ -146,7 +146,7 @@ export const DEFAULT_SETTINGS: SettingsData = {
   appearance: DEFAULT_APPEARANCE,
   startup: { launchOnLogin: false, startMinimized: false, startupAnimation: true },
   gaming: { gamingModeEnabled: true, approvedBackgroundApps: ["Spotify.exe", "Discord.exe"], defaultLauncher: "steam" },
-  media: { authorizedFolders: [], defaultColumns: 3, defaultRows: 2, pauseOnHide: true, thumbnails: false, restoreWorkspace: true },
+  media: { authorizedFolders: [], defaultColumns: 3, defaultRows: 2, pauseOnHide: true, thumbnails: true, restoreWorkspace: true },
   privacy: { hotkey: "CommandOrControl+Shift+`", action: "home", stopPlaybackOnTrigger: true, clearWorkspaceOnTrigger: false },
   system: { safety: "observe", allowStartupChanges: false, allowProcessManagement: false, activityHistory: true, preferredGpu: null },
   ai: { provider: "local", localCommandMode: true, inboxMode: "off" },

@@ -110,6 +110,77 @@ describe("layout optimizer", () => {
     const r = run([null, null]);
     expect(r.tiles).toHaveLength(2);
   });
+
+  it("2–4 portrait videos pack into a single row of tall, narrow tiles (not a wasteful grid)", () => {
+    // On a landscape wall the efficient packing for a handful of portraits is a row of
+    // full-height columns — each tile taller than wide — rather than 16:9-shaped cells.
+    for (const n of [2, 3, 4]) {
+      const r = run(Array(n).fill(P));
+      expect(r.tiles).toHaveLength(n);
+      expect(noOverlap(r.tiles)).toBe(true);
+      expect(r.tiles.every((t) => t.height > t.width)).toBe(true);
+    }
+  });
+
+  it("all-portrait sets keep useful coverage and never overlap for every count", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const r = run(Array(n).fill(P), { width: 1920, height: 1080 });
+      expect(r.tiles).toHaveLength(n);
+      expect(noOverlap(r.tiles)).toBe(true);
+      expect(r.coverage).toBeGreaterThan(0.4);
+    }
+  });
+
+  it("all-landscape sets stay high-coverage and non-overlapping for every count", () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const r = run(Array(n).fill(L), { width: 1920, height: 1080 });
+      expect(r.tiles).toHaveLength(n);
+      expect(noOverlap(r.tiles)).toBe(true);
+      expect(r.coverage).toBeGreaterThan(0.45);
+    }
+    // Four 16:9 videos tile a 16:9 wall almost perfectly (2×2 of 16:9 cells).
+    expect(run(Array(4).fill(L), { width: 1920, height: 1080 }).coverage).toBeGreaterThan(0.9);
+  });
+
+  it("every count 1..6 produces exactly n non-overlapping tiles above the minimum size", () => {
+    for (let n = 1; n <= 6; n++) {
+      const r = run(Array(n).fill(L), { width: 1800, height: 940 });
+      expect(r.tiles).toHaveLength(n);
+      expect(noOverlap(r.tiles)).toBe(true);
+      expect(r.tiles.every((t) => t.width >= 160 && t.height >= 90)).toBe(true);
+    }
+  });
+
+  it("a mixed 6-video set packs without overlap and keeps good coverage", () => {
+    const r = run([L, P, L, P, L, P], { width: 1920, height: 1080 });
+    expect(r.tiles).toHaveLength(6);
+    expect(noOverlap(r.tiles)).toBe(true);
+    expect(r.coverage).toBeGreaterThan(0.6);
+  });
+
+  it("no-distortion invariant: smart fill only crops within the bounded threshold, never stretches", () => {
+    // For every tile the layout produces, the chosen fit is contain or cover — never a
+    // distorting scale — and when it covers, the cropped fraction stays within budget.
+    for (const set of [[P, P, P], [L, L, L, L], [L, P, L, P], [P, L, P, L, P, L]]) {
+      const r = run(set);
+      for (const t of r.tiles) {
+        const src = set[r.tiles.indexOf(t)]!;
+        const tileAspect = t.width / t.height;
+        const fit = resolveFit("smart", tileAspect, src);
+        expect(fit === "contain" || fit === "cover").toBe(true);
+        if (fit === "cover") expect(cropFraction(tileAspect, src)).toBeLessThanOrEqual(SMART_FILL_MAX_CROP + 1e-9);
+      }
+    }
+  });
+
+  it("re-layouts deterministically when a video is added or removed", () => {
+    const two = run([L, L]);
+    const three = run([L, L, P]);
+    const back = run([L, L]);
+    expect(three.tiles).toHaveLength(3);
+    expect(noOverlap(three.tiles)).toBe(true);
+    expect(back.id).toBe(two.id); // removing returns to the same arrangement
+  });
 });
 
 describe("fit resolution", () => {

@@ -56,11 +56,22 @@ export function MediaScreen() {
     if (!restoreWorkspace && !revealed && loadedSlots > 0) useMediaStore.getState().clearAll();
   }, [restoreWorkspace, revealed, loadedSlots]);
   const curtain = mode === "real" && restoreWorkspace && !revealed && loadedSlots > 0;
+  const immersive = useMediaStore((st) => st.immersive);
+  const immersiveActive = tab === "workspace" && immersive && !offline && !curtain && !(mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0);
 
   const authorize = async () => {
     const r = await provider.authorizeRoot();
     if (r) { notify.success("Folder authorized", "Indexing"); await provider.scanRoot?.(r.id).catch(() => undefined); reload(); }
   };
+
+  // Immersive: the wall uses the whole content area — no header, max-width or padding.
+  if (immersiveActive) {
+    return (
+      <div className="h-full w-full">
+        <VideoWall items={items ?? []} onOpenLibrary={() => setTab("library")} onAuthorize={() => void authorize()} realMode={mode === "real"} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">

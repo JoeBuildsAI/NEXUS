@@ -1,6 +1,48 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useMediaStore } from "./mediaStore";
 
+describe("learned aspect ratios", () => {
+  beforeEach(() => useMediaStore.getState().clearPrivateWorkspace());
+
+  it("remembers a valid intrinsic aspect per item and ignores junk", () => {
+    const s = useMediaStore.getState();
+    s.learnAspect("vid-portrait", 9 / 16);
+    s.learnAspect("vid-wide", 16 / 9);
+    s.learnAspect("vid-bad", 0);
+    s.learnAspect("vid-nan", Number.NaN);
+    const learned = useMediaStore.getState().learnedAspects;
+    expect(learned["vid-portrait"]).toBeCloseTo(9 / 16);
+    expect(learned["vid-wide"]).toBeCloseTo(16 / 9);
+    expect("vid-bad" in learned).toBe(false);
+    expect("vid-nan" in learned).toBe(false);
+  });
+
+  it("clearing the private workspace forgets learned aspects", () => {
+    const s = useMediaStore.getState();
+    s.learnAspect("vid", 9 / 16);
+    expect(Object.keys(useMediaStore.getState().learnedAspects)).toContain("vid");
+    useMediaStore.getState().clearPrivateWorkspace();
+    expect(useMediaStore.getState().learnedAspects).toEqual({});
+  });
+});
+
+describe("immersive wall mode", () => {
+  beforeEach(() => useMediaStore.getState().clearPrivateWorkspace());
+
+  it("toggles and is cleared when the wall is cleared or made private", () => {
+    const s = useMediaStore.getState();
+    expect(useMediaStore.getState().immersive).toBe(false);
+    s.toggleImmersive();
+    expect(useMediaStore.getState().immersive).toBe(true);
+    s.setImmersive(true);
+    useMediaStore.getState().clearAll();
+    expect(useMediaStore.getState().immersive).toBe(false);
+    useMediaStore.getState().setImmersive(true);
+    useMediaStore.getState().clearPrivateWorkspace();
+    expect(useMediaStore.getState().immersive).toBe(false);
+  });
+});
+
 describe("media workspace store", () => {
   beforeEach(() => useMediaStore.getState().clearPrivateWorkspace());
 
