@@ -4,6 +4,7 @@ import { useModeStore } from "./modeStore";
 import { notify } from "./toastStore";
 import { createLogger } from "@/lib/logger";
 import { activity } from "./activityStore";
+import { native } from "@/providers/system/nativeBridge";
 
 const log = createLogger("session");
 
@@ -30,6 +31,15 @@ function stop() {
   timer = null;
 }
 
+/** Steam asks its provider; other launchers (Xbox) use the discovered install folder. */
+async function isRunning(gameId: string): Promise<boolean> {
+  const steam = getProviders().steam;
+  if (!gameId.startsWith("xbox:")) return steam.isGameRunning ? steam.isGameRunning(gameId).catch(() => false) : false;
+  const { useLibraryStore } = await import("./libraryStore");
+  const dir = useLibraryStore.getState().games.find((g) => g.id === gameId)?.installPath;
+  return dir ? native.runningUnder(dir) : false;
+}
+
 /**
  * Tracks a launched game externally: after a launch request, NEXUS polls for a
  * process running under the game's install folder (read-only enumeration). No
@@ -48,8 +58,7 @@ export const useGameSessionStore = create<GameSessionState>((set, get) => ({
     useModeStore.getState().setGameRunning(true);
 
     const probe = async () => {
-      const steam = getProviders().steam;
-      const running = steam.isGameRunning ? await steam.isGameRunning(gameId).catch(() => false) : false;
+      const running = await isRunning(gameId);
       const { phase } = get();
       if (phase === "launch-requested") {
         if (running) {

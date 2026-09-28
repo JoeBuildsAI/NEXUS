@@ -69,9 +69,23 @@ filenames, credentials, or private media history. Privacy‑relevant guarantees:
 
 The WebView CSP restricts `connect-src` to the app + IPC, disallows remote
 scripts, and scopes media/image sources. See `src-tauri/tauri.conf.json`.
+The `index.html` meta policy applies too (the stricter wins); both must allow
+`http://asset.localhost` for local artwork/media (`src/app/csp.test.ts`).
+`frame-src https:` plus the browser-surface address policy keep NEXUS's own
+origins, loopback and private hosts out of iframes.
+
+### Remote pages (browser surfaces)
+
+Verified against the release build in WebView2: Tauri injects its IPC shim
+into every frame, but a remote `https://` iframe is refused by the ACL for
+every command — application commands (telemetry, process close, power plan,
+media roots, secrets, session), core commands (app, event, window) and plugin
+commands (sql, autostart) — and direct `ipc.localhost` requests fail. The
+capability lists only the local `main` window; never add remote URLs to it.
 
 ## Capabilities
 
 Tauri capabilities (`src-tauri/capabilities/default.json`) grant only the
 specific window/plugin permissions the app needs (window controls, tray,
-dialog open, fs read, autostart toggle, global‑shortcut register).
+dialog open, autostart toggle). The privacy hotkey is registered natively,
+so no global-shortcut permission is exposed to the WebView.
