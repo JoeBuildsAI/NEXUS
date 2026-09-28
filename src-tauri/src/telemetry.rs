@@ -95,6 +95,14 @@ pub struct TelemetrySnapshot {
     health: String,
 }
 
+/// "13th Gen Intel(R) Core(TM) i7-13700K" → "13th Gen Intel Core i7-13700K".
+pub fn clean_cpu_name(brand: &str) -> String {
+    let s = brand.replace("(R)", "").replace("(r)", "").replace("(TM)", "").replace("(tm)", "");
+    let s = s.split(" @ ").next().unwrap_or(&s).replace(" CPU", "");
+    let out = s.split_whitespace().filter(|w| !w.eq_ignore_ascii_case("processor")).collect::<Vec<_>>().join(" ");
+    if out.is_empty() { brand.trim().to_string() } else { out }
+}
+
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -155,7 +163,7 @@ pub fn get_telemetry(state: State<AppState>, gpu_state: State<crate::gpu::GpuSta
     let cpu_name = sys
         .cpus()
         .first()
-        .map(|c| c.brand().trim().to_string())
+        .map(|c| clean_cpu_name(c.brand()))
         .unwrap_or_else(|| "CPU".to_string());
     let cores = sys.cpus().len();
 
@@ -171,14 +179,17 @@ pub fn get_telemetry(state: State<AppState>, gpu_state: State<crate::gpu::GpuSta
     let mut networks = state.networks.lock().map_err(|e| e.to_string())?;
     networks.refresh();
     let (mut total_rx, mut total_tx) = (0u64, 0u64);
-    let mut iface: Option<String> = None;
+    // Label the adapter carrying the most traffic since the last poll (map order is arbitrary).
+    let mut busiest: Option<(u64, String)> = None;
     for (name, data) in networks.iter() {
         total_rx += data.total_received();
         total_tx += data.total_transmitted();
-        if iface.is_none() && data.total_received() > 0 {
-            iface = Some(name.clone());
+        let recent = data.received() + data.transmitted();
+        if data.total_received() > 0 && busiest.as_ref().map_or(true, |(b, _)| recent > *b) {
+            busiest = Some((recent, name.clone()));
         }
     }
+    let iface = busiest.map(|(_, n)| n);
     let mut last = state.last_net.lock().map_err(|e| e.to_string())?;
     let (down_rate, up_rate) = match *last {
         Some((prev_t, prev_rx, prev_tx)) => {
@@ -246,4 +257,17 @@ pub fn get_telemetry(state: State<AppState>, gpu_state: State<crate::gpu::GpuSta
 #[tauri::command]
 pub fn get_drives() -> Result<Vec<DriveInfo>, String> {
     Ok(collect_drives())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_cpu_name;
+
+    #[test]
+    fn cpu_names_drop_trademark_noise() {
+        assert_eq!(clean_cpu_name("13th Gen Intel(R) Core(TM) i7-13700K"), "13th Gen Intel Core i7-13700K");
+        assert_eq!(clean_cpu_name("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz"), "Intel Core i7-8700K");
+        assert_eq!(clean_cpu_name("AMD Ryzen 9 7950X 16-Core Processor           "), "AMD Ryzen 9 7950X 16-Core");
+        assert_eq!(clean_cpu_name("  "), "");
+    }
 }

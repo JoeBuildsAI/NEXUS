@@ -132,7 +132,7 @@ pub fn collect() -> HardwareInventory {
     sys.refresh_cpu_all();
     sys.refresh_memory();
     HardwareInventory {
-        cpu_name: sys.cpus().first().map(|c| c.brand().trim().to_string()).unwrap_or_else(|| "CPU".into()),
+        cpu_name: sys.cpus().first().map(|c| crate::telemetry::clean_cpu_name(c.brand())).unwrap_or_else(|| "CPU".into()),
         logical_cores: sys.cpus().len(),
         physical_cores: sys.physical_core_count(),
         total_memory_bytes: sys.total_memory(),
