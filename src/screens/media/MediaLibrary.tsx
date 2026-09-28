@@ -5,6 +5,8 @@ import { useAsync } from "@/hooks/useAsync";
 import { useThumbnails } from "@/hooks/useThumbnails";
 import { getProviders } from "@/providers";
 import { useMediaStore } from "@/state/mediaStore";
+import { useMediaLibraryStore } from "@/state/mediaLibraryStore";
+import { withThumbnails } from "@/core/media/thumbnails";
 import { notify } from "@/state/toastStore";
 import type { MediaCollection, MediaItem } from "@/core/types";
 import { formatBytes, formatDuration, formatRelativeTime } from "@/lib/utils";
@@ -13,8 +15,11 @@ import { cn } from "@/lib/utils";
 type View = "library" | "favorites" | "recent" | "collections";
 
 /** Local browsing. Folder names and counts only — paths stay out of the interface. */
-export function MediaLibrary({ view, items, onChanged }: { view: View; items: readonly MediaItem[]; onChanged: () => void }) {
+export function MediaLibrary({ view, items: listed, onChanged }: { view: View; items: readonly MediaItem[]; onChanged: () => void }) {
   const provider = useMemo(() => getProviders().media, []);
+  // Thumbnails arrive in the store after the item list was loaded; overlay them live.
+  const thumbs = useMediaLibraryStore((s) => s.thumbs);
+  const items = useMemo(() => withThumbnails(listed, thumbs), [listed, thumbs]);
   const { data: collections, reload: reloadCollections } = useAsync<readonly MediaCollection[]>(() => provider.getCollections(), [items.length, view]);
   const [collection, setCollection] = useState<string | null>(null);
   const [folder, setFolder] = useState<string>("");

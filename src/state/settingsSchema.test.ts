@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeSettings } from "./settingsSchema";
+import { migrateSettings, sanitizeSettings } from "./settingsSchema";
 import { DEFAULT_SETTINGS } from "./settingsStore";
+
+describe("settings migration", () => {
+  it("v3 installs that persisted the old thumbnails=false default adopt thumbnails once", () => {
+    const v3 = { ...DEFAULT_SETTINGS, media: { ...DEFAULT_SETTINGS.media, thumbnails: false } };
+    expect(migrateSettings(v3, 3, DEFAULT_SETTINGS).media.thumbnails).toBe(true);
+    expect(migrateSettings(v3, 3, DEFAULT_SETTINGS).media.pauseOnHide).toBe(v3.media.pauseOnHide);
+  });
+  it("an explicit off saved as v4 is respected", () => {
+    const v4 = { ...DEFAULT_SETTINGS, media: { ...DEFAULT_SETTINGS.media, thumbnails: false } };
+    expect(migrateSettings(v4, 4, DEFAULT_SETTINGS).media.thumbnails).toBe(false);
+  });
+});
 
 describe("settings sanitization", () => {
   it("returns defaults for garbage", () => {
@@ -45,7 +57,7 @@ describe("settings sanitization", () => {
     expect(s.appearance.backgroundImage).toBeNull();
     expect(s.system.safety).toBe("enabled");
     expect(s.system.activityHistory).toBe(true);
-    expect(s.media.thumbnails).toBe(false);
+    expect(s.media.thumbnails).toBe(DEFAULT_SETTINGS.media.thumbnails);
   });
 
   it("bounds string lengths", () => {

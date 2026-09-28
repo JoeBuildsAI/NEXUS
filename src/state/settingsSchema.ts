@@ -19,7 +19,18 @@ export interface SettingsData {
   data: DataSettings;
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
+
+/**
+ * Versioned migration on top of sanitizing. v4: local thumbnails became the
+ * default, but installs that persisted the old default (false) never saw it —
+ * adopt it once; a later "off" is a real choice and is kept (it persists as v4).
+ */
+export function migrateSettings(persisted: unknown, fromVersion: number, defaults: SettingsData): SettingsData {
+  const s = sanitizeSettings(persisted, defaults);
+  if (fromVersion < 4) s.media = { ...s.media, thumbnails: true };
+  return s;
+}
 
 /** Coerce anything persisted (any version, any corruption) into valid settings. */
 export function sanitizeSettings(persisted: unknown, defaults: SettingsData): SettingsData {

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { safeStorage } from "./persistence";
-import { sanitizeSettings, SETTINGS_VERSION, type SettingsData } from "./settingsSchema";
+import { migrateSettings, sanitizeSettings, SETTINGS_VERSION, type SettingsData } from "./settingsSchema";
 
 export type PrivacyAction = "home" | "minimize" | "tray";
 export type EnvironmentPreset = "nexus" | "void" | "aurora" | "neural" | "minimal";
@@ -184,7 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
         return rest as SettingsState;
       },
       // Any persisted shape (older versions, partial, corrupted values) is coerced to valid settings.
-      migrate: (persisted) => sanitizeSettings(persisted, DEFAULT_SETTINGS) as unknown as SettingsState,
+      migrate: (persisted, version) => migrateSettings(persisted, version, DEFAULT_SETTINGS) as unknown as SettingsState,
       merge: (persisted, current) => ({ ...current, ...sanitizeSettings(persisted, DEFAULT_SETTINGS), devPanelOpen: false }),
     },
   ),
