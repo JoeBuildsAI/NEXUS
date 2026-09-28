@@ -33,7 +33,7 @@ async function collect(): Promise<string> {
       autostart = await (await import("@tauri-apps/plugin-autostart")).isEnabled();
     } catch { autostart = null; }
     try {
-      hotkey = await (await import("@tauri-apps/plugin-global-shortcut")).isRegistered(settings.privacy.hotkey);
+      hotkey = (await (await import("@tauri-apps/api/core")).invoke<string | null>("privacy_hotkey_status")) === settings.privacy.hotkey;
     } catch { hotkey = null; }
   }
   const roots = useMediaLibraryStore.getState().roots;

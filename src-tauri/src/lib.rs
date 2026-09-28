@@ -1,6 +1,7 @@
 mod apps;
 mod gpu;
 mod hardware;
+mod hotkey;
 mod life_db;
 mod xbox;
 mod media;
@@ -42,6 +43,7 @@ pub fn run() {
         .manage(steam_api::ApiCache::new())
         .manage(gpu::GpuState::new())
         .manage(oauth::OAuthState::new())
+        .manage(hotkey::HotkeyState::default())
         .setup(|app| {
             setup_tray(app.handle())?;
             if let Some(w) = app.get_webview_window("main") {
@@ -110,6 +112,8 @@ pub fn run() {
             xbox::xbox_inventory,
             xbox::xbox_launch,
             gpu::gpu_set_preferred,
+            hotkey::privacy_hotkey_set,
+            hotkey::privacy_hotkey_status,
             session::session_read,
             session::session_write,
             session::session_clear,

@@ -77,23 +77,19 @@ export function useGlobalHotkeys() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [togglePalette, activatePrivacy, shortcuts, parsedPrivacy]);
 
-  // OS-level global shortcut for privacy (Tauri only), with verification on focus.
+  // OS-level global shortcut for privacy (Tauri only). The native layer owns the
+  // registration (it survives WebView reloads) and emits an event; verified on focus.
   useEffect(() => {
     if (!config.isTauri) return;
     let disposed = false;
-    let registeredAccel: string | null = null;
+    let unlisten: (() => void) | null = null;
     const hk = useHotkeyStore.getState();
+    void import("@tauri-apps/api/event").then(({ listen }) => listen("nexus:privacy-hotkey", () => activatePrivacy("hotkey"))).then((u) => { if (disposed) u(); else unlisten = u; });
 
     const register = async () => {
       try {
-        const mod = await import("@tauri-apps/plugin-global-shortcut");
-        // A registration left over from a previous WebView load can refuse to
-        // unregister; unregisterAll clears this app's shortcuts natively.
-        if (await mod.isRegistered(privacyHotkey)) await mod.unregister(privacyHotkey).catch(() => mod.unregisterAll());
-        await mod.register(privacyHotkey, (ev) => {
-          if (ev.state === "Pressed") activatePrivacy("hotkey");
-        });
-        registeredAccel = privacyHotkey;
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("privacy_hotkey_set", { accelerator: privacyHotkey });
         if (!disposed) hk.set({ registered: true, error: null, accelerator: privacyHotkey });
       } catch (err) {
         const message = String((err as Error)?.message ?? err);
@@ -107,19 +103,13 @@ export function useGlobalHotkeys() {
     };
     void register();
 
-    const verify = async () => {
-      try {
-        const mod = await import("@tauri-apps/plugin-global-shortcut");
-        if (!(await mod.isRegistered(privacyHotkey))) await register();
-      } catch {
-        /* plugin unavailable */
-      }
-    };
+    // Idempotent natively: re-confirms after sleep or a lost registration.
+    const verify = () => void register();
     window.addEventListener("focus", verify);
     return () => {
       disposed = true;
+      unlisten?.();
       window.removeEventListener("focus", verify);
-      if (registeredAccel) void import("@tauri-apps/plugin-global-shortcut").then((m) => m.unregister(registeredAccel!)).catch(() => undefined);
     };
   }, [privacyHotkey, activatePrivacy]);
 }
