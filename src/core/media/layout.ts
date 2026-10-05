@@ -77,258 +77,204 @@ export function fitArea(w: number, h: number, sourceAspect: number): number {
   return tileAspect > sourceAspect ? h * h * sourceAspect : (w * w) / sourceAspect;
 }
 
-// ------------------------------------------------------------------ candidates
+// ------------------------------------------------------------- slicing trees
 
-interface Candidate {
-  id: string;
-  /** Normalized rects (0–1) keyed by player order position. */
-  rects: { x: number; y: number; w: number; h: number }[];
+/**
+ * A wall is a guillotine (slicing) tree: every internal node splits its
+ * rectangle side-by-side ("h") or stacked ("v"), leaves hold one video. The
+ * natural aspect of a tree is what its videos need to tile WITHOUT crop:
+ * side-by-side sums aspects, stacked sums inverse aspects. Splits are sized by
+ * those natural aspects, so the whole wall is always covered (no dead regions
+ * by construction) and every tile shares one modest distortion that Smart Fill
+ * absorbs as crop. The search picks the tree + assignment whose natural aspect
+ * best matches the wall, which is what lets portraits and landscapes interlock.
+ */
+type Tree = { kind: "leaf"; pos: number } | { kind: "h" | "v"; a: Tree; b: Tree };
+
+interface TreeCand {
+  tree: Tree;
+  aspect: number;
+  /** Smallest / largest leaf area when laid out at its natural aspect (1 = balanced). */
+  balance: number;
 }
 
-/** Rows of given sizes, equal heights; tiles in a row share width equally. */
-function rowsLayout(sizes: number[], id: string): Candidate {
-  const rects: Candidate["rects"] = [];
-  const rowH = 1 / sizes.length;
-  sizes.forEach((count, r) => {
-    for (let c = 0; c < count; c++) rects.push({ x: c / count, y: r * rowH, w: 1 / count, h: rowH });
-  });
-  return { id, rects };
+function naturalAspect(kind: "h" | "v", a: number, b: number): number {
+  return kind === "h" ? a + b : 1 / (1 / a + 1 / b);
 }
 
-/** Columns of given sizes (transpose of rows). */
-function colsLayout(sizes: number[], id: string): Candidate {
-  const rects: Candidate["rects"] = [];
-  const colW = 1 / sizes.length;
-  sizes.forEach((count, c) => {
-    for (let r = 0; r < count; r++) rects.push({ x: c * colW, y: r / count, w: colW, h: 1 / count });
-  });
-  return { id, rects };
-}
-
-/** Primary tile taking `frac` of the width (left) with the rest stacked vertically on the right. */
-function primaryLeft(n: number, frac: number, id: string): Candidate {
-  const rects: Candidate["rects"] = [{ x: 0, y: 0, w: frac, h: 1 }];
-  const rest = n - 1;
-  for (let i = 0; i < rest; i++) rects.push({ x: frac, y: i / rest, w: 1 - frac, h: 1 / rest });
-  return { id, rects };
-}
-
-/** Primary tile taking `frac` of the height (top) with the rest in a row below. */
-function primaryTop(n: number, frac: number, id: string): Candidate {
-  const rects: Candidate["rects"] = [{ x: 0, y: 0, w: 1, h: frac }];
-  const rest = n - 1;
-  for (let i = 0; i < rest; i++) rects.push({ x: i / rest, y: frac, w: 1 / rest, h: 1 - frac });
-  return { id, rects };
-}
-
-/** Primary left, secondaries in a 2-column block on the right (for 5–6 players). */
-function primaryLeftGrid(n: number, frac: number, id: string): Candidate {
-  const rects: Candidate["rects"] = [{ x: 0, y: 0, w: frac, h: 1 }];
-  const rest = n - 1;
-  const cols = 2;
-  const rows = Math.ceil(rest / cols);
-  for (let i = 0; i < rest; i++) {
-    const r = Math.floor(i / cols);
-    const c = i % cols;
-    const inRow = Math.min(cols, rest - r * cols);
-    rects.push({ x: frac + (c / inRow) * (1 - frac), y: r / rows, w: (1 - frac) / inRow, h: 1 / rows });
+/** Leaf areas of a tree laid out at its natural aspect with unit height. */
+function leafAreas(t: Tree, aspects: readonly number[], w: number, h: number, out: number[]): void {
+  if (t.kind === "leaf") {
+    out.push(w * h);
+    return;
   }
-  return { id, rects };
+  const aa = treeAspect(t.a, aspects);
+  const ab = treeAspect(t.b, aspects);
+  if (t.kind === "h") {
+    const wa = (w * aa) / (aa + ab);
+    leafAreas(t.a, aspects, wa, h, out);
+    leafAreas(t.b, aspects, w - wa, h, out);
+  } else {
+    const ha = (h * (1 / aa)) / (1 / aa + 1 / ab);
+    leafAreas(t.a, aspects, w, ha, out);
+    leafAreas(t.b, aspects, w, h - ha, out);
+  }
+}
+
+function treeAspect(t: Tree, aspects: readonly number[]): number {
+  return t.kind === "leaf" ? aspects[t.pos]! : naturalAspect(t.kind, treeAspect(t.a, aspects), treeAspect(t.b, aspects));
+}
+
+function treeId(t: Tree, ordered: readonly LayoutPlayer[]): string {
+  return t.kind === "leaf" ? String(ordered[t.pos]!.index) : `${t.kind}(${treeId(t.a, ordered)},${treeId(t.b, ordered)})`;
+}
+
+/** Keep a bounded, diverse set per subset: best balance per aspect bucket. */
+const BUCKETS_PER_SUBSET = 24;
+function prune(cands: TreeCand[]): TreeCand[] {
+  const byBucket = new Map<number, TreeCand>();
+  for (const c of cands) {
+    const k = Math.round(Math.log(c.aspect) * 10);
+    const cur = byBucket.get(k);
+    if (!cur || c.balance > cur.balance + 1e-9) byBucket.set(k, c);
+  }
+  return [...byBucket.values()].sort((x, y) => y.balance - x.balance || x.aspect - y.aspect).slice(0, BUCKETS_PER_SUBSET);
 }
 
 /**
- * Aspect-weighted rows: within a row every tile gets width ∝ its aspect (so all
- * tiles in the row share the row height without letterboxing), and rows get
- * height ∝ 1/Σaspect so each row spans the full width. Perfect packing when
- * the sources cooperate; the scorer decides when it beats a uniform grid.
+ * All slicing trees over every assignment of the n (≤ 6) videos, built bottom-up
+ * over subsets. Intermediate subsets are pruned to a bounded diverse set; the
+ * full set is enumerated exhaustively from those. Deterministic.
  */
-function weightedRows(sizes: number[], aspects: number[], id: string): Candidate {
-  const rects: Candidate["rects"] = [];
-  let k = 0;
-  const sums = sizes.map((count) => aspects.slice(k, (k += count)).reduce((a, b) => a + b, 0));
-  const inv = sums.map((s) => 1 / s);
-  const total = inv.reduce((a, b) => a + b, 0);
-  let y = 0;
-  k = 0;
-  sizes.forEach((count, r) => {
-    const h = inv[r]! / total;
-    let x = 0;
-    for (let c = 0; c < count; c++) {
-      const w = aspects[k + c]! / sums[r]!;
-      rects.push({ x, y, w, h });
-      x += w;
+export function slicingCandidates(aspects: readonly number[]): TreeCand[] {
+  const n = aspects.length;
+  const full = (1 << n) - 1;
+  const memo = new Map<number, TreeCand[]>();
+  const build = (mask: number): TreeCand[] => {
+    const hit = memo.get(mask);
+    if (hit) return hit;
+    let out: TreeCand[];
+    if ((mask & (mask - 1)) === 0) {
+      const pos = Math.log2(mask);
+      out = [{ tree: { kind: "leaf", pos }, aspect: aspects[pos]!, balance: 1 }];
+    } else {
+      out = [];
+      const low = mask & -mask;
+      // Submasks containing the lowest bit: each unordered split once.
+      for (let a = (mask - 1) & mask; a > 0; a = (a - 1) & mask) {
+        if (!(a & low)) continue;
+        const b = mask ^ a;
+        for (const ca of build(a)) for (const cb of build(b)) {
+          for (const kind of ["h", "v"] as const) {
+            for (const [x, y] of [[ca, cb], [cb, ca]] as const) {
+              const tree: Tree = { kind, a: x.tree, b: y.tree };
+              const aspect = naturalAspect(kind, x.aspect, y.aspect);
+              const areas: number[] = [];
+              leafAreas(tree, aspects, aspect, 1, areas);
+              out.push({ tree, aspect, balance: Math.min(...areas) / Math.max(...areas) });
+            }
+          }
+        }
+      }
+      if (mask !== full) out = prune(out);
     }
-    k += count;
-    y += h;
-  });
-  return { id, rects };
-}
-
-/** Transpose of weightedRows: columns of stacked tiles, heights ∝ 1/aspect. */
-function weightedCols(sizes: number[], aspects: number[], id: string): Candidate {
-  const rects: Candidate["rects"] = [];
-  let k = 0;
-  const sums = sizes.map((count) => aspects.slice(k, (k += count)).reduce((a, b) => a + 1 / b, 0));
-  const inv = sums.map((s) => 1 / s);
-  const total = inv.reduce((a, b) => a + b, 0);
-  let x = 0;
-  k = 0;
-  sizes.forEach((count, c) => {
-    const w = inv[c]! / total;
-    let y = 0;
-    for (let r = 0; r < count; r++) {
-      const h = 1 / aspects[k + r]! / sums[c]!;
-      rects.push({ x, y, w, h });
-      y += h;
-    }
-    k += count;
-    x += w;
-  });
-  return { id, rects };
-}
-
-/** All compositions of n into up to `maxParts` ordered parts (e.g. 3 → [3],[1,2],[2,1],[1,1,1]). */
-function compositions(n: number, maxParts: number): number[][] {
-  const out: number[][] = [];
-  const walk = (remaining: number, acc: number[]) => {
-    if (remaining === 0) {
-      out.push([...acc]);
-      return;
-    }
-    if (acc.length >= maxParts) return;
-    for (let k = Math.min(remaining, 4); k >= 1; k--) walk(remaining - k, [...acc, k]);
+    memo.set(mask, out);
+    return out;
   };
-  walk(n, []);
-  return out;
+  return build(full);
 }
 
-export function candidatesFor(n: number, mode: WallMode, hasPrimary: boolean, aspects: number[] = [], wallAspect?: number): Candidate[] {
-  if (n <= 0) return [];
-  if (n === 1 || mode === "focus") return [{ id: "single", rects: [{ x: 0, y: 0, w: 1, h: 1 }] }];
-  const out: Candidate[] = [];
-  const wantGrid = mode === "auto" || mode === "grid";
-  const wantPrimary = mode === "auto" || mode === "primary";
-  const mixed = aspects.length === n && new Set(aspects.map((a) => a.toFixed(2))).size > 1;
-  if (wantGrid) {
-    for (const comp of compositions(n, 3)) {
-      // Prefer balanced compositions; skip rows with more than 4 tiles.
-      if (comp.some((k) => k > 4)) continue;
-      out.push(rowsLayout(comp, `rows:${comp.join("-")}`));
-      if (comp.length > 1 || comp[0] !== n) out.push(colsLayout(comp, `cols:${comp.join("-")}`));
-      if (mixed) {
-        out.push(weightedRows(comp, aspects, `wrows:${comp.join("-")}`));
-        out.push(weightedCols(comp, aspects, `wcols:${comp.join("-")}`));
-      }
-    }
+/** Lay a tree into a pixel rect; gutters are taken from the split dimension. */
+function place(t: Tree, aspects: readonly number[], x: number, y: number, w: number, h: number, gap: number, out: { pos: number; x: number; y: number; w: number; h: number }[]): void {
+  if (t.kind === "leaf") {
+    out.push({ pos: t.pos, x, y, w, h });
+    return;
   }
-  // Without an explicit primary, "primary + supporting" only makes sense for 3+ players.
-  if (wantPrimary && (hasPrimary ? n >= 2 : n >= 3)) {
-    for (const frac of [0.6, 0.68, 0.75]) {
-      out.push(primaryLeft(n, frac, `pl:${frac}`));
-      out.push(primaryTop(n, frac, `pt:${frac}`));
-      if (n >= 4) out.push(primaryLeftGrid(n, frac, `plg:${frac}`));
-    }
-    // Primary sized to its own aspect (a portrait primary gets a portrait column).
-    if (wallAspect && aspects[0]) {
-      const fitFrac = Math.min(0.75, Math.max(0.28, aspects[0] / wallAspect));
-      if (fitFrac < 0.58) {
-        const f = Number(fitFrac.toFixed(3));
-        out.push(primaryLeft(n, f, `pla:${f}`));
-        if (n >= 3) out.push(primaryLeftGrid(n, f, `plga:${f}`));
-      }
-    }
+  const aa = treeAspect(t.a, aspects);
+  const ab = treeAspect(t.b, aspects);
+  if (t.kind === "h") {
+    const avail = Math.max(0, w - gap);
+    const wa = Math.round((avail * aa) / (aa + ab));
+    place(t.a, aspects, x, y, wa, h, gap, out);
+    place(t.b, aspects, x + wa + gap, y, w - wa - gap, h, gap, out);
+  } else {
+    const avail = Math.max(0, h - gap);
+    const ha = Math.round((avail * (1 / aa)) / (1 / aa + 1 / ab));
+    place(t.a, aspects, x, y, w, ha, gap, out);
+    place(t.b, aspects, x, y + ha + gap, w, h - ha - gap, gap, out);
   }
-  // Dedupe by geometry: e.g. rows:[1,1] and cols:[2] are the same stacked arrangement.
-  const seen = new Set<string>();
-  return out.filter((c) => {
-    const sig = c.rects.map((r) => [r.x, r.y, r.w, r.h].map((v) => v.toFixed(3)).join(",")).join("|");
-    if (seen.has(sig)) return false;
-    seen.add(sig);
-    return true;
-  });
 }
 
 // --------------------------------------------------------------------- scoring
 
 /**
- * Order players into a candidate: the primary (or focus) player takes the
- * first rect, the rest keep wall order.
+ * Pick the densest wall. Cost terms, in priority order:
+ *   dead area (letterboxed / unused viewport)   — dominant
+ *   tiles below the minimum size or far below an equal share — very high
+ *   Smart Fill crop (area-weighted)             — moderate
+ *   size imbalance between peers                 — mild (strong in Grid)
+ * Primary mode rewards a dominant primary; Focus shows one player.
  */
-function orderPlayers(players: readonly LayoutPlayer[], leadIndex: number | null): LayoutPlayer[] {
-  if (leadIndex == null) return [...players];
-  const lead = players.find((p) => p.index === leadIndex);
-  if (!lead) return [...players];
-  return [lead, ...players.filter((p) => p.index !== leadIndex)];
-}
-
 export function optimizeLayout(input: LayoutInput): LayoutResult {
   const { width, height } = input;
   const gap = input.gap ?? 4;
   const fit = input.fit ?? "smart";
   const minTile = input.minTile ?? { width: 160, height: 90 };
   const players = input.players;
-  const n = players.length;
-  if (n === 0 || width <= 0 || height <= 0) return { id: "empty", tiles: [], score: 0, coverage: 0 };
+  if (players.length === 0 || width <= 0 || height <= 0) return { id: "empty", tiles: [], score: 0, coverage: 0 };
 
-  const lead = input.mode === "focus" ? (input.focusIndex ?? input.primaryIndex ?? players[0]!.index) : input.primaryIndex;
-  const ordered = input.mode === "focus" ? orderPlayers(players, lead).slice(0, 1) : orderPlayers(players, lead);
-  const candidates = candidatesFor(ordered.length, input.mode, input.primaryIndex != null, ordered.map((p) => p.aspect ?? DEFAULT_ASPECT), width / height);
+  const focusLead = input.focusIndex ?? input.primaryIndex ?? players[0]!.index;
+  const ordered = input.mode === "focus" ? [players.find((p) => p.index === focusLead) ?? players[0]!] : [...players];
+  const n = ordered.length;
+  const aspects = ordered.map((p) => (p.aspect && p.aspect > 0 ? p.aspect : DEFAULT_ASPECT));
   const viewportArea = width * height;
-  // A tile far below an equal share reads as an inexplicable sliver on a real wall.
-  const tinyArea = (input.primaryIndex != null ? 0.12 : 0.25) * (viewportArea / ordered.length);
+  const primary = input.mode !== "focus" && input.primaryIndex != null ? input.primaryIndex : null;
+  const equalShare = viewportArea / n;
+  const balanceWeight = input.mode === "grid" ? 0.7 : primary != null ? 0 : 0.45;
 
   let best: LayoutResult | null = null;
-  for (const cand of candidates) {
-    if (cand.rects.length !== ordered.length) continue;
-    let effective = 0;
-    let penalty = 0;
-    let primaryArea = 0;
+  for (const cand of slicingCandidates(aspects)) {
+    const rects: { pos: number; x: number; y: number; w: number; h: number }[] = [];
+    place(cand.tree, aspects, 0, 0, width, height, gap, rects);
+    let shown = 0;
+    let cropArea = 0;
+    let cost = 0;
     let smallest = Infinity;
     let largest = 0;
-    const tiles: Tile[] = cand.rects.map((r, i) => {
-      const p = ordered[i]!;
-      const x = Math.round(r.x * width + (r.x > 0 ? gap / 2 : 0));
-      const y = Math.round(r.y * height + (r.y > 0 ? gap / 2 : 0));
-      const right = Math.round((r.x + r.w) * width - (r.x + r.w < 0.999 ? gap / 2 : 0));
-      const bottom = Math.round((r.y + r.h) * height - (r.y + r.h < 0.999 ? gap / 2 : 0));
-      const w = Math.max(1, right - x);
-      const h = Math.max(1, bottom - y);
-      const aspect = p.aspect ?? DEFAULT_ASPECT;
-      const tileAspect = w / h;
-      const crop = cropFraction(tileAspect, aspect);
-      const tileArea = w * h;
+    let primaryArea = 0;
+    let primaryLargest = true;
+    const tiles: Tile[] = rects.map((r) => {
+      const w = Math.max(1, r.w);
+      const h = Math.max(1, r.h);
+      const area = w * h;
+      const src = aspects[r.pos]!;
+      const crop = cropFraction(w / h, src);
       const covered = fit === "fill" || (fit === "smart" && crop <= SMART_FILL_MAX_CROP);
-      // Covered tiles show the whole tile but lose `crop` of the source; letterboxed tiles show less area.
-      const shown = covered ? tileArea * (1 - 0.6 * crop) : fitArea(w, h, aspect);
-      effective += shown;
-      if (w < minTile.width || h < minTile.height) penalty += 0.25;
-      if (ordered.length > 1 && tileArea < tinyArea) penalty += 0.2;
-      if (tileAspect > 3.2 || tileAspect < 0.3) penalty += 0.08;
-      // Primary share counts displayed video, so a letterboxed portrait primary earns no bonus.
-      if (input.primaryIndex != null && p.index === input.primaryIndex) primaryArea = shown;
-      smallest = Math.min(smallest, tileArea);
-      largest = Math.max(largest, tileArea);
-      return { index: p.index, x, y, width: w, height: h };
+      shown += covered ? area : fitArea(w, h, src);
+      if (covered) cropArea += crop * area;
+      if (w < minTile.width || h < minTile.height) cost += 2;
+      if (n > 1 && area < 0.3 * equalShare) cost += 1.5 * (1 - area / (0.3 * equalShare));
+      smallest = Math.min(smallest, area);
+      largest = Math.max(largest, area);
+      if (primary != null && ordered[r.pos]!.index === primary) primaryArea = area;
+      return { index: ordered[r.pos]!.index, x: r.x, y: r.y, width: w, height: h };
     });
-    const coverage = effective / viewportArea;
-    // Without a primary, players are peers: strongly unequal tiles need a real coverage win.
-    if (input.primaryIndex == null && ordered.length > 1 && largest > 0) penalty += 0.12 * (1 - smallest / largest);
-    let score = coverage - penalty;
-    if (input.primaryIndex != null && input.mode !== "focus") {
+    if (primary != null) primaryLargest = primaryArea >= largest - 1;
+    const coverage = shown / viewportArea;
+    cost += 4 * (1 - coverage);
+    cost += 1.2 * (cropArea / viewportArea);
+    if (n > 1) cost += balanceWeight * (1 - smallest / largest);
+    if (primary != null) {
+      // Primary mode intentionally trades balance (and some crop) for a dominant player.
       const share = primaryArea / viewportArea;
-      // Reward a dominant primary without starving the rest. The target is relative to
-      // what the source can show at full height (a portrait primary can never reach 55%).
-      const reachable = Math.min(1, (ordered[0]!.aspect ?? DEFAULT_ASPECT) / (width / height));
-      const target = Math.min(0.6, 0.9 * reachable);
-      score += 0.35 * Math.min(share, target) - (share < 0.66 * target ? 0.15 : 0);
+      cost -= 1.2 * Math.min(share, 0.6);
+      if (share < 0.4) cost += 0.3;
+      if (!primaryLargest) cost += 1;
     }
-    // No explicit primary: asymmetric arrangements need a clear coverage win to be chosen.
-    if (input.primaryIndex == null && /^(pl|pt|plg|pla|plga):/.test(cand.id)) score -= 0.12;
-    // Deterministic tie-break: side-by-side on landscape walls, stacked on portrait walls.
-    if (cand.id.startsWith(width >= height ? "rows:" : "cols:")) score += 0.001;
-    if (input.previousId && cand.id === input.previousId) score += 0.03;
-    const result: LayoutResult = { id: cand.id, tiles, score, coverage };
-    if (!best || score > best.score + 1e-9 || (Math.abs(score - best.score) <= 1e-9 && cand.id < best.id)) best = result;
+    const id = treeId(cand.tree, ordered);
+    if (input.previousId && id === input.previousId) cost -= 0.02;
+    const result: LayoutResult = { id, tiles: [...tiles].sort((a, b) => a.index - b.index), score: -cost, coverage };
+    if (!best || result.score > best.score + 1e-9 || (Math.abs(result.score - best.score) <= 1e-9 && id < best.id)) best = result;
   }
   return best ?? { id: "empty", tiles: [], score: 0, coverage: 0 };
 }

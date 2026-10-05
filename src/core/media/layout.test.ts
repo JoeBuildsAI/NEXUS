@@ -29,12 +29,14 @@ describe("layout optimizer", () => {
 
   it("two landscape videos on a landscape wall sit side by side (more area than stacked)", () => {
     const r = run([L, L]);
-    expect(r.id).toBe("rows:2");
+    expect(r.tiles[0]!.y).toBe(r.tiles[1]!.y);
+    expect(r.tiles[0]!.x).not.toBe(r.tiles[1]!.x);
     expect(noOverlap(r.tiles)).toBe(true);
   });
 
   it("two portrait videos prefer a side-by-side split; two landscape on a tall wall stack", () => {
-    expect(run([P, P]).id).toBe("rows:2");
+    const pp = run([P, P]);
+    expect(pp.tiles[0]!.y).toBe(pp.tiles[1]!.y);
     const tall = run([L, L], { width: 900, height: 1600 });
     expect(tall.tiles[0]!.x).toBe(tall.tiles[1]!.x); // stacked
     expect(tall.tiles[0]!.y).not.toBe(tall.tiles[1]!.y);
@@ -49,7 +51,6 @@ describe("layout optimizer", () => {
 
   it("a landscape + a portrait video pack by aspect instead of a 50/50 split", () => {
     const r = run([L, P], { width: 1408, height: 700 });
-    expect(r.id.startsWith("wrows") || r.id.startsWith("wcols")).toBe(true);
     const land = r.tiles.find((t) => t.index === 0)!, port = r.tiles.find((t) => t.index === 1)!;
     expect(land.width).toBeGreaterThan(port.width * 2);
     expect(r.coverage).toBeGreaterThan(0.9);
@@ -58,7 +59,6 @@ describe("layout optimizer", () => {
 
   it("four landscape videos become a balanced 2×2", () => {
     const r = run([L, L, L, L]);
-    expect(r.id).toBe("rows:2-2");
     const widths = new Set(r.tiles.map((t) => t.width));
     expect(widths.size).toBe(1);
   });
@@ -78,7 +78,26 @@ describe("layout optimizer", () => {
     const primary = r.tiles.find((t) => t.index === 2)!;
     const share = (primary.width * primary.height) / (1600 * 900);
     expect(share).toBeGreaterThan(0.45);
-    expect(r.id.startsWith("pl") || r.id.startsWith("pt")).toBe(true);
+    expect(r.tiles.every((t) => t.index === 2 || t.width * t.height < primary.width * primary.height)).toBe(true);
+  });
+
+  it("real gaming-PC regression: mixed portrait/landscape walls of 4–6 fill the wall with modest crop, no slivers", () => {
+    // 2560×1440 at 120% text scaling leaves a ~2134×1130 CSS wall.
+    for (const set of [[P, L, P, L], [L, P, L, P, L], [P, L, L, L, P], [L, L, P, P, P], [P, P, P, L, L, L], [L, P, L, P, 21 / 9, 4 / 3]]) {
+      const r = run(set, { width: 2134, height: 1130 });
+      expect(r.tiles).toHaveLength(set.length);
+      expect(noOverlap(r.tiles)).toBe(true);
+      expect(r.coverage, set.join(",")).toBeGreaterThan(0.97); // no large dead regions
+      const areas = r.tiles.map((t) => t.width * t.height);
+      expect(r.tiles.every((t) => t.width >= 160 && t.height >= 90)).toBe(true);
+      expect(Math.min(...areas) / Math.max(...areas)).toBeGreaterThan(0.15);
+      for (const t of r.tiles) {
+        const crop = cropFraction(t.width / t.height, set[t.index]!);
+        expect(crop).toBeLessThanOrEqual(SMART_FILL_MAX_CROP); // covered by Smart Fill, never stretched
+        // Orientation follows the source when it matters (strong portrait never gets a wide tile).
+        if (set[t.index]! < 0.7) expect(t.width / t.height).toBeLessThan(1);
+      }
+    }
   });
 
   it("focus mode shows only the focused player at full size", () => {

@@ -50,6 +50,9 @@ interface NavigationState {
   calendarView: CalendarView;
   calendarDay: string | null;
   commandPaletteOpen: boolean;
+  /** True while a screen needs the whole window (immersive media wall): app chrome takes no space. */
+  chromeHidden: boolean;
+  setChromeHidden: (hidden: boolean) => void;
   setBootPhase: (phase: BootPhase) => void;
   navigate: (screen: Screen) => void;
   setSystemTab: (tab: SystemTab) => void;
@@ -78,6 +81,8 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   calendarView: "day",
   calendarDay: null,
   commandPaletteOpen: false,
+  chromeHidden: false,
+  setChromeHidden: (chromeHidden) => set({ chromeHidden }),
   setBootPhase: (bootPhase) => set({ bootPhase }),
   navigate: (screen) => set({ screen, selectedGameId: null }),
   setSystemTab: (systemTab) => set({ systemTab }),

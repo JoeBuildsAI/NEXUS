@@ -52,6 +52,7 @@ export function App() {
   const gameRunning = useModeStore((s) => s.gameRunning);
   const gamingMode = useModeStore((s) => s.current === "gaming");
   const screen = useNavigationStore((s) => s.screen);
+  const wallImmersive = useNavigationStore((s) => s.chromeHidden) && screen === "media";
   const active = useWindowStore(isWindowActive);
   useEffect(() => wireWindowActivity(), []);
   const interval = telemetryInterval({ active, gameRunning, gamingMode, screen });
@@ -112,9 +113,10 @@ export function App() {
       </AnimatePresence>
 
       <div className="flex h-full flex-col">
-        <TitleBar />
+        {/* Immersive media wall: app chrome takes no layout space (Esc exits). */}
+        {!wallImmersive && <TitleBar />}
         <div className="flex min-h-0 flex-1">
-          <NavRail />
+          {!wallImmersive && <NavRail />}
           <main className="relative min-h-0 flex-1 overflow-hidden">
             <ScreenRouter />
           </main>

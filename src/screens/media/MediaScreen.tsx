@@ -58,6 +58,11 @@ export function MediaScreen() {
   const curtain = mode === "real" && restoreWorkspace && !revealed && loadedSlots > 0;
   const immersive = useMediaStore((st) => st.immersive);
   const immersiveActive = tab === "workspace" && immersive && !offline && !curtain && !(mode === "real" && (items?.length ?? 0) === 0 && rootsCount === 0);
+  // Immersive wall gets the whole window: the app title bar and nav rail take no layout space.
+  useEffect(() => {
+    useNavigationStore.getState().setChromeHidden(immersiveActive);
+    return () => useNavigationStore.getState().setChromeHidden(false);
+  }, [immersiveActive]);
 
   const authorize = async () => {
     const r = await provider.authorizeRoot();
