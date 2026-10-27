@@ -33,7 +33,10 @@ export const native = {
   openVideo: (path: string) => invoke<FolderListing>("open_video", { path }),
   openFolder: (path: string) => invoke<FolderListing>("open_folder", { path }),
   refreshFolder: (folder: string) => invoke<FolderListing>("refresh_folder", { folder }),
-  launchFile: () => (isDesktop ? invoke<string | null>("launch_file") : Promise.resolve(null)),
+  /** The file this window was opened for (Explorer, Open with, new window), claimed once. */
+  takeInitialFile: () => (isDesktop ? invoke<string | null>("take_initial_file") : Promise.resolve(null)),
+  /** A new independent player window, optionally opening `file`. */
+  newWindow: (file?: string) => (isDesktop ? invoke<string>("new_window", { file: file ?? null }) : Promise.resolve("")),
   thumbnail: (path: string) => invoke<string | null>("video_thumbnail", { path }),
   clearThumbnails: () => invoke<number>("clear_thumbnails"),
 

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Film, FolderOpen, RefreshCw } from "lucide-react";
+import { Film, FolderOpen, RefreshCw, SquareArrowOutUpRight } from "lucide-react";
 import type { VideoEntry } from "@/core/native";
 import { native } from "@/core/native";
 import { usePlayer } from "@/state/player";
@@ -35,7 +35,7 @@ export function FolderPanel() {
 }
 
 const Item = memo(function Item({ video, active }: { video: VideoEntry; active: boolean }) {
-  const [node, setNode] = useState<HTMLButtonElement | null>(null);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
   const thumb = useThumbnail(video.path, node);
   const select = usePlayer((s) => s.select);
 
@@ -43,12 +43,19 @@ const Item = memo(function Item({ video, active }: { video: VideoEntry; active: 
     if (active && node) node.scrollIntoView({ block: "nearest" });
   }, [active, node]);
 
+  const openNew = () => void native.newWindow(video.path);
+
   return (
-    <button
+    <div
       ref={setNode}
-      onClick={() => select(video.path)}
+      role="button"
+      tabIndex={0}
+      title="Click to play · Ctrl+click or middle-click to open in a new window"
+      onClick={(e) => (e.ctrlKey ? openNew() : select(video.path))}
+      onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); openNew(); } }}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (e.ctrlKey) openNew(); else select(video.path); } }}
       aria-current={active ? "true" : undefined}
-      className={cn("group flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors", active ? "bg-white/[0.09]" : "hover:bg-white/[0.04]")}
+      className={cn("group relative flex w-full cursor-pointer items-center gap-3 rounded-md p-2 text-left transition-colors", active ? "bg-white/[0.09]" : "hover:bg-white/[0.04]")}
     >
       <div className={cn("relative aspect-video w-[132px] shrink-0 overflow-hidden rounded-[4px] bg-white/[0.04]", active && "ring-1 ring-sky-400/80")}>
         {thumb ? (
@@ -67,7 +74,15 @@ const Item = memo(function Item({ video, active }: { video: VideoEntry; active: 
           {!video.playable && <span className="ml-1 normal-case text-amber-300/70">· may not play</span>}
         </p>
       </div>
-    </button>
+      <button
+        aria-label="Open in new window"
+        title="Open in new window"
+        onClick={(e) => { e.stopPropagation(); openNew(); }}
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded bg-black/70 text-white/60 opacity-0 transition-opacity hover:text-white focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <SquareArrowOutUpRight size={13} />
+      </button>
+    </div>
   );
 });
 

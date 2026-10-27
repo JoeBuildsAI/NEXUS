@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { shortcutFor, type ShortcutAction } from "@/core/shortcuts";
 import { validateSegment } from "@/core/loop";
+import { native } from "@/core/native";
 import { markersOf, usePlayer } from "@/state/player";
 import { playback, useVideo } from "@/state/video";
 import { prevNext } from "@/components/Controls";
@@ -45,6 +46,7 @@ function run(action: ShortcutAction) {
     case "faster": return p.setRate(RATE_STEPS.find((r) => r > p.rate) ?? p.rate);
     case "toggle-panel": return p.togglePanel();
     case "open": return void pickAndOpenVideo();
+    case "new-window": return void native.newWindow();
   }
 }
 

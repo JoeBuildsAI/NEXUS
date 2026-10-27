@@ -2,7 +2,7 @@ export type ShortcutAction =
   | "toggle-play" | "seek-back" | "seek-fwd" | "seek-back-long" | "seek-fwd-long" | "frame-back" | "frame-fwd"
   | "set-a" | "set-b" | "toggle-loop" | "clear-markers" | "jump-a" | "cycle-repeat"
   | "next" | "prev" | "fullscreen" | "exit-fullscreen" | "mute" | "vol-up" | "vol-down"
-  | "slower" | "faster" | "toggle-panel" | "open";
+  | "slower" | "faster" | "toggle-panel" | "open" | "new-window";
 
 interface KeyLike {
   key: string;
@@ -16,7 +16,7 @@ interface KeyLike {
 export function shortcutFor(e: KeyLike): ShortcutAction | null {
   if (e.altKey) return null;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (e.ctrlKey || e.metaKey) return k === "o" ? "open" : null;
+  if (e.ctrlKey || e.metaKey) return k === "o" ? "open" : k === "n" ? "new-window" : null;
   switch (k) {
     case " ": case "k": return "toggle-play";
     case "ArrowLeft": return e.shiftKey ? "seek-back-long" : "seek-back";

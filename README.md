@@ -6,6 +6,7 @@ A high-definition local video player for Windows.
 - **A–B loops.** Set loop start and end at the playhead (`I` / `O`), drag the markers on the timeline, and loop the segment (`L`). Markers are remembered per video.
 - **Repeat.** Off, this video, or the whole folder (`R`).
 - **The folder, at a glance.** Every other video in the same folder, with a real frame from each file. Click to play; `N` / `P` for next / previous.
+- **Many windows.** Like Windows Photos: every video can play in its own window with its own position, volume, speed, repeat and A–B loop. `Ctrl+N`, "Open in new window" in the folder (or Ctrl+click / middle-click), and opening a video from Explorer all create a new window — nothing already playing is replaced. No window limit beyond what your hardware can decode.
 - **Private.** Everything stays on your machine. NEXUS can read only the folder you opened.
 
 ## Keyboard
@@ -26,6 +27,7 @@ A high-definition local video player for Windows.
 | [ / ] | Slower / faster |
 | B | Show / hide the folder |
 | Ctrl+O | Open a video |
+| Ctrl+N | New window |
 
 Drop a video (or a folder) anywhere on the window to open it.
 

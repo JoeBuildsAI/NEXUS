@@ -1,7 +1,7 @@
 {
   "name": "nexus",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "description": "NEXUS - a high-definition local video player with A-B loops and folder browsing",
   "scripts": {

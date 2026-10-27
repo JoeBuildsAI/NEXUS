@@ -2,11 +2,46 @@
 //! Explorer shows, produced by codecs already on the machine. Local only:
 //! cached as PNGs under the app cache dir with hashed names (no filenames on
 //! disk), keyed by path + size + modified time so edited files refresh.
-//! Generation runs off the UI thread.
+//! Generation runs off the UI thread. Shared by every window: one render per
+//! file even when several windows ask at once, and writes are atomic.
 
 use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::Manager;
+
+#[derive(Default)]
+pub struct ThumbState {
+    /// One lock per cache name currently being rendered.
+    inflight: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
+    /// Files Windows had no thumbnail for this session (don't retry per window).
+    no_frame: Mutex<HashSet<String>>,
+}
+
+impl ThumbState {
+    fn lock_for(&self, name: &str) -> Arc<AsyncMutex<()>> {
+        self.inflight.lock().map(|mut m| m.entry(name.to_string()).or_default().clone()).unwrap_or_default()
+    }
+    fn release(&self, name: &str) {
+        if let Ok(mut m) = self.inflight.lock() {
+            // Drop the entry once nobody else holds or waits on it.
+            if m.get(name).map(|l| Arc::strong_count(l) <= 1).unwrap_or(false) {
+                m.remove(name);
+            }
+        }
+    }
+}
+
+/// Write via a temp file + rename so readers never see a partial PNG.
+fn write_atomic(out: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let tmp = out.with_extension(format!("{}.tmp", std::process::id()));
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, out).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })
+}
 
 const THUMB_W: i32 = 480;
 const THUMB_H: i32 = 270;
@@ -29,7 +64,7 @@ pub fn cache_name(path: &Path, size: u64, modified: u64) -> String {
 /// Cached (or freshly rendered) thumbnail path for a video in an opened folder;
 /// None when Windows has no thumbnail for it (unsupported codec, corrupt file).
 #[tauri::command]
-pub async fn video_thumbnail(app: tauri::AppHandle, state: tauri::State<'_, crate::library::LibraryState>, path: String) -> Result<Option<String>, String> {
+pub async fn video_thumbnail(app: tauri::AppHandle, state: tauri::State<'_, crate::library::LibraryState>, thumbs: tauri::State<'_, ThumbState>, path: String) -> Result<Option<String>, String> {
     let p = PathBuf::from(path.trim());
     if !crate::library::in_granted_folder(&state, &p) {
         return Err("File is not in a folder you opened.".into());
@@ -39,18 +74,35 @@ pub async fn video_thumbnail(app: tauri::AppHandle, state: tauri::State<'_, crat
     let dir = thumbs_dir(&app)?;
     // The WebView may read the cache (read-only grant, idempotent).
     let _ = app.asset_protocol_scope().allow_directory(&dir, false);
-    let out = dir.join(format!("{}.png", cache_name(&p, meta.len(), modified)));
-    if out.is_file() {
-        return Ok(Some(crate::library::normalize(&out).to_string_lossy().to_string()));
+    let name = cache_name(&p, meta.len(), modified);
+    let out = dir.join(format!("{name}.png"));
+    let found = |out: &Path| out.is_file().then(|| crate::library::normalize(out).to_string_lossy().to_string());
+    if let Some(hit) = found(&out) {
+        return Ok(Some(hit));
     }
-    let png = tauri::async_runtime::spawn_blocking(move || shell_image(&p, THUMB_W)).await.map_err(|e| e.to_string())?;
-    match png {
-        Some(bytes) => {
-            std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
-            Ok(Some(crate::library::normalize(&out).to_string_lossy().to_string()))
+    let lock = thumbs.lock_for(&name);
+    let result = {
+        let _guard = lock.lock().await;
+        // Another window may have rendered (or failed) it while we waited.
+        if let Some(hit) = found(&out) {
+            Ok(Some(hit))
+        } else if thumbs.no_frame.lock().map(|s| s.contains(&name)).unwrap_or(false) {
+            Ok(None)
+        } else {
+            match tauri::async_runtime::spawn_blocking(move || shell_image(&p, THUMB_W)).await.map_err(|e| e.to_string())? {
+                Some(bytes) => write_atomic(&out, &bytes).map_err(|e| e.to_string()).map(|_| found(&out)),
+                None => {
+                    if let Ok(mut s) = thumbs.no_frame.lock() {
+                        s.insert(name.clone());
+                    }
+                    Ok(None)
+                }
+            }
         }
-        None => Ok(None),
-    }
+    };
+    drop(lock);
+    thumbs.release(&name);
+    result
 }
 
 /// Remove every cached thumbnail.
@@ -159,6 +211,29 @@ mod tests {
         assert_eq!(a, cache_name(Path::new(r"x:\private\VERY SECRET VIDEO.mp4"), 100, 1));
         assert_ne!(a, cache_name(p, 101, 1));
         assert_ne!(a, cache_name(p, 100, 2));
+    }
+
+    #[test]
+    fn atomic_write_leaves_no_temp_file_and_inflight_locks_are_released() {
+        let d = std::env::temp_dir().join(format!("nexus-thumb-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let out = d.join("x.png");
+        write_atomic(&out, b"one").unwrap();
+        write_atomic(&out, b"two").unwrap();
+        assert_eq!(std::fs::read(&out).unwrap(), b"two");
+        assert_eq!(std::fs::read_dir(&d).unwrap().count(), 1);
+        let _ = std::fs::remove_dir_all(d);
+
+        let s = ThumbState::default();
+        let a = s.lock_for("n");
+        let b = s.lock_for("n");
+        assert!(Arc::ptr_eq(&a, &b));
+        drop(a);
+        s.release("n");
+        assert_eq!(s.inflight.lock().unwrap().len(), 1, "kept while another caller holds it");
+        drop(b);
+        s.release("n");
+        assert!(s.inflight.lock().unwrap().is_empty());
     }
 
     #[test]

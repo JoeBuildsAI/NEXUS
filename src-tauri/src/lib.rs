@@ -1,20 +1,44 @@
 mod library;
 mod thumbs;
+mod windows;
 
 use tauri::Manager;
 
-/// NEXUS — a local, high-definition video player: one video at a time with
+/// NEXUS — a local, high-definition video player: one video per window with
 /// precise A–B loop markers, repeat, and the other videos of the same folder
-/// (with real thumbnails) one click away. Everything stays on this machine.
+/// (with real thumbnails) one click away. Any number of independent windows.
+/// Everything stays on this machine.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be first: a second launch (Explorer "Open with", Start menu) is
+        // forwarded here and becomes a new window instead of a second process.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let files = windows::video_args(argv.into_iter().skip(1));
+            if files.is_empty() {
+                let _ = windows::open_window(app, None);
+            }
+            for f in files {
+                let _ = windows::open_window(app, Some(f));
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        // Only the first window's geometry is remembered; extra windows cascade.
+        .plugin(tauri_plugin_window_state::Builder::new().with_filter(|label| label == "main").build())
         .manage(library::LibraryState::default())
+        .manage(windows::WindowState::default())
+        .manage(thumbs::ThumbState::default())
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
                 ensure_on_screen(&w);
+            }
+            // Explorer may pass several files: the first plays in the main window, the rest get their own.
+            let mut files = windows::video_args(std::env::args().skip(1)).into_iter();
+            if let Some(first) = files.next() {
+                app.state::<windows::WindowState>().set_pending("main", first);
+            }
+            for f in files {
+                let _ = windows::open_window(app.handle(), Some(f));
             }
             Ok(())
         })
@@ -22,7 +46,8 @@ pub fn run() {
             library::open_video,
             library::open_folder,
             library::refresh_folder,
-            library::launch_file,
+            windows::new_window,
+            windows::take_initial_file,
             thumbs::video_thumbnail,
             thumbs::clear_thumbnails,
         ])
@@ -30,8 +55,8 @@ pub fn run() {
         .expect("error while running NEXUS");
 }
 
-/// If a restored window position no longer intersects any monitor, re-center it.
-fn ensure_on_screen(w: &tauri::WebviewWindow) {
+/// If a window position no longer intersects any monitor, re-center it.
+pub(crate) fn ensure_on_screen(w: &tauri::WebviewWindow) {
     let (Ok(pos), Ok(size), Ok(monitors)) = (w.outer_position(), w.outer_size(), w.available_monitors()) else { return };
     if monitors.is_empty() {
         return;

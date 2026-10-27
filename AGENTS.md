@@ -44,11 +44,20 @@ env vars (never edit git config).
 - `src-tauri/src/thumbs.rs` — Windows Shell (IShellItemImageFactory) video frames →
   PNG under the app cache dir; hashed names keyed by path+size+mtime; only for files
   in an opened folder; rendered off the UI thread.
+- `src-tauri/src/windows.rs` — independent player windows (labels `main`, `player-N`, no
+  limit), cascade placement, per-label pending file handoff (`take_initial_file`).
+  `tauri-plugin-single-instance` forwards second launches / Explorer "Open with" → new window.
+  Window-state restore applies to `main` only. Capabilities cover `main` and `player-*`.
+- Thumbnails are shared by all windows: one render per file (per-name async lock),
+  atomic writes, session negative cache.
 - `src/core/` — pure, tested logic: `loop.ts` (A–B segment model), `playlist.ts`
-  (repeat/next), `shortcuts.ts` (key map), `native.ts` (the only bridge to Rust).
-- `src/state/player.ts` — zustand store (folder, current video, markers per video,
-  prefs persisted to localStorage); `src/state/video.ts` — live `<video>` state +
-  imperative `playback` handle.
+  (repeat/next), `shortcuts.ts` (key map), `persistence.ts` (shared records),
+  `native.ts` (the only bridge to Rust).
+- `src/state/player.ts` — this window's zustand store (no persist middleware). Each window is
+  its own document, so stores are never shared. Shared localStorage records (persistence.ts):
+  window defaults (read at window start, written on change — seeds the next window only),
+  one A–B preset key per video identity, last file. Never sync playback live across windows.
+- `src/state/video.ts` — live `<video>` state + imperative `playback` handle.
 - `src/components/` — `Player` (stage, per-frame A–B loop via
   `requestVideoFrameCallback`), `Timeline` (draggable A/B handles), `Controls`,
   `FolderPanel` (lazy queued thumbnails via `useThumbnail`), `TitleBar`, `EmptyState`.

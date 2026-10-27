@@ -16,6 +16,7 @@ describe("shortcuts", () => {
 
   it("Ctrl+O opens; other modified keys pass through", () => {
     expect(shortcutFor({ key: "o", ctrlKey: true })).toBe("open");
+    expect(shortcutFor({ key: "N", ctrlKey: true })).toBe("new-window");
     expect(shortcutFor({ key: "c", ctrlKey: true })).toBeNull();
     expect(shortcutFor({ key: "i", altKey: true })).toBeNull();
     expect(shortcutFor({ key: "q" })).toBeNull();

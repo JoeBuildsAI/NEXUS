@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { isDesktop, native, VIDEO_EXTENSIONS } from "@/core/native";
 import { usePlayer } from "@/state/player";
 import { useVideo } from "@/state/video";
+import { loadLastFile } from "@/core/persistence";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { TitleBar } from "@/components/TitleBar";
 import { Player } from "@/components/Player";
@@ -19,13 +20,16 @@ export function App() {
   const [dropping, setDropping] = useState(false);
   useShortcuts();
 
-  // Startup: a file passed by "Open with" wins; otherwise reopen the last video.
+  // Startup: the file this window was created for wins; the first window of a
+  // session otherwise reopens the last video; extra windows start empty.
   useEffect(() => {
+    if (!isDesktop) return;
     void (async () => {
-      const launched = await native.launchFile().catch(() => null);
-      const last = usePlayer.getState().lastFile;
-      if (launched) await usePlayer.getState().openFile(launched);
-      else if (last && isDesktop && !(await usePlayer.getState().openFile(last))) usePlayer.getState().dismissError();
+      const initial = await native.takeInitialFile().catch(() => null);
+      if (initial) return void (await usePlayer.getState().openFile(initial));
+      const w = await native.window();
+      const last = loadLastFile(localStorage);
+      if (w.label === "main" && last && !(await usePlayer.getState().openFile(last))) usePlayer.getState().dismissError();
     })();
   }, []);
 

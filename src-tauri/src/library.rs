@@ -181,12 +181,6 @@ pub fn refresh_folder(app: tauri::AppHandle, state: tauri::State<LibraryState>, 
     grant_and_list(&app, &state, &canon, None)
 }
 
-/// A video passed on the command line ("Open with NEXUS" / double-click).
-#[tauri::command]
-pub fn launch_file() -> Option<String> {
-    std::env::args().skip(1).find(|a| !a.starts_with('-') && video_ext(Path::new(a)).is_some() && Path::new(a).is_file())
-}
-
 /// Whether `file` sits directly inside a folder the user opened (canonical compare).
 pub fn in_granted_folder(state: &LibraryState, file: &Path) -> bool {
     let Ok(canon) = file.canonicalize() else { return false };
