@@ -6,10 +6,8 @@ import path from "node:path";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async ({ command }) => ({
+export default defineConfig(async () => ({
   plugins: [react()],
-  // Dev only: lets the simulation lab load synthetic fixture videos via /@fs/. Never part of a production bundle.
-  define: { __NEXUS_DEV_ROOT__: JSON.stringify(command === "serve" ? process.cwd().split(path.sep).join("/") : "") },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -45,7 +43,6 @@ export default defineConfig(async ({ command }) => ({
         // Stable vendor chunks: app code changes don't invalidate the framework bundle.
         manualChunks: {
           react: ["react", "react-dom"],
-          motion: ["framer-motion"],
           icons: ["lucide-react"],
         },
       },

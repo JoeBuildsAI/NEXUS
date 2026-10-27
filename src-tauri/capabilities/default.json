@@ -1,31 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core capabilities for the NEXUS main window. No shell or filesystem plugin access: launching, media and cleanup go through validated native commands.",
-  "windows": [
-    "main"
-  ],
+  "description": "NEXUS player window. No shell or filesystem plugin access: files are opened through the dialog or validated native commands, and only the opened folder is readable.",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
-    "core:window:allow-unminimize",
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-hide",
-    "core:window:allow-show",
-    "core:window:allow-set-focus",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
     "core:window:allow-start-dragging",
     "core:window:allow-close",
-    "core:app:default",
-    "dialog:allow-open",
-    "autostart:allow-enable",
-    "autostart:allow-disable",
-    "autostart:allow-is-enabled",
-    "sql:default",
-    "sql:allow-execute",
-    "sql:allow-select",
-    "sql:allow-load",
-    "sql:allow-close"
+    "core:window:allow-set-title",
+    "dialog:allow-open"
   ]
 }
